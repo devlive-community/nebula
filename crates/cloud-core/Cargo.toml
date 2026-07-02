@@ -1,0 +1,17 @@
+[package]
+name = "cloud-core"
+version = "0.1.0"
+description = "Shared primitives for hand-written Chinese cloud SDKs: crypto/signing helpers, errors, HTTP"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+hmac = "0.12"
+sha1 = "0.10"
+sha2 = "0.10"
+md-5 = "0.10"
+hex = "0.4"
+base64 = "0.22"
