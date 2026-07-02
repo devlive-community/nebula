@@ -16,5 +16,6 @@ reqwest = { workspace = true }
 tokio = { workspace = true }
 bytes = { workspace = true }
 serde = { workspace = true }
+futures = { workspace = true }
 httpdate = "1"
 quick-xml = { version = "0.36", features = ["serialize"] }

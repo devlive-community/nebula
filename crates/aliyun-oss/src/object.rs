@@ -157,7 +157,7 @@ impl OssClient {
 }
 
 /// 当前时间的 HTTP GMT 格式,如 `Thu, 17 Nov 2005 18:49:58 GMT`。
-fn now_gmt() -> String {
+pub(crate) fn now_gmt() -> String {
     httpdate::fmt_http_date(SystemTime::now())
 }
 
@@ -172,7 +172,7 @@ fn header_string(
 }
 
 /// 成功(2xx)原样返回;否则读取 OSS Error XML 转成 [`OssError::Api`]。
-async fn check_status(resp: Response) -> Result<Response> {
+pub(crate) async fn check_status(resp: Response) -> Result<Response> {
     let status = resp.status();
     if status.is_success() {
         return Ok(resp);
