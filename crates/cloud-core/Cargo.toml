@@ -11,6 +11,8 @@ authors.workspace = true
 thiserror = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
+futures = { workspace = true }
+async-stream = "0.3"
 hmac = "0.12"
 sha1 = "0.10"
 sha2 = "0.10"
