@@ -30,6 +30,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("bucket = {bucket}, key = {key}\n");
 
+    // 0) 列举账号下的 bucket(验证 service endpoint 签名路径)
+    {
+        let stream = client.list_buckets();
+        futures::pin_mut!(stream);
+        let mut names = Vec::new();
+        while let Some(item) = stream.next().await {
+            names.push(item?.name);
+        }
+        println!(
+            "[0/5] list_buckets  ✅ 账号下 {} 个 bucket{}",
+            names.len(),
+            if names.iter().any(|n| n == &bucket) {
+                ",含目标 bucket"
+            } else {
+                ""
+            }
+        );
+    }
+
     // 1) 上传
     client
         .put_object(&bucket, key, content.to_vec(), Some("text/plain"))
