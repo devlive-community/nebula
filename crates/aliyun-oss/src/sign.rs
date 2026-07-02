@@ -41,6 +41,38 @@ where
     out
 }
 
+/// OSS 签名中被视为"子资源"、需计入 CanonicalizedResource 的参数键。
+///
+/// 只列当前用到的项(分片上传相关);后续需要 `acl`、`lifecycle` 等再扩充。
+const SUBRESOURCE_KEYS: &[&str] = &["uploads", "uploadId", "partNumber"];
+
+/// 构造带子资源的 CanonicalizedResource,如 `/bucket/key?partNumber=1&uploadId=xxx`。
+///
+/// `params` 里非子资源的普通查询参数会被忽略(它们不参与签名);子资源按键的字典序
+/// 排序,无值的(如 `uploads`)只保留键名。
+pub fn canonicalized_resource(bucket: &str, key: &str, params: &[(&str, Option<&str>)]) -> String {
+    let mut subs: Vec<(&str, Option<&str>)> = params
+        .iter()
+        .filter(|(k, _)| SUBRESOURCE_KEYS.contains(k))
+        .copied()
+        .collect();
+    subs.sort_by(|a, b| a.0.cmp(b.0));
+
+    let base = format!("/{bucket}/{key}");
+    if subs.is_empty() {
+        return base;
+    }
+    let joined = subs
+        .iter()
+        .map(|(k, v)| match v {
+            Some(v) => format!("{k}={v}"),
+            None => (*k).to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join("&");
+    format!("{base}?{joined}")
+}
+
 /// 拼装完整的 StringToSign。
 ///
 /// `content_md5` / `content_type` 缺省时传空串。`canonicalized_oss_headers`
@@ -118,6 +150,31 @@ mod tests {
             authorization(AK_ID, AK_SECRET, &sts),
             "OSS 44CF9590006BF252F707:26NBxoKdsyly4EDv6inkoDft/yA="
         );
+    }
+
+    #[test]
+    fn canonicalized_resource_sorts_and_formats_subresources() {
+        // 未排序传入,应按字典序输出:partNumber 在 uploadId 之前。
+        let got = canonicalized_resource(
+            "b",
+            "k",
+            &[("uploadId", Some("abc")), ("partNumber", Some("1"))],
+        );
+        assert_eq!(got, "/b/k?partNumber=1&uploadId=abc");
+    }
+
+    #[test]
+    fn canonicalized_resource_keeps_valueless_and_drops_normal_params() {
+        // uploads 无值只留键名;prefix 不是子资源,应被丢弃。
+        let got =
+            canonicalized_resource("b", "k", &[("uploads", None), ("prefix", Some("photos/"))]);
+        assert_eq!(got, "/b/k?uploads");
+    }
+
+    #[test]
+    fn canonicalized_resource_without_subresources() {
+        let got = canonicalized_resource("b", "k", &[("prefix", Some("x"))]);
+        assert_eq!(got, "/b/k");
     }
 
     #[test]
