@@ -22,7 +22,7 @@ members = [
     # "crates/aws-s3",
 
     # App 统一抽象 trait(可选发布)
-    # "crates/nebula-provider",
+    "crates/nebula-provider",
 
     # 适配层(App 私有,不发布)
     # "crates/providers/provider-aliyun",

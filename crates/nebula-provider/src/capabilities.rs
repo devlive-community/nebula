@@ -1,0 +1,16 @@
+//! provider 能力位。App 据此决定是否暴露某些功能(如大文件分片、临时链接)。
+
+use serde::{Deserialize, Serialize};
+
+/// 一个 provider 支持哪些高级能力。缺省全部为 `false`,适配层按实际情况开启。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Capabilities {
+    /// 支持分片上传大文件。
+    pub multipart_upload: bool,
+    /// 支持生成预签名临时链接。
+    pub presign: bool,
+    /// 支持服务端复制(跨对象 / 跨桶免中转)。
+    pub server_side_copy: bool,
+    /// 后端有真正的层级目录(否则目录是按前缀模拟的)。
+    pub hierarchical: bool,
+}
