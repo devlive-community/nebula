@@ -84,10 +84,14 @@ mod tests {
     async fn succeeds_first_try_without_retry() {
         let calls_cell = Cell::new(0);
         let calls = &calls_cell; // &Cell 是 Copy,可在闭包/future 间安全共享
-        let out: Result<i32, ()> = retry(&RetryPolicy::none(), |_| true, || async move {
-            calls.set(calls.get() + 1);
-            Ok(42)
-        })
+        let out: Result<i32, ()> = retry(
+            &RetryPolicy::none(),
+            |_| true,
+            || async move {
+                calls.set(calls.get() + 1);
+                Ok(42)
+            },
+        )
         .await;
         assert_eq!(out, Ok(42));
         assert_eq!(calls_cell.get(), 1);
@@ -102,14 +106,18 @@ mod tests {
         };
         let calls_cell = Cell::new(0);
         let calls = &calls_cell;
-        let out: Result<&str, &str> = retry(&policy, |_| true, || async move {
-            calls.set(calls.get() + 1);
-            if calls.get() < 3 {
-                Err("transient")
-            } else {
-                Ok("ok")
-            }
-        })
+        let out: Result<&str, &str> = retry(
+            &policy,
+            |_| true,
+            || async move {
+                calls.set(calls.get() + 1);
+                if calls.get() < 3 {
+                    Err("transient")
+                } else {
+                    Ok("ok")
+                }
+            },
+        )
         .await;
         assert_eq!(out, Ok("ok"));
         assert_eq!(calls_cell.get(), 3);
@@ -119,10 +127,14 @@ mod tests {
     async fn stops_on_non_retryable_error() {
         let calls_cell = Cell::new(0);
         let calls = &calls_cell;
-        let out: Result<(), &str> = retry(&RetryPolicy::default(), |_| false, || async move {
-            calls.set(calls.get() + 1);
-            Err("fatal")
-        })
+        let out: Result<(), &str> = retry(
+            &RetryPolicy::default(),
+            |_| false,
+            || async move {
+                calls.set(calls.get() + 1);
+                Err("fatal")
+            },
+        )
         .await;
         assert_eq!(out, Err("fatal"));
         assert_eq!(calls_cell.get(), 1); // 不可重试,只调用一次
@@ -137,10 +149,14 @@ mod tests {
         };
         let calls_cell = Cell::new(0);
         let calls = &calls_cell;
-        let out: Result<(), &str> = retry(&policy, |_| true, || async move {
-            calls.set(calls.get() + 1);
-            Err("always")
-        })
+        let out: Result<(), &str> = retry(
+            &policy,
+            |_| true,
+            || async move {
+                calls.set(calls.get() + 1);
+                Err("always")
+            },
+        )
         .await;
         assert_eq!(out, Err("always"));
         assert_eq!(calls_cell.get(), 3); // 1 次初始 + 2 次重试

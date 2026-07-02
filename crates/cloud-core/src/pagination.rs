@@ -27,10 +27,7 @@ impl<T, C> Page<T, C> {
 /// 从 `initial` 游标开始反复调用 `fetch`,产出一条 `Result<T, E>` 的流。
 ///
 /// 任一页 `fetch` 出错时,流产出该 `Err` 后结束。
-pub fn paginate<T, E, C, F, Fut>(
-    initial: C,
-    mut fetch: F,
-) -> impl Stream<Item = Result<T, E>>
+pub fn paginate<T, E, C, F, Fut>(initial: C, mut fetch: F) -> impl Stream<Item = Result<T, E>>
 where
     F: FnMut(C) -> Fut,
     Fut: Future<Output = Result<Page<T, C>, E>>,
@@ -65,7 +62,11 @@ mod tests {
         let stream = paginate(0usize, |idx: usize| async move {
             fetches.set(fetches.get() + 1);
             let items = pages[idx].clone();
-            let next = if idx + 1 < pages.len() { Some(idx + 1) } else { None };
+            let next = if idx + 1 < pages.len() {
+                Some(idx + 1)
+            } else {
+                None
+            };
             Ok::<_, ()>(Page { items, next })
         });
         futures::pin_mut!(stream);
@@ -91,7 +92,10 @@ mod tests {
     async fn stops_and_surfaces_error() {
         let stream = paginate(0usize, |idx: usize| async move {
             if idx == 0 {
-                Ok(Page { items: vec![10, 20], next: Some(1) })
+                Ok(Page {
+                    items: vec![10, 20],
+                    next: Some(1),
+                })
             } else {
                 Err("boom")
             }
