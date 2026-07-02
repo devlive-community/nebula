@@ -1,0 +1,56 @@
+# Nebula — 全平台多云存储管理器 (workspace 根)
+#
+# 依赖方向严格单向,不可反向:
+#   cloud-core → 各厂商 SDK → providers 适配层 → app/src-tauri
+#
+# 厂商 SDK 用厂商原名(便于被搜索到),App 层用 nebula- 前缀。
+
+[workspace]
+resolver = "2"
+members = [
+    # 公共底座(可发布)
+    # "crates/cloud-core",
+
+    # 厂商原生 SDK(独立可发布,保持厂商原名)
+    # "crates/aliyun-oss",
+    # "crates/aliyun-openapi",
+    # "crates/aliyun-pan",
+    # "crates/tencent-cos",
+    # "crates/tencent-cloud-api",
+    # "crates/huawei-obs",
+    # "crates/huawei-openapi",
+    # "crates/aws-s3",
+
+    # App 统一抽象 trait(可选发布)
+    # "crates/nebula-provider",
+
+    # 适配层(App 私有,不发布)
+    # "crates/providers/provider-aliyun",
+    # "crates/providers/provider-tencent",
+    # "crates/providers/provider-huawei",
+    # "crates/providers/provider-aws",
+
+    # 桌面 App 后端
+    # "app/src-tauri",
+]
+
+# 全 workspace 共享的依赖版本,子 crate 用 { workspace = true } 引用
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+bytes = "1"
+futures = "0.3"
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/shichengoooo/nebula"
+authors = ["shicheng <shichengoooo@gmail.com>"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

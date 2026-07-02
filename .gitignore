@@ -1,0 +1,30 @@
+# Rust
+/target
+**/target
+Cargo.lock.bak
+
+# Tauri
+/app/src-tauri/target
+/app/src-tauri/gen
+
+# Node / frontend
+node_modules
+dist
+.vite
+*.log
+
+# Env & secrets
+.env
+.env.local
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.swp
