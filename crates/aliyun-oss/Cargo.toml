@@ -1,0 +1,16 @@
+[package]
+name = "aliyun-oss"
+version.workspace = true
+description = "Hand-written async Rust SDK for Alibaba Cloud OSS (object storage), no aggregation library"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["aliyun", "oss", "object-storage", "alibaba-cloud"]
+categories = ["api-bindings"]
+
+[dependencies]
+cloud-core = { path = "../cloud-core", version = "1.0.0" }
+thiserror = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }

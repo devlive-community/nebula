@@ -12,7 +12,7 @@ members = [
     "crates/cloud-core",
 
     # 厂商原生 SDK(独立可发布,保持厂商原名)
-    # "crates/aliyun-oss",
+    "crates/aliyun-oss",
     # "crates/aliyun-openapi",
     # "crates/aliyun-pan",
     # "crates/tencent-cos",
