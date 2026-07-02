@@ -91,6 +91,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.delete_object(&bucket, key).await?;
     println!("[5/5] delete_object ✅ 已清理临时对象");
 
+    // 6) 分片上传(验证子资源签名路径):造 250KB 数据,强制切成多片
+    let mp_key = "nebula-smoke-multipart.bin";
+    let part_size = aliyun_oss::multipart::MIN_PART_SIZE; // 100KB
+    let big: Vec<u8> = (0..(part_size * 2 + 12345))
+        .map(|i| (i % 251) as u8)
+        .collect();
+    let big_len = big.len();
+    client
+        .upload_multipart(
+            &bucket,
+            mp_key,
+            big.clone(),
+            part_size,
+            Some("application/octet-stream"),
+        )
+        .await?;
+    let back = client.get_object(&bucket, mp_key).await?;
+    assert_eq!(back.len(), big_len, "分片上传后大小不一致");
+    assert_eq!(back.as_ref(), big.as_slice(), "分片上传后内容不一致");
+    client.delete_object(&bucket, mp_key).await?;
+    println!(
+        "[6/6] multipart     ✅ {big_len} 字节分 {} 片上传/校验/清理完成",
+        big_len.div_ceil(part_size)
+    );
+
     println!("\n🎉 全链路验证通过");
     Ok(())
 }
