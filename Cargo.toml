@@ -25,7 +25,7 @@ members = [
     "crates/nebula-provider",
 
     # 适配层(App 私有,不发布)
-    # "crates/providers/provider-aliyun",
+    "crates/providers/provider-aliyun",
     # "crates/providers/provider-tencent",
     # "crates/providers/provider-huawei",
     # "crates/providers/provider-aws",

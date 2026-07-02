@@ -1,0 +1,19 @@
+[package]
+name = "provider-aliyun"
+version.workspace = true
+description = "Adapter wrapping aliyun-oss as a nebula StorageProvider (app-internal, not published)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+nebula-provider = { path = "../../nebula-provider" }
+aliyun-oss = { path = "../../aliyun-oss" }
+async-trait = "0.1"
+bytes = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

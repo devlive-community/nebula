@@ -1,0 +1,228 @@
+//! 把 [`aliyun_oss::OssClient`] 适配成统一的 [`StorageProvider`]。
+//!
+//! 这是 App 私有的适配层(不发布):它是唯一同时依赖 `aliyun-oss` 和
+//! `nebula-provider` 的地方,从而让纯净 SDK 与 App 抽象彼此解耦。
+//!
+//! 路径遵循 [`StorageProvider`] 的 `bucket/key` 约定,解析复用
+//! [`nebula_provider::path::split`]。
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::StreamExt;
+
+use aliyun_oss::{OssClient, OssError};
+use nebula_provider::{path, Capabilities, Entry, ProviderError, Result, StorageProvider};
+
+/// 阿里云 OSS 的 provider 适配器。一个实例 = 一个账号。
+pub struct AliyunProvider {
+    id: String,
+    client: OssClient,
+}
+
+impl AliyunProvider {
+    /// 用账号别名与凭证创建。`id` 是注册表里的稳定标识(如账号别名)。
+    pub fn new(
+        id: impl Into<String>,
+        access_key_id: impl Into<String>,
+        access_key_secret: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            client: OssClient::new(access_key_id, access_key_secret, endpoint),
+        }
+    }
+
+    /// 复用已构造好的 [`OssClient`]。
+    pub fn from_client(id: impl Into<String>, client: OssClient) -> Self {
+        Self {
+            id: id.into(),
+            client,
+        }
+    }
+}
+
+/// 要求路径能定位到一个对象(bucket + 非空 key),否则视为非法路径。
+fn require_object(path: &str) -> Result<(&str, &str)> {
+    match path::split(path) {
+        (Some(bucket), key) if !key.is_empty() => Ok((bucket, key)),
+        _ => Err(ProviderError::InvalidPath(path.to_string())),
+    }
+}
+
+/// 把 OSS 错误映射到统一 provider 错误。
+fn map_err(err: OssError) -> ProviderError {
+    match err {
+        OssError::Api { code, message, .. } => match code.as_str() {
+            "NoSuchKey" | "NoSuchBucket" | "SymlinkTargetNotExist" => {
+                ProviderError::NotFound(message)
+            }
+            "AccessDenied" | "InvalidAccessKeyId" | "SignatureDoesNotMatch" => {
+                ProviderError::AccessDenied(message)
+            }
+            _ => ProviderError::Backend(format!("{code}: {message}")),
+        },
+        other => ProviderError::Backend(other.to_string()),
+    }
+}
+
+#[async_trait]
+impl StorageProvider for AliyunProvider {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        Capabilities {
+            multipart_upload: true,
+            presign: false,
+            server_side_copy: false,
+            hierarchical: false,
+        }
+    }
+
+    async fn list(&self, path: &str) -> Result<Vec<Entry>> {
+        match path::split(path) {
+            // 根:列出所有 bucket,每个作为目录。
+            (None, _) => {
+                let stream = self.client.list_buckets();
+                futures::pin_mut!(stream);
+                let mut entries = Vec::new();
+                while let Some(item) = stream.next().await {
+                    let bucket = item.map_err(map_err)?;
+                    entries.push(Entry::directory(bucket.name));
+                }
+                Ok(entries)
+            }
+            // 桶 / 前缀:列出对象(当前为扁平列举,不合成子目录)。
+            (Some(bucket), prefix) => {
+                let prefix_opt = (!prefix.is_empty()).then_some(prefix);
+                let stream = self.client.list_objects(bucket, prefix_opt);
+                futures::pin_mut!(stream);
+                let mut entries = Vec::new();
+                while let Some(item) = stream.next().await {
+                    let obj = item.map_err(map_err)?;
+                    entries.push(
+                        Entry::file(format!("{bucket}/{}", obj.key), obj.size)
+                            .with_etag(obj.etag)
+                            .with_last_modified(obj.last_modified),
+                    );
+                }
+                Ok(entries)
+            }
+        }
+    }
+
+    async fn stat(&self, path: &str) -> Result<Entry> {
+        match path::split(path) {
+            (Some(bucket), "") => Ok(Entry::directory(bucket.to_string())),
+            (Some(bucket), key) => {
+                let meta = self
+                    .client
+                    .head_object(bucket, key)
+                    .await
+                    .map_err(map_err)?;
+                let mut entry = Entry::file(format!("{bucket}/{key}"), meta.content_length);
+                if let Some(etag) = meta.etag {
+                    entry = entry.with_etag(etag);
+                }
+                if let Some(lm) = meta.last_modified {
+                    entry = entry.with_last_modified(lm);
+                }
+                Ok(entry)
+            }
+            (None, _) => Err(ProviderError::InvalidPath(path.to_string())),
+        }
+    }
+
+    async fn read(&self, path: &str) -> Result<Bytes> {
+        let (bucket, key) = require_object(path)?;
+        self.client.get_object(bucket, key).await.map_err(map_err)
+    }
+
+    async fn write(&self, path: &str, data: Bytes, content_type: Option<&str>) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .put_object(bucket, key, data, content_type)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn delete(&self, path: &str) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .delete_object(bucket, key)
+            .await
+            .map_err(map_err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn provider() -> AliyunProvider {
+        AliyunProvider::new("test", "ak", "sk", "oss-cn-hangzhou.aliyuncs.com")
+    }
+
+    #[test]
+    fn id_and_capabilities() {
+        let p = provider();
+        assert_eq!(p.id(), "test");
+        assert!(p.capabilities().multipart_upload);
+        assert!(!p.capabilities().hierarchical);
+    }
+
+    #[test]
+    fn map_err_classifies_codes() {
+        let not_found = map_err(OssError::Api {
+            status: 404,
+            code: "NoSuchKey".into(),
+            message: "missing".into(),
+            request_id: None,
+        });
+        assert!(matches!(not_found, ProviderError::NotFound(_)));
+
+        let denied = map_err(OssError::Api {
+            status: 403,
+            code: "AccessDenied".into(),
+            message: "nope".into(),
+            request_id: None,
+        });
+        assert!(matches!(denied, ProviderError::AccessDenied(_)));
+
+        let other = map_err(OssError::Api {
+            status: 400,
+            code: "InvalidArgument".into(),
+            message: "bad".into(),
+            request_id: None,
+        });
+        assert!(matches!(other, ProviderError::Backend(_)));
+    }
+
+    #[tokio::test]
+    async fn object_ops_reject_rootless_paths() {
+        let p = provider();
+        // 无 bucket 或无 key 时,不发网络请求就应报 InvalidPath。
+        assert!(matches!(
+            p.read("").await,
+            Err(ProviderError::InvalidPath(_))
+        ));
+        assert!(matches!(
+            p.delete("bucket-only").await,
+            Err(ProviderError::InvalidPath(_))
+        ));
+        assert!(matches!(
+            p.write("bucket/", Bytes::new(), None).await,
+            Err(ProviderError::InvalidPath(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn stat_on_bucket_returns_directory() {
+        let p = provider();
+        let entry = p.stat("mybucket").await.unwrap();
+        assert!(entry.is_dir());
+        assert_eq!(entry.name, "mybucket");
+    }
+}
