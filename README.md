@@ -37,6 +37,11 @@ nebula/
 - 厂商 SDK **不得**依赖 App 层任何 crate,以保持独立可发布。
 - 按功能逐个开发:每个功能验证通过后独立提交,确认后再进入下一个。
 
+## 开发文档
+
+- [SDK 开发手册](./docs/sdk-playbook.md) — 从零手写一个厂商 SDK 的标准流程、增量顺序、验收标准
+- 厂商规格卡 `docs/sdk/<crate>.md` — 每家特有的签名/endpoint/进度(见 [aliyun-oss](./docs/sdk/aliyun-oss.md),新建用 [_template](./docs/sdk/_template.md))
+
 ## License
 
 MIT OR Apache-2.0
