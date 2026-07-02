@@ -47,6 +47,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         buckets.len()
     );
 
+    // 1b) 列出目标桶根一层(验证 delimiter 折叠:目录 vs 文件)
+    let root = provider.list(&format!("{bucket}/")).await?;
+    let dirs = root.iter().filter(|e| e.is_dir()).count();
+    let files = root.len() - dirs;
+    println!("      · {bucket}/ 顶层:{dirs} 个目录,{files} 个文件");
+
     // 2) 写入对象
     let path = format!("{bucket}/nebula-provider-smoke.txt");
     let content = Bytes::from_static(b"hello via unified StorageProvider");

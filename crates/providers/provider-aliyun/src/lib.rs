@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use aliyun_oss::{OssClient, OssError};
+use aliyun_oss::{ListEntry, OssClient, OssError};
 use nebula_provider::{path, Capabilities, Entry, ProviderError, Result, StorageProvider};
 
 /// 阿里云 OSS 的 provider 适配器。一个实例 = 一个账号。
@@ -94,19 +94,25 @@ impl StorageProvider for AliyunProvider {
                 }
                 Ok(entries)
             }
-            // 桶 / 前缀:列出对象(当前为扁平列举,不合成子目录)。
+            // 桶 / 前缀:按 "/" 折叠成一层目录,子前缀为目录、对象为文件。
             (Some(bucket), prefix) => {
                 let prefix_opt = (!prefix.is_empty()).then_some(prefix);
-                let stream = self.client.list_objects(bucket, prefix_opt);
+                let stream = self.client.list_dir(bucket, prefix_opt);
                 futures::pin_mut!(stream);
                 let mut entries = Vec::new();
                 while let Some(item) = stream.next().await {
-                    let obj = item.map_err(map_err)?;
-                    entries.push(
-                        Entry::file(format!("{bucket}/{}", obj.key), obj.size)
-                            .with_etag(obj.etag)
-                            .with_last_modified(obj.last_modified),
-                    );
+                    match item.map_err(map_err)? {
+                        ListEntry::Prefix(prefix) => {
+                            entries.push(Entry::directory(format!("{bucket}/{prefix}")));
+                        }
+                        ListEntry::Object(obj) => {
+                            entries.push(
+                                Entry::file(format!("{bucket}/{}", obj.key), obj.size)
+                                    .with_etag(obj.etag)
+                                    .with_last_modified(obj.last_modified),
+                            );
+                        }
+                    }
                 }
                 Ok(entries)
             }
