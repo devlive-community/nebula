@@ -79,6 +79,9 @@ struct ListBucketResult {
     next_marker: Option<String>,
     #[serde(default, rename = "Contents")]
     contents: Vec<ContentsXml>,
+    /// 使用 delimiter 时,被折叠的"子目录"公共前缀。
+    #[serde(default, rename = "CommonPrefixes")]
+    common_prefixes: Vec<CommonPrefixXml>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -89,6 +92,31 @@ struct ContentsXml {
     e_tag: String,
     size: u64,
     storage_class: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct CommonPrefixXml {
+    prefix: String,
+}
+
+impl From<ContentsXml> for ObjectSummary {
+    fn from(c: ContentsXml) -> Self {
+        ObjectSummary {
+            key: c.key,
+            size: c.size,
+            etag: c.e_tag,
+            last_modified: c.last_modified,
+            storage_class: c.storage_class,
+        }
+    }
+}
+
+/// 列举一层目录时的条目:对象文件,或被 delimiter 折叠出的子目录前缀。
+#[derive(Debug, Clone)]
+pub enum ListEntry {
+    Object(ObjectSummary),
+    Prefix(String),
 }
 
 /// 每页最多返回的对象数(OSS 上限 1000)。
@@ -117,7 +145,7 @@ impl OssClient {
         marker: String,
     ) -> Result<Page<ObjectSummary, String>> {
         let date = now_gmt();
-        let request = self.build_list_request(bucket, prefix, &marker, &date)?;
+        let request = self.build_list_request(bucket, prefix, &marker, None, &date)?;
         let resp = check_status(self.http().execute(request).await?).await?;
         let body = resp.text().await.map_err(CoreError::from)?;
 
@@ -127,14 +155,51 @@ impl OssClient {
         let items = parsed
             .contents
             .into_iter()
-            .map(|c| ObjectSummary {
-                key: c.key,
-                size: c.size,
-                etag: c.e_tag,
-                last_modified: c.last_modified,
-                storage_class: c.storage_class,
-            })
+            .map(ObjectSummary::from)
             .collect();
+        Ok(Page { items, next })
+    }
+
+    /// 列举**一层目录**:用 `delimiter = "/"` 把子前缀折叠成目录,返回文件与子目录混合流。
+    ///
+    /// 适合文件管理器逐层浏览;`prefix` 应以 `/` 结尾(如 `photos/`),根为 `None`。
+    pub fn list_dir<'a>(
+        &'a self,
+        bucket: &'a str,
+        prefix: Option<&'a str>,
+    ) -> impl Stream<Item = Result<ListEntry>> + 'a {
+        paginate(String::new(), move |marker: String| {
+            self.list_dir_page(bucket, prefix, marker)
+        })
+    }
+
+    /// 拉取一层目录的一页(子目录前缀在前,文件在后)。
+    async fn list_dir_page(
+        &self,
+        bucket: &str,
+        prefix: Option<&str>,
+        marker: String,
+    ) -> Result<Page<ListEntry, String>> {
+        let date = now_gmt();
+        let request = self.build_list_request(bucket, prefix, &marker, Some("/"), &date)?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(CoreError::from)?;
+
+        let parsed: ListBucketResult = quick_xml::de::from_str(&body)
+            .map_err(|e| OssError::Core(CoreError::InvalidResponse(e.to_string())))?;
+        let next = next_marker(&parsed);
+
+        let mut items: Vec<ListEntry> = parsed
+            .common_prefixes
+            .into_iter()
+            .map(|p| ListEntry::Prefix(p.prefix))
+            .collect();
+        items.extend(
+            parsed
+                .contents
+                .into_iter()
+                .map(|c| ListEntry::Object(c.into())),
+        );
         Ok(Page { items, next })
     }
 
@@ -144,6 +209,7 @@ impl OssClient {
         bucket: &str,
         prefix: Option<&str>,
         marker: &str,
+        delimiter: Option<&str>,
         date: &str,
     ) -> Result<Request> {
         // 普通查询参数不参与签名,CanonicalizedResource 仅为 /{bucket}/。
@@ -161,6 +227,9 @@ impl OssClient {
             }
             if !marker.is_empty() {
                 qp.append_pair("marker", marker);
+            }
+            if let Some(d) = delimiter {
+                qp.append_pair("delimiter", d);
             }
         }
 
@@ -309,7 +378,7 @@ mod tests {
         let client = test_client();
         let date = "Thu, 17 Nov 2005 18:49:58 GMT";
         let req = client
-            .build_list_request("oss-example", Some("photos/"), "cat.jpg", date)
+            .build_list_request("oss-example", Some("photos/"), "cat.jpg", None, date)
             .unwrap();
 
         // CanonicalizedResource 是 /{bucket}/,查询参数不参与签名。
@@ -335,12 +404,47 @@ mod tests {
     fn empty_prefix_and_marker_are_omitted() {
         let client = test_client();
         let req = client
-            .build_list_request("b", Some(""), "", "date")
+            .build_list_request("b", Some(""), "", None, "date")
             .unwrap();
         let query = req.url().query().unwrap();
         assert!(query.contains("max-keys=1000"));
         assert!(!query.contains("prefix="));
         assert!(!query.contains("marker="));
+        assert!(!query.contains("delimiter="));
+    }
+
+    #[test]
+    fn list_dir_request_sets_delimiter() {
+        let client = test_client();
+        let req = client
+            .build_list_request("b", Some("photos/"), "", Some("/"), "date")
+            .unwrap();
+        let query = req.url().query().unwrap();
+        assert!(query.contains("delimiter=%2F"));
+        assert!(query.contains("prefix=photos%2F"));
+    }
+
+    #[test]
+    fn parses_common_prefixes_as_dirs() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult>
+  <Name>b</Name>
+  <Delimiter>/</Delimiter>
+  <IsTruncated>false</IsTruncated>
+  <Contents>
+    <Key>photos/cover.jpg</Key>
+    <LastModified>2024-01-01T00:00:00.000Z</LastModified>
+    <ETag>"E1"</ETag>
+    <Size>100</Size>
+    <StorageClass>Standard</StorageClass>
+  </Contents>
+  <CommonPrefixes><Prefix>photos/2023/</Prefix></CommonPrefixes>
+  <CommonPrefixes><Prefix>photos/2024/</Prefix></CommonPrefixes>
+</ListBucketResult>"#;
+        let parsed: ListBucketResult = quick_xml::de::from_str(xml).unwrap();
+        assert_eq!(parsed.common_prefixes.len(), 2);
+        assert_eq!(parsed.common_prefixes[0].prefix, "photos/2023/");
+        assert_eq!(parsed.contents.len(), 1);
     }
 
     #[test]
@@ -454,6 +558,7 @@ mod tests {
                 size: 0,
                 storage_class: String::new(),
             }],
+            common_prefixes: vec![],
         };
         assert_eq!(next_marker(&with_next).as_deref(), Some("n.txt"));
 
@@ -468,6 +573,7 @@ mod tests {
                 size: 0,
                 storage_class: String::new(),
             }],
+            common_prefixes: vec![],
         };
         assert_eq!(next_marker(&fallback).as_deref(), Some("z.txt"));
     }
