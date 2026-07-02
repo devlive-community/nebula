@@ -14,3 +14,7 @@ cloud-core = { path = "../cloud-core", version = "1.0.0" }
 thiserror = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+httpdate = "1"
+quick-xml = { version = "0.36", features = ["serialize"] }
