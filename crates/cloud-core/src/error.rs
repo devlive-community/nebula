@@ -20,6 +20,10 @@ pub enum CoreError {
     /// 签名过程本身出错。
     #[error("signature error: {0}")]
     Signature(String),
+
+    /// 底层 HTTP 传输失败(连接、超时、TLS 等)。
+    #[error("http transport error: {0}")]
+    Transport(#[from] reqwest::Error),
 }
 
 /// `cloud-core` 内部便捷 Result 别名。
