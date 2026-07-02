@@ -26,6 +26,49 @@ pub struct ObjectSummary {
     pub storage_class: String,
 }
 
+/// 账号下的一个 bucket。
+#[derive(Debug, Clone)]
+pub struct BucketSummary {
+    pub name: String,
+    pub location: String,
+    pub creation_date: String,
+    pub storage_class: String,
+    /// 外网访问 endpoint。
+    pub endpoint: String,
+}
+
+/// GET Service(列举 bucket)的 XML 响应体。
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ListAllMyBucketsResult {
+    #[serde(default)]
+    is_truncated: bool,
+    #[serde(default)]
+    next_marker: Option<String>,
+    #[serde(default)]
+    buckets: BucketsXml,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct BucketsXml {
+    #[serde(default, rename = "Bucket")]
+    bucket: Vec<BucketXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct BucketXml {
+    name: String,
+    #[serde(default)]
+    creation_date: String,
+    #[serde(default)]
+    location: String,
+    #[serde(default)]
+    storage_class: String,
+    #[serde(default)]
+    extranet_endpoint: String,
+}
+
 /// GET Bucket 的 XML 响应体(仅取需要的字段)。
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -132,6 +175,111 @@ impl OssClient {
     }
 }
 
+impl OssClient {
+    /// 列举当前账号下的所有 bucket,自动翻页为一条流。
+    pub fn list_buckets(&self) -> impl Stream<Item = Result<BucketSummary>> + '_ {
+        paginate(String::new(), move |marker: String| {
+            self.list_buckets_page(marker)
+        })
+    }
+
+    /// 创建一个 bucket(默认配置,私有读写)。
+    pub async fn create_bucket(&self, bucket: &str) -> Result<()> {
+        let date = now_gmt();
+        let request = self.build_bucket_root_request(Method::PUT, bucket, &date)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 删除一个 bucket(必须为空)。
+    pub async fn delete_bucket(&self, bucket: &str) -> Result<()> {
+        let date = now_gmt();
+        let request = self.build_bucket_root_request(Method::DELETE, bucket, &date)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 拉取一页 bucket 列表,并算出下一页游标。
+    async fn list_buckets_page(&self, marker: String) -> Result<Page<BucketSummary, String>> {
+        let date = now_gmt();
+        let request = self.build_list_buckets_request(&marker, &date)?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(CoreError::from)?;
+
+        let parsed: ListAllMyBucketsResult = quick_xml::de::from_str(&body)
+            .map_err(|e| OssError::Core(CoreError::InvalidResponse(e.to_string())))?;
+
+        let next = if parsed.is_truncated {
+            parsed
+                .next_marker
+                .clone()
+                .filter(|m| !m.is_empty())
+                .or_else(|| parsed.buckets.bucket.last().map(|b| b.name.clone()))
+        } else {
+            None
+        };
+        let items = parsed
+            .buckets
+            .bucket
+            .into_iter()
+            .map(|b| BucketSummary {
+                name: b.name,
+                location: b.location,
+                creation_date: b.creation_date,
+                storage_class: b.storage_class,
+                endpoint: b.extranet_endpoint,
+            })
+            .collect();
+        Ok(Page { items, next })
+    }
+
+    /// 组装并签名一次针对 bucket 根(`/{bucket}/`)的请求,用于建桶 / 删桶。
+    fn build_bucket_root_request(
+        &self,
+        method: Method,
+        bucket: &str,
+        date: &str,
+    ) -> Result<Request> {
+        let sts = sign::string_to_sign(method.as_str(), "", "", date, "", &format!("/{bucket}/"));
+        let authorization =
+            sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
+        let url = format!("{}/", self.bucket_base_url(bucket));
+        self.http()
+            .inner()
+            .request(method, &url)
+            .header(DATE, date)
+            .header(AUTHORIZATION, authorization)
+            .build()
+            .map_err(CoreError::from)
+            .map_err(OssError::from)
+    }
+
+    /// 组装并签名一次 GET Service(列举 bucket)请求,CanonicalizedResource 为 `/`。
+    fn build_list_buckets_request(&self, marker: &str, date: &str) -> Result<Request> {
+        let sts = sign::string_to_sign("GET", "", "", date, "", "/");
+        let authorization =
+            sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
+
+        let mut url = Url::parse(&format!("https://{}/", self.endpoint()))
+            .map_err(|e| OssError::Core(CoreError::InvalidRequest(e.to_string())))?;
+        {
+            let mut qp = url.query_pairs_mut();
+            qp.append_pair("max-keys", MAX_KEYS);
+            if !marker.is_empty() {
+                qp.append_pair("marker", marker);
+            }
+        }
+        self.http()
+            .inner()
+            .request(Method::GET, url)
+            .header(DATE, date)
+            .header(AUTHORIZATION, authorization)
+            .build()
+            .map_err(CoreError::from)
+            .map_err(OssError::from)
+    }
+}
+
 /// 下一页游标:未截断则无;截断时优先用 `NextMarker`,否则退回本页最后一个 Key。
 fn next_marker(result: &ListBucketResult) -> Option<String> {
     if !result.is_truncated {
@@ -225,6 +373,72 @@ mod tests {
         assert_eq!(parsed.contents[1].size, 20);
         assert_eq!(parsed.contents[1].storage_class, "IA");
         assert!(next_marker(&parsed).is_none()); // 未截断
+    }
+
+    #[test]
+    fn list_buckets_request_signs_root_resource() {
+        let client = test_client();
+        let date = "Thu, 17 Nov 2005 18:49:58 GMT";
+        let req = client.build_list_buckets_request("mybucket", date).unwrap();
+
+        // GET Service 的 CanonicalizedResource 是 "/"。
+        let sts = sign::string_to_sign("GET", "", "", date, "", "/");
+        let expected =
+            sign::authorization(client.access_key_id(), client.access_key_secret(), &sts);
+        assert_eq!(
+            req.headers().get(AUTHORIZATION).unwrap().to_str().unwrap(),
+            expected
+        );
+        // 走 service endpoint,host 不含 bucket 前缀。
+        assert_eq!(req.url().host_str(), Some("oss-cn-hangzhou.aliyuncs.com"));
+        assert!(req.url().query().unwrap().contains("marker=mybucket"));
+    }
+
+    #[test]
+    fn create_and_delete_bucket_requests_target_bucket_root() {
+        let client = test_client();
+        let date = "Thu, 17 Nov 2005 18:49:58 GMT";
+
+        let put = client
+            .build_bucket_root_request(Method::PUT, "new-bucket", date)
+            .unwrap();
+        assert_eq!(put.method(), Method::PUT);
+        assert_eq!(
+            put.url().as_str(),
+            "https://new-bucket.oss-cn-hangzhou.aliyuncs.com/"
+        );
+        let sts = sign::string_to_sign("PUT", "", "", date, "", "/new-bucket/");
+        assert_eq!(
+            put.headers().get(AUTHORIZATION).unwrap().to_str().unwrap(),
+            sign::authorization(client.access_key_id(), client.access_key_secret(), &sts)
+        );
+
+        let del = client
+            .build_bucket_root_request(Method::DELETE, "new-bucket", date)
+            .unwrap();
+        assert_eq!(del.method(), Method::DELETE);
+    }
+
+    #[test]
+    fn parses_list_all_my_buckets() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<ListAllMyBucketsResult>
+  <Owner><ID>1</ID><DisplayName>1</DisplayName></Owner>
+  <Buckets>
+    <Bucket>
+      <Name>devlive-cdn</Name>
+      <CreationDate>2020-01-01T00:00:00.000Z</CreationDate>
+      <Location>oss-cn-hangzhou</Location>
+      <StorageClass>Standard</StorageClass>
+      <ExtranetEndpoint>oss-cn-hangzhou.aliyuncs.com</ExtranetEndpoint>
+    </Bucket>
+  </Buckets>
+</ListAllMyBucketsResult>"#;
+        let parsed: ListAllMyBucketsResult = quick_xml::de::from_str(xml).unwrap();
+        assert_eq!(parsed.buckets.bucket.len(), 1);
+        assert_eq!(parsed.buckets.bucket[0].name, "devlive-cdn");
+        assert_eq!(parsed.buckets.bucket[0].location, "oss-cn-hangzhou");
+        assert!(!parsed.is_truncated);
     }
 
     #[test]
