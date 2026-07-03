@@ -17,6 +17,10 @@ pub enum AppError {
     /// 账号持久化(SQLite)错误。
     #[error("storage error: {0}")]
     Store(#[from] rusqlite::Error),
+
+    /// 密钥存储(钥匙串)错误。
+    #[error("secret store error: {0}")]
+    Secret(#[from] keyring::Error),
 }
 
 /// App 层 Result 别名。

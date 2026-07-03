@@ -14,6 +14,13 @@ provider-aliyun = { path = "../providers/provider-aliyun" }
 bytes = { workspace = true }
 thiserror = { workspace = true }
 rusqlite = { version = "0.32", features = ["bundled"] }
+# 纯 Rust 后端(zbus + crypto-rust),避免 Linux CI 依赖 openssl/dbus 系统库。
+keyring = { version = "3", default-features = false, features = [
+    "apple-native",
+    "windows-native",
+    "sync-secret-service",
+    "crypto-rust",
+] }
 
 [dev-dependencies]
 tokio = { workspace = true }
