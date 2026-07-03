@@ -8,6 +8,7 @@
 //! 逻辑可以完全用 `cargo test` 覆盖,无需启动 GUI。
 
 mod error;
+mod store;
 
 use std::sync::Arc;
 
@@ -17,43 +18,91 @@ use provider_aliyun::AliyunProvider;
 
 pub use error::{AppError, Result};
 pub use nebula_provider::{Capabilities, EntryKind};
+pub use store::{AccountRecord, AccountStore};
 
-/// App 的核心状态与操作入口。可低成本 clone(共享同一注册表)。
+const VENDOR_ALIYUN: &str = "aliyun";
+
+/// App 的核心状态与操作入口。可低成本 clone(共享注册表与存储)。
 #[derive(Clone, Default)]
 pub struct App {
     registry: ProviderRegistry,
+    /// 持久化存储;`None` 时账号仅存在内存(用于测试)。
+    store: Option<Arc<AccountStore>>,
 }
 
 impl App {
-    /// 新建一个空 App(无任何账号)。
+    /// 新建一个不持久化的空 App(账号仅存内存)。
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// 注册一个账号 / provider(以 `provider.id()` 为键)。
+    /// 用 SQLite 库路径创建 App,并把库里已存的账号加载注册。
+    pub fn with_store(db_path: impl AsRef<std::path::Path>) -> Result<Self> {
+        let store = AccountStore::open(db_path)?;
+        let app = App {
+            registry: ProviderRegistry::new(),
+            store: Some(Arc::new(store)),
+        };
+        app.load_persisted()?;
+        Ok(app)
+    }
+
+    /// 把存储里的账号构造成 provider 并注册。
+    fn load_persisted(&self) -> Result<()> {
+        let Some(store) = &self.store else {
+            return Ok(());
+        };
+        for rec in store.list()? {
+            self.register_record(rec);
+        }
+        Ok(())
+    }
+
+    /// 按厂商把一条记录注册为 provider(未知厂商忽略)。
+    fn register_record(&self, rec: AccountRecord) {
+        if rec.vendor == VENDOR_ALIYUN {
+            self.registry.register(Arc::new(AliyunProvider::new(
+                rec.id,
+                rec.access_key_id,
+                rec.access_key_secret,
+                rec.endpoint,
+            )));
+        }
+    }
+
+    /// 注册一个账号 / provider(以 `provider.id()` 为键)。不持久化。
     pub fn add_account(&self, provider: Arc<dyn StorageProvider>) {
         self.registry.register(provider);
     }
 
-    /// 便捷:新增一个阿里云 OSS 账号。
+    /// 便捷:新增一个阿里云 OSS 账号(注册并持久化)。
     pub fn add_aliyun_account(
         &self,
         id: impl Into<String>,
         access_key_id: impl Into<String>,
         access_key_secret: impl Into<String>,
         endpoint: impl Into<String>,
-    ) {
-        self.add_account(Arc::new(AliyunProvider::new(
-            id,
-            access_key_id,
-            access_key_secret,
-            endpoint,
-        )));
+    ) -> Result<()> {
+        let rec = AccountRecord {
+            id: id.into(),
+            vendor: VENDOR_ALIYUN.to_string(),
+            access_key_id: access_key_id.into(),
+            access_key_secret: access_key_secret.into(),
+            endpoint: endpoint.into(),
+        };
+        if let Some(store) = &self.store {
+            store.upsert(&rec)?;
+        }
+        self.register_record(rec);
+        Ok(())
     }
 
-    /// 移除一个账号,返回它是否存在过。
-    pub fn remove_account(&self, id: &str) -> bool {
-        self.registry.remove(id)
+    /// 移除一个账号(注册表 + 存储),返回它是否存在过。
+    pub fn remove_account(&self, id: &str) -> Result<bool> {
+        if let Some(store) = &self.store {
+            store.delete(id)?;
+        }
+        Ok(self.registry.remove(id))
     }
 
     /// 列出已注册的账号 id(字典序)。
@@ -231,7 +280,36 @@ mod tests {
     fn account_management() {
         let app = app_with_memory();
         assert_eq!(app.accounts(), vec!["mem"]);
-        assert!(app.remove_account("mem"));
+        assert!(app.remove_account("mem").unwrap());
         assert!(app.accounts().is_empty());
+    }
+
+    #[test]
+    fn store_backed_accounts_persist_across_restart() {
+        let path = std::env::temp_dir().join(format!(
+            "nebula-app-test-{}.db",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        {
+            let app = App::with_store(&path).unwrap();
+            app.add_aliyun_account("acc", "ak", "sk", "oss-cn-hangzhou.aliyuncs.com")
+                .unwrap();
+            assert_eq!(app.accounts(), vec!["acc"]);
+        }
+        {
+            // 重新打开:账号应从库里加载并注册。
+            let app = App::with_store(&path).unwrap();
+            assert_eq!(app.accounts(), vec!["acc"]);
+            assert!(app.remove_account("acc").unwrap());
+        }
+        {
+            // 删除已持久化:再次打开为空。
+            let app = App::with_store(&path).unwrap();
+            assert!(app.accounts().is_empty());
+        }
+        let _ = std::fs::remove_file(&path);
     }
 }

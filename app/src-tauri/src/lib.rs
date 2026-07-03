@@ -5,7 +5,7 @@
 use app_core::App;
 use bytes::Bytes;
 use nebula_provider::Entry;
-use tauri::State;
+use tauri::{Manager, State};
 
 /// 列出已注册账号。
 #[tauri::command]
@@ -13,7 +13,7 @@ fn list_accounts(state: State<'_, App>) -> Vec<String> {
     state.accounts()
 }
 
-/// 新增一个阿里云 OSS 账号。
+/// 新增一个阿里云 OSS 账号(持久化到 SQLite)。
 #[tauri::command]
 fn add_aliyun_account(
     state: State<'_, App>,
@@ -21,14 +21,16 @@ fn add_aliyun_account(
     access_key_id: String,
     access_key_secret: String,
     endpoint: String,
-) {
-    state.add_aliyun_account(id, access_key_id, access_key_secret, endpoint);
+) -> Result<(), String> {
+    state
+        .add_aliyun_account(id, access_key_id, access_key_secret, endpoint)
+        .map_err(|e| e.to_string())
 }
 
-/// 移除账号。
+/// 移除账号(从注册表与 SQLite)。
 #[tauri::command]
-fn remove_account(state: State<'_, App>, id: String) -> bool {
-    state.remove_account(&id)
+fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
+    state.remove_account(&id).map_err(|e| e.to_string())
 }
 
 /// 浏览某账号下某路径(桶 / 前缀)。
@@ -97,12 +99,18 @@ async fn delete(state: State<'_, App>, account: String, path: String) -> Result<
     app.delete(&account, &path).await.map_err(|e| e.to_string())
 }
 
-/// 启动 Tauri 应用。
+/// 启动 Tauri 应用。账号存到应用数据目录下的 `nebula.db`。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(App::new())
+        .setup(|app| {
+            let dir = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&dir)?;
+            let core = App::with_store(dir.join("nebula.db"))?;
+            app.manage(core);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             list_accounts,
             add_aliyun_account,

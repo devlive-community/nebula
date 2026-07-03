@@ -13,6 +13,7 @@ nebula-provider = { path = "../nebula-provider" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
 bytes = { workspace = true }
 thiserror = { workspace = true }
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [dev-dependencies]
 tokio = { workspace = true }
