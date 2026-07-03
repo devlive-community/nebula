@@ -193,6 +193,20 @@ async fn copy(
         .map_err(|e| e.to_string())
 }
 
+/// 生成对象的预签名下载链接。
+#[tauri::command]
+async fn presign(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    expires_secs: u64,
+) -> Result<String, String> {
+    let app = state.inner().clone();
+    app.presign(&account, &path, expires_secs)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 启动 Tauri 应用。账号存到应用数据目录下的 `nebula.db`。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -217,6 +231,7 @@ pub fn run() {
             create_folder,
             rename,
             copy,
+            presign,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

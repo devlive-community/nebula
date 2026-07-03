@@ -211,6 +211,11 @@ impl App {
         Ok(self.provider(account)?.copy(from, to).await?)
     }
 
+    /// 生成预签名下载链接,`expires_secs` 秒后失效。
+    pub async fn presign(&self, account: &str, path: &str, expires_secs: u64) -> Result<String> {
+        Ok(self.provider(account)?.presign(path, expires_secs).await?)
+    }
+
     /// 按 id 解析 provider,未注册则报 [`AppError::NoSuchProvider`]。
     fn provider(&self, account: &str) -> Result<Arc<dyn StorageProvider>> {
         self.registry

@@ -3,12 +3,12 @@
 //! 所有请求都经 [`crate::sign`] 签名后由共享 HTTP 客户端发出;非 2xx 响应会被
 //! 解析成 [`OssError::Api`](读取 OSS 的 Error XML)。
 
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
 use futures::StreamExt;
 use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, DATE, ETAG, LAST_MODIFIED};
-use reqwest::{Method, Request, Response, StatusCode};
+use reqwest::{Method, Request, Response, StatusCode, Url};
 use serde::Deserialize;
 
 use crate::client::OssClient;
@@ -151,6 +151,31 @@ impl OssClient {
             .build()
             .map_err(cloud_core::CoreError::from)
             .map_err(OssError::from)
+    }
+
+    /// 生成一个 GET 预签名 URL,`expires_in` 秒后失效。纯本地签名,不发请求。
+    pub fn presign_get(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| OssError::Core(cloud_core::CoreError::Signature(e.to_string())))?
+            .as_secs();
+        self.build_presigned_url(bucket, key, now + expires_in)
+    }
+
+    /// 用绝对过期时间戳构造预签名 URL。抽出 `expiration` 便于确定性测试。
+    fn build_presigned_url(&self, bucket: &str, key: &str, expiration: u64) -> Result<String> {
+        // 预签名的 StringToSign 用 Expires 顶替 Date 那一行。
+        let canonical = format!("/{bucket}/{key}");
+        let sts = sign::string_to_sign("GET", "", "", &expiration.to_string(), "", &canonical);
+        let signature = sign::signature(self.access_key_secret(), &sts);
+
+        let mut url = Url::parse(&format!("{}/{}", self.bucket_base_url(bucket), key))
+            .map_err(|e| OssError::Core(cloud_core::CoreError::InvalidRequest(e.to_string())))?;
+        url.query_pairs_mut()
+            .append_pair("OSSAccessKeyId", self.access_key_id())
+            .append_pair("Expires", &expiration.to_string())
+            .append_pair("Signature", &signature);
+        Ok(url.to_string())
     }
 
     /// 读取对象元信息(HEAD)。
@@ -372,6 +397,29 @@ mod tests {
             req.headers().get(AUTHORIZATION).unwrap().to_str().unwrap(),
             sign::authorization(client.access_key_id(), client.access_key_secret(), &sts)
         );
+    }
+
+    #[test]
+    fn presign_builds_signed_query_url() {
+        let client = test_client();
+        let url = client
+            .build_presigned_url("oss-example", "nelson", 1_234_567_890)
+            .unwrap();
+
+        assert!(url.starts_with("https://oss-example.oss-cn-hangzhou.aliyuncs.com/nelson?"));
+
+        let parsed = Url::parse(&url).unwrap();
+        let params: std::collections::HashMap<_, _> = parsed.query_pairs().into_owned().collect();
+        assert_eq!(
+            params.get("OSSAccessKeyId").unwrap(),
+            "44CF9590006BF252F707"
+        );
+        assert_eq!(params.get("Expires").unwrap(), "1234567890");
+
+        // 独立按预签名规则算出期望签名(Expires 顶替 Date)。
+        let sts = sign::string_to_sign("GET", "", "", "1234567890", "", "/oss-example/nelson");
+        let expected = sign::signature(client.access_key_secret(), &sts);
+        assert_eq!(params.get("Signature").unwrap(), &expected);
     }
 
     #[test]

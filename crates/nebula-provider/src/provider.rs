@@ -8,7 +8,7 @@ use futures::Stream;
 
 use crate::capabilities::Capabilities;
 use crate::entry::Entry;
-use crate::error::Result;
+use crate::error::{ProviderError, Result};
 
 /// 进度回调:`(已处理字节, 总字节)`。适配层在传输过程中多次调用。
 pub type ProgressFn<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
@@ -89,5 +89,10 @@ pub trait StorageProvider: Send + Sync {
     async fn rename(&self, from: &str, to: &str) -> Result<()> {
         self.copy(from, to).await?;
         self.delete(from).await
+    }
+
+    /// 生成一个 `expires_secs` 秒后失效的预签名下载链接。默认不支持。
+    async fn presign(&self, _path: &str, _expires_secs: u64) -> Result<String> {
+        Err(ProviderError::Unsupported("presign".into()))
     }
 }

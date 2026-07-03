@@ -18,6 +18,10 @@ pub enum ProviderError {
     #[error("invalid path: {0}")]
     InvalidPath(String),
 
+    /// 该 provider 不支持此操作。
+    #[error("unsupported: {0}")]
+    Unsupported(String),
+
     /// 其他来自后端 SDK 的失败(携带原始信息)。
     #[error("backend error: {0}")]
     Backend(String),

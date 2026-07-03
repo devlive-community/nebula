@@ -87,8 +87,8 @@ impl StorageProvider for AliyunProvider {
     fn capabilities(&self) -> Capabilities {
         Capabilities {
             multipart_upload: true,
-            presign: false,
-            server_side_copy: false,
+            presign: true,
+            server_side_copy: true,
             hierarchical: false,
         }
     }
@@ -230,6 +230,13 @@ impl StorageProvider for AliyunProvider {
         self.client
             .copy_object(src_bucket, src_key, dst_bucket, dst_key)
             .await
+            .map_err(map_err)
+    }
+
+    async fn presign(&self, path: &str, expires_secs: u64) -> Result<String> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .presign_get(bucket, key, expires_secs)
             .map_err(map_err)
     }
 }
