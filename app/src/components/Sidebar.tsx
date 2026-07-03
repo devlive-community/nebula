@@ -1,3 +1,6 @@
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCloud, faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+
 interface Props {
   accounts: string[];
   current: string | null;
@@ -10,15 +13,13 @@ export function Sidebar({ accounts, current, onSelect, onAdd, onRemove }: Props)
   return (
     <aside className="sidebar">
       <div className="sidebar__brand">
-        <span className="sidebar__logo">☁</span>
+        <FontAwesomeIcon icon={faCloud} className="sidebar__logo" />
         <span>Nebula</span>
       </div>
 
       <div className="sidebar__section-title">账号</div>
       <nav className="sidebar__accounts">
-        {accounts.length === 0 && (
-          <div className="sidebar__empty">还没有账号</div>
-        )}
+        {accounts.length === 0 && <div className="sidebar__empty">还没有账号</div>}
         {accounts.map((id) => (
           <div
             key={id}
@@ -35,14 +36,14 @@ export function Sidebar({ accounts, current, onSelect, onAdd, onRemove }: Props)
                 onRemove(id);
               }}
             >
-              ✕
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
         ))}
       </nav>
 
       <button className="btn btn--primary sidebar__add" onClick={onAdd}>
-        + 添加账号
+        <FontAwesomeIcon icon={faPlus} /> 添加账号
       </button>
     </aside>
   );

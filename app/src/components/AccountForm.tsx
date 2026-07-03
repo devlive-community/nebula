@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
 
 interface Props {
   onSubmit: (
@@ -24,7 +26,7 @@ export function AccountForm({ onSubmit, onClose }: Props) {
         <div className="modal__header">
           <h3>添加阿里云 OSS 账号</h3>
           <button className="modal__close" onClick={onClose}>
-            ✕
+            <FontAwesomeIcon icon={faXmark} />
           </button>
         </div>
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCloud, faPlus } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "./types";
 import * as api from "./api";
 import { baseName, joinRemote, parentPath } from "./util";
@@ -167,11 +169,11 @@ export default function App() {
           </>
         ) : (
           <div className="empty-state">
-            <div className="empty-state__icon">☁</div>
+            <FontAwesomeIcon icon={faCloud} className="empty-state__icon" />
             <h2>欢迎使用 Nebula</h2>
             <p>添加一个云账号开始管理你的对象存储</p>
             <button className="btn btn--primary" onClick={() => setShowForm(true)}>
-              + 添加账号
+              <FontAwesomeIcon icon={faPlus} /> 添加账号
             </button>
           </div>
         )}

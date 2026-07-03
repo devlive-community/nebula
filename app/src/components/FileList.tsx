@@ -1,3 +1,10 @@
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faDownload,
+  faFile,
+  faFolder,
+  faTrash,
+} from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { formatBytes } from "../util";
 
@@ -35,7 +42,9 @@ export function FileList({ entries, loading, onOpenDir, onDownload, onDelete }: 
               onDoubleClick={() => isDir && onOpenDir(entry)}
             >
               <span className="col-name">
-                <span className="row__icon">{isDir ? "📁" : "📄"}</span>
+                <span className="row__icon">
+                  <FontAwesomeIcon icon={isDir ? faFolder : faFile} />
+                </span>
                 {isDir ? (
                   <button className="row__name-link" onClick={() => onOpenDir(entry)}>
                     {entry.name}
@@ -54,14 +63,14 @@ export function FileList({ entries, loading, onOpenDir, onDownload, onDelete }: 
                       title="下载"
                       onClick={() => onDownload(entry)}
                     >
-                      ⬇
+                      <FontAwesomeIcon icon={faDownload} />
                     </button>
                     <button
                       className="icon-btn icon-btn--danger"
                       title="删除"
                       onClick={() => onDelete(entry)}
                     >
-                      🗑
+                      <FontAwesomeIcon icon={faTrash} />
                     </button>
                   </>
                 )}
