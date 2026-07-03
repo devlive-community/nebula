@@ -11,8 +11,24 @@
   --danger: #ef4757;
   --radius: 10px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --scrollbar: #2b313d;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root[data-theme="light"] {
+  --bg: #f6f7f9;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #eef0f3;
+  --border: #dfe3e8;
+  --text: #1c2128;
+  --text-dim: #5a6472;
+  --text-faint: #9aa3b2;
+  --primary: #2f6fed;
+  --primary-hover: #245fd6;
+  --danger: #e5484d;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --scrollbar: #cdd3db;
 }
 
 * {
@@ -144,6 +160,10 @@ button {
 
 .sidebar__add {
   margin-top: 12px;
+}
+
+.sidebar__theme {
+  margin-top: 8px;
 }
 
 /* ---------- Main ---------- */
@@ -901,11 +921,11 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2b313d;
+  background: var(--scrollbar);
   border-radius: 5px;
   border: 2px solid var(--bg);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #363d4b;
+  opacity: 0.8;
 }

@@ -38,6 +38,14 @@ export default function App() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingBatchDelete, setPendingBatchDelete] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(
+    () => (localStorage.getItem("nebula-theme") as "dark" | "light") || "dark",
+  );
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("nebula-theme", theme);
+  }, [theme]);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [filter, setFilter] = useState("");
   const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
@@ -376,9 +384,11 @@ export default function App() {
       <Sidebar
         accounts={accounts}
         current={current}
+        theme={theme}
         onSelect={selectAccount}
         onAdd={() => setShowForm(true)}
         onRemove={removeAccount}
+        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
       />
 
       <main className="main">

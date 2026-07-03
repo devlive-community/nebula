@@ -1,15 +1,31 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCloud, faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCloud,
+  faMoon,
+  faPlus,
+  faSun,
+  faXmark,
+} from "@fortawesome/free-solid-svg-icons";
 
 interface Props {
   accounts: string[];
   current: string | null;
+  theme: "dark" | "light";
   onSelect: (id: string) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
+  onToggleTheme: () => void;
 }
 
-export function Sidebar({ accounts, current, onSelect, onAdd, onRemove }: Props) {
+export function Sidebar({
+  accounts,
+  current,
+  theme,
+  onSelect,
+  onAdd,
+  onRemove,
+  onToggleTheme,
+}: Props) {
   return (
     <aside className="sidebar">
       <div className="sidebar__brand">
@@ -44,6 +60,11 @@ export function Sidebar({ accounts, current, onSelect, onAdd, onRemove }: Props)
 
       <button className="btn btn--primary sidebar__add" onClick={onAdd}>
         <FontAwesomeIcon icon={faPlus} /> 添加账号
+      </button>
+
+      <button className="btn sidebar__theme" onClick={onToggleTheme}>
+        <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} />
+        {theme === "dark" ? " 浅色模式" : " 深色模式"}
       </button>
     </aside>
   );
