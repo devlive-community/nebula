@@ -4,6 +4,7 @@ import {
   faDownload,
   faFile,
   faFolder,
+  faLink,
   faPen,
   faSortDown,
   faSortUp,
@@ -29,6 +30,7 @@ interface Props {
   onDownload: (entry: Entry) => void;
   onRename: (entry: Entry) => void;
   onMoveCopy: (entry: Entry) => void;
+  onShare: (entry: Entry) => void;
   onDelete: (entry: Entry) => void;
 }
 
@@ -46,6 +48,7 @@ export function FileList({
   onDownload,
   onRename,
   onMoveCopy,
+  onShare,
   onDelete,
 }: Props) {
   const someSelected = entries.some(
@@ -143,6 +146,13 @@ export function FileList({
                       onClick={() => onMoveCopy(entry)}
                     >
                       <FontAwesomeIcon icon={faCopy} />
+                    </button>
+                    <button
+                      className="icon-btn"
+                      title="分享链接"
+                      onClick={() => onShare(entry)}
+                    >
+                      <FontAwesomeIcon icon={faLink} />
                     </button>
                     <button
                       className="icon-btn icon-btn--danger"

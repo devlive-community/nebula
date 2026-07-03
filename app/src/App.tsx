@@ -15,6 +15,7 @@ import { FileList } from "./components/FileList";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { MoveCopyDialog } from "./components/MoveCopyDialog";
+import { ShareDialog } from "./components/ShareDialog";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -28,7 +29,10 @@ export default function App() {
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [moveCopyTarget, setMoveCopyTarget] = useState<Entry | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+
+  const SHARE_MINUTES = 60;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingBatchDelete, setPendingBatchDelete] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -337,6 +341,17 @@ export default function App() {
     }
   };
 
+  const share = async (entry: Entry) => {
+    if (!current) return;
+    setError(null);
+    try {
+      const url = await api.presign(current, entry.path, SHARE_MINUTES * 60);
+      setShareUrl(url);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const createFolder = async (name: string) => {
     setShowNewFolder(false);
     if (!current || !path) return;
@@ -422,6 +437,7 @@ export default function App() {
               onDownload={download}
               onRename={setRenameTarget}
               onMoveCopy={setMoveCopyTarget}
+              onShare={share}
               onDelete={setPendingDelete}
             />
 
@@ -512,6 +528,14 @@ export default function App() {
           onCopy={(to) => doMoveCopy("copy", to)}
           onMove={(to) => doMoveCopy("move", to)}
           onCancel={() => setMoveCopyTarget(null)}
+        />
+      )}
+
+      {shareUrl && (
+        <ShareDialog
+          url={shareUrl}
+          minutes={SHARE_MINUTES}
+          onClose={() => setShareUrl(null)}
         />
       )}
     </div>

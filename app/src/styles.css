@@ -323,7 +323,7 @@ button {
 .filelist__head,
 .row {
   display: grid;
-  grid-template-columns: 32px 1fr 110px 180px 150px;
+  grid-template-columns: 32px 1fr 100px 160px 180px;
   align-items: center;
   gap: 8px;
   padding: 0 20px;
@@ -681,6 +681,25 @@ button {
   color: var(--text-dim);
   line-height: 1.6;
   word-break: break-all;
+}
+
+.share__url {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+  user-select: text;
+}
+
+.share__note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-faint);
 }
 
 .prompt__input {
