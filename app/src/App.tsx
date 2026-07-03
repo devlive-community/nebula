@@ -26,14 +26,17 @@ export default function App() {
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pendingBatchDelete, setPendingBatchDelete] = useState(false);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [filter, setFilter] = useState("");
   const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  // 切换账号 / 目录时清空过滤词。
+  // 切换账号 / 目录时清空过滤词与选择。
   useEffect(() => {
     setFilter("");
+    setSelected(new Set());
   }, [current, path]);
 
   const visibleEntries = useMemo(() => {
@@ -61,6 +64,31 @@ export default function App() {
       setSortDir("asc");
     }
   };
+
+  const visibleFiles = useMemo(
+    () => visibleEntries.filter((e) => e.kind === "file"),
+    [visibleEntries],
+  );
+  const allSelected =
+    visibleFiles.length > 0 && visibleFiles.every((f) => selected.has(f.path));
+
+  const toggleSelect = (p: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
+
+  const toggleSelectAll = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) visibleFiles.forEach((f) => next.delete(f.path));
+      else visibleFiles.forEach((f) => next.add(f.path));
+      return next;
+    });
+
+  const clearSelection = () => setSelected(new Set());
 
   useEffect(() => {
     const unUpload = listen<UploadProgress>("upload-progress", (e) => {
@@ -147,6 +175,41 @@ export default function App() {
       setEntries([]);
     }
     await refreshAccounts();
+  };
+
+  const doBatchDelete = async () => {
+    setPendingBatchDelete(false);
+    if (!current || selected.size === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      for (const p of selected) await api.deletePath(current, p);
+      clearSelection();
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const batchDownload = async () => {
+    if (!current || selected.size === 0) return;
+    const dir = await open({ directory: true, title: "选择下载到的文件夹" });
+    if (typeof dir !== "string") return;
+    setBusy(true);
+    setError(null);
+    try {
+      for (const p of selected) {
+        await api.downloadFile(current, p, `${dir}/${baseName(p)}`);
+      }
+      clearSelection();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+      setTransfer(null);
+    }
   };
 
   const upload = async () => {
@@ -262,12 +325,35 @@ export default function App() {
 
             {error && <div className="error-banner">{error}</div>}
 
+            {selected.size > 0 && (
+              <div className="batch-bar">
+                <span className="batch-bar__count">已选 {selected.size} 项</span>
+                <div className="batch-bar__spacer" />
+                <button className="btn" onClick={batchDownload}>
+                  批量下载
+                </button>
+                <button
+                  className="btn btn--danger"
+                  onClick={() => setPendingBatchDelete(true)}
+                >
+                  批量删除
+                </button>
+                <button className="btn" onClick={clearSelection}>
+                  取消选择
+                </button>
+              </div>
+            )}
+
             <FileList
               entries={visibleEntries}
               loading={loading}
               sortKey={sortKey}
               sortDir={sortDir}
+              selected={selected}
+              allSelected={allSelected}
               onSort={toggleSort}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
               onOpenDir={(e) => setPath(e.path.endsWith("/") ? e.path : e.path + "/")}
               onDownload={download}
               onRename={setRenameTarget}
@@ -340,6 +426,17 @@ export default function App() {
           submitLabel="重命名"
           onSubmit={doRename}
           onCancel={() => setRenameTarget(null)}
+        />
+      )}
+
+      {pendingBatchDelete && (
+        <ConfirmDialog
+          title="批量删除"
+          message={`确定删除选中的 ${selected.size} 项?此操作不可恢复。`}
+          danger
+          confirmLabel="删除"
+          onConfirm={doBatchDelete}
+          onCancel={() => setPendingBatchDelete(false)}
         />
       )}
     </div>

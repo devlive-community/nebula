@@ -18,7 +18,11 @@ interface Props {
   loading: boolean;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
+  selected: Set<string>;
+  allSelected: boolean;
   onSort: (key: SortKey) => void;
+  onToggleSelect: (path: string) => void;
+  onToggleSelectAll: () => void;
   onOpenDir: (entry: Entry) => void;
   onDownload: (entry: Entry) => void;
   onRename: (entry: Entry) => void;
@@ -30,7 +34,11 @@ export function FileList({
   loading,
   sortKey,
   sortDir,
+  selected,
+  allSelected,
   onSort,
+  onToggleSelect,
+  onToggleSelectAll,
   onOpenDir,
   onDownload,
   onRename,
@@ -58,6 +66,13 @@ export function FileList({
   return (
     <div className="filelist">
       <div className="filelist__head">
+        <span className="col-check">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={onToggleSelectAll}
+          />
+        </span>
         {header("name", "名称", "col-name")}
         {header("size", "大小", "col-size")}
         {header("modified", "修改时间", "col-modified")}
@@ -72,6 +87,15 @@ export function FileList({
               className={`row ${isDir ? "row--dir" : ""}`}
               onDoubleClick={() => isDir && onOpenDir(entry)}
             >
+              <span className="col-check" onClick={(e) => e.stopPropagation()}>
+                {!isDir && (
+                  <input
+                    type="checkbox"
+                    checked={selected.has(entry.path)}
+                    onChange={() => onToggleSelect(entry.path)}
+                  />
+                )}
+              </span>
               <span className="col-name">
                 <span className="row__icon">
                   <FontAwesomeIcon icon={isDir ? faFolder : faFile} />

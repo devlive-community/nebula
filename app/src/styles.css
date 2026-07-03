@@ -300,10 +300,20 @@ button {
 .filelist__head,
 .row {
   display: grid;
-  grid-template-columns: 1fr 120px 200px 120px;
+  grid-template-columns: 32px 1fr 120px 200px 120px;
   align-items: center;
   gap: 8px;
   padding: 0 20px;
+}
+
+.col-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.col-check input {
+  cursor: pointer;
 }
 
 .filelist__head {
@@ -432,6 +442,27 @@ button {
 .icon-btn--danger:hover {
   color: var(--danger);
   background: rgba(239, 71, 87, 0.12);
+}
+
+/* ---------- Batch selection bar ---------- */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 20px 0;
+  padding: 8px 12px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.batch-bar__count {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.batch-bar__spacer {
+  flex: 1;
 }
 
 /* ---------- Error banner ---------- */
