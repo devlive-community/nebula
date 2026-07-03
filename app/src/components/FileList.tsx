@@ -8,7 +8,7 @@ import {
   faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
-import { formatBytes } from "../util";
+import { formatBytes, formatDate } from "../util";
 
 type SortKey = "name" | "size" | "modified";
 
@@ -82,7 +82,9 @@ export function FileList({
                 )}
               </span>
               <span className="col-size">{isDir ? "—" : formatBytes(entry.size)}</span>
-              <span className="col-modified">{entry.last_modified ?? "—"}</span>
+              <span className="col-modified">
+                {isDir ? "—" : formatDate(entry.last_modified)}
+              </span>
               <span className="col-actions">
                 {!isDir && (
                   <>

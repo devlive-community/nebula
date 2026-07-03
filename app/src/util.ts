@@ -7,6 +7,18 @@ export function formatBytes(size: number): string {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** 把 ISO 时间(如 2026-07-03T08:12:04.000Z)格式化为本地时区的可读字符串。 */
+export function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+}
+
 /** 取路径的父目录(用于"返回上一层")。根("")保持不变。 */
 export function parentPath(path: string): string {
   const trimmed = path.replace(/\/+$/, "");
