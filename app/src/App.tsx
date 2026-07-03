@@ -4,7 +4,12 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCloud, faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-icons";
-import type { DownloadProgress, Entry, Transfer, UploadProgress } from "./types";
+import type {
+  DownloadProgress,
+  Entry,
+  TransferItem,
+  UploadProgress,
+} from "./types";
 import * as api from "./api";
 import { baseName, joinRemote, parentPath } from "./util";
 import { Sidebar } from "./components/Sidebar";
@@ -17,6 +22,7 @@ import { PromptDialog } from "./components/PromptDialog";
 import { MoveCopyDialog } from "./components/MoveCopyDialog";
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
+import { TransferPanel } from "./components/TransferPanel";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -46,7 +52,44 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("nebula-theme", theme);
   }, [theme]);
-  const [transfer, setTransfer] = useState<Transfer | null>(null);
+  const [transfers, setTransfers] = useState<Record<string, TransferItem>>({});
+
+  const updateProgress = (id: string, done: number, total: number) =>
+    setTransfers((prev) =>
+      prev[id] ? { ...prev, [id]: { ...prev[id], done, total } } : prev,
+    );
+
+  const runTransfer = async (
+    id: string,
+    kind: "上传" | "下载",
+    name: string,
+    fn: () => Promise<void>,
+  ) => {
+    setTransfers((prev) => ({
+      ...prev,
+      [id]: { id, kind, name, done: 0, total: 0, status: "active" },
+    }));
+    try {
+      await fn();
+      setTransfers((prev) =>
+        prev[id]
+          ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
+          : prev,
+      );
+    } catch (e) {
+      setError(String(e));
+      setTransfers((prev) =>
+        prev[id] ? { ...prev, [id]: { ...prev[id], status: "error" } } : prev,
+      );
+    }
+  };
+
+  const clearTransfers = () =>
+    setTransfers((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).filter(([, v]) => v.status === "active"),
+      ),
+    );
   const [filter, setFilter] = useState("");
   const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -111,20 +154,10 @@ export default function App() {
 
   useEffect(() => {
     const unUpload = listen<UploadProgress>("upload-progress", (e) => {
-      setTransfer({
-        label: "上传",
-        path: e.payload.path,
-        done: e.payload.uploaded,
-        total: e.payload.total,
-      });
+      updateProgress(e.payload.path, e.payload.uploaded, e.payload.total);
     });
     const unDownload = listen<DownloadProgress>("download-progress", (e) => {
-      setTransfer({
-        label: "下载",
-        path: e.payload.path,
-        done: e.payload.downloaded,
-        total: e.payload.total,
-      });
+      updateProgress(e.payload.path, e.payload.downloaded, e.payload.total);
     });
     return () => {
       unUpload.then((off) => off());
@@ -168,18 +201,14 @@ export default function App() {
   onDropRef.current = async (paths: string[]) => {
     if (!current || !path || paths.length === 0) return;
     setBusy(true);
-    setError(null);
-    try {
-      for (const local of paths) {
-        await api.uploadFile(current, joinRemote(path, baseName(local)), local);
-      }
-      await load();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-      setTransfer(null);
+    for (const local of paths) {
+      const remote = joinRemote(path, baseName(local));
+      await runTransfer(remote, "上传", baseName(local), () =>
+        api.uploadFile(current, remote, local),
+      );
     }
+    await load();
+    setBusy(false);
   };
 
   useEffect(() => {
@@ -254,18 +283,13 @@ export default function App() {
     const dir = await open({ directory: true, title: "选择下载到的文件夹" });
     if (typeof dir !== "string") return;
     setBusy(true);
-    setError(null);
-    try {
-      for (const p of selected) {
-        await api.downloadFile(current, p, `${dir}/${baseName(p)}`);
-      }
-      clearSelection();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-      setTransfer(null);
+    for (const p of selected) {
+      await runTransfer(p, "下载", baseName(p), () =>
+        api.downloadFile(current, p, `${dir}/${baseName(p)}`),
+      );
     }
+    clearSelection();
+    setBusy(false);
   };
 
   const upload = async () => {
@@ -274,16 +298,11 @@ export default function App() {
     if (typeof selected !== "string") return;
     const remote = joinRemote(path, baseName(selected));
     setBusy(true);
-    setError(null);
-    try {
-      await api.uploadFile(current, remote, selected);
-      await load();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-      setTransfer(null);
-    }
+    await runTransfer(remote, "上传", baseName(selected), () =>
+      api.uploadFile(current, remote, selected),
+    );
+    await load();
+    setBusy(false);
   };
 
   const download = async (entry: Entry) => {
@@ -291,15 +310,10 @@ export default function App() {
     const target = await save({ defaultPath: entry.name });
     if (typeof target !== "string") return;
     setBusy(true);
-    setError(null);
-    try {
-      await api.downloadFile(current, entry.path, target);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-      setTransfer(null);
-    }
+    await runTransfer(entry.path, "下载", entry.name, () =>
+      api.downloadFile(current, entry.path, target),
+    );
+    setBusy(false);
   };
 
   const doDelete = async () => {
@@ -464,25 +478,11 @@ export default function App() {
               />
             )}
 
-            {transfer && transfer.total > 0 && (
-              <div className="upload-progress">
-                <div className="upload-progress__info">
-                  <span className="upload-progress__name">
-                    {transfer.label} {baseName(transfer.path)}
-                  </span>
-                  <span className="upload-progress__pct">
-                    {Math.round((transfer.done / transfer.total) * 100)}%
-                  </span>
-                </div>
-                <div className="upload-progress__track">
-                  <div
-                    className="upload-progress__fill"
-                    style={{
-                      width: `${(transfer.done / transfer.total) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
+            {Object.keys(transfers).length > 0 && (
+              <TransferPanel
+                items={Object.values(transfers)}
+                onClear={clearTransfers}
+              />
             )}
           </>
         ) : (

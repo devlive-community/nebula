@@ -14,12 +14,14 @@ export interface DownloadProgress {
   total: number;
 }
 
-/** 统一的传输进度(上传 / 下载共用一个进度条)。 */
-export interface Transfer {
-  label: string;
-  path: string;
+/** 传输任务列表中的一项。 */
+export interface TransferItem {
+  id: string;
+  kind: "上传" | "下载";
+  name: string;
   done: number;
   total: number;
+  status: "active" | "done" | "error";
 }
 
 /** 与 Rust 端 nebula_provider::Entry 对应。 */
