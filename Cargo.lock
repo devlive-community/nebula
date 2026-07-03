@@ -18,6 +18,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "app-core"
+version = "1.0.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "nebula-provider",
+ "provider-aliyun",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

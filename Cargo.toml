@@ -24,6 +24,9 @@ members = [
     # App 统一抽象 trait(可选发布)
     "crates/nebula-provider",
 
+    # App 业务逻辑(框架无关,App 私有)
+    "crates/app-core",
+
     # 适配层(App 私有,不发布)
     "crates/providers/provider-aliyun",
     # "crates/providers/provider-tencent",

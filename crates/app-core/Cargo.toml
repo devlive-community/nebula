@@ -1,0 +1,19 @@
+[package]
+name = "app-core"
+version.workspace = true
+description = "Framework-agnostic Nebula app logic over the provider registry (used by the Tauri shell)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+nebula-provider = { path = "../nebula-provider" }
+provider-aliyun = { path = "../providers/provider-aliyun" }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+async-trait = "0.1"
