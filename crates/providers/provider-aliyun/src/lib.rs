@@ -13,6 +13,16 @@ use futures::StreamExt;
 use aliyun_oss::{ListEntry, OssClient, OssError};
 use nebula_provider::{path, Capabilities, Entry, ProviderError, Result, StorageProvider};
 
+/// 超过该大小的上传自动改用分片上传。
+const MULTIPART_THRESHOLD: usize = 16 * 1024 * 1024;
+/// 分片上传时每片大小。
+const MULTIPART_PART_SIZE: usize = 8 * 1024 * 1024;
+
+/// 是否应对该大小的数据使用分片上传。
+fn should_multipart(len: usize) -> bool {
+    len > MULTIPART_THRESHOLD
+}
+
 /// 阿里云 OSS 的 provider 适配器。一个实例 = 一个账号。
 pub struct AliyunProvider {
     id: String,
@@ -148,10 +158,17 @@ impl StorageProvider for AliyunProvider {
 
     async fn write(&self, path: &str, data: Bytes, content_type: Option<&str>) -> Result<()> {
         let (bucket, key) = require_object(path)?;
-        self.client
-            .put_object(bucket, key, data, content_type)
-            .await
-            .map_err(map_err)
+        if should_multipart(data.len()) {
+            self.client
+                .upload_multipart(bucket, key, data, MULTIPART_PART_SIZE, content_type)
+                .await
+                .map_err(map_err)
+        } else {
+            self.client
+                .put_object(bucket, key, data, content_type)
+                .await
+                .map_err(map_err)
+        }
     }
 
     async fn delete(&self, path: &str) -> Result<()> {
@@ -169,6 +186,13 @@ mod tests {
 
     fn provider() -> AliyunProvider {
         AliyunProvider::new("test", "ak", "sk", "oss-cn-hangzhou.aliyuncs.com")
+    }
+
+    #[test]
+    fn multipart_threshold_decision() {
+        assert!(!should_multipart(0));
+        assert!(!should_multipart(MULTIPART_THRESHOLD));
+        assert!(should_multipart(MULTIPART_THRESHOLD + 1));
     }
 
     #[test]
