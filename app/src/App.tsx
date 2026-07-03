@@ -14,6 +14,7 @@ import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
+import { MoveCopyDialog } from "./components/MoveCopyDialog";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -26,6 +27,7 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
+  const [moveCopyTarget, setMoveCopyTarget] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingBatchDelete, setPendingBatchDelete] = useState(false);
@@ -318,6 +320,23 @@ export default function App() {
     }
   };
 
+  const doMoveCopy = async (mode: "copy" | "move", to: string) => {
+    const entry = moveCopyTarget;
+    setMoveCopyTarget(null);
+    if (!current || !entry) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (mode === "copy") await api.copy(current, entry.path, to);
+      else await api.rename(current, entry.path, to);
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const createFolder = async (name: string) => {
     setShowNewFolder(false);
     if (!current || !path) return;
@@ -402,6 +421,7 @@ export default function App() {
               onOpenDir={(e) => setPath(e.path.endsWith("/") ? e.path : e.path + "/")}
               onDownload={download}
               onRename={setRenameTarget}
+              onMoveCopy={setMoveCopyTarget}
               onDelete={setPendingDelete}
             />
 
@@ -482,6 +502,15 @@ export default function App() {
           confirmLabel="删除"
           onConfirm={doBatchDelete}
           onCancel={() => setPendingBatchDelete(false)}
+        />
+      )}
+
+      {moveCopyTarget && (
+        <MoveCopyDialog
+          from={moveCopyTarget.path}
+          onCopy={(to) => doMoveCopy("copy", to)}
+          onMove={(to) => doMoveCopy("move", to)}
+          onCancel={() => setMoveCopyTarget(null)}
         />
       )}
     </div>

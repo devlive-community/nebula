@@ -323,7 +323,7 @@ button {
 .filelist__head,
 .row {
   display: grid;
-  grid-template-columns: 32px 1fr 120px 200px 120px;
+  grid-template-columns: 32px 1fr 110px 180px 150px;
   align-items: center;
   gap: 8px;
   padding: 0 20px;
@@ -700,6 +700,11 @@ button {
 
 .field input:focus {
   border-color: var(--primary);
+}
+
+.field input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .modal__footer {

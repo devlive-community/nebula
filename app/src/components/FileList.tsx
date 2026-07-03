@@ -1,5 +1,6 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faCopy,
   faDownload,
   faFile,
   faFolder,
@@ -27,6 +28,7 @@ interface Props {
   onOpenDir: (entry: Entry) => void;
   onDownload: (entry: Entry) => void;
   onRename: (entry: Entry) => void;
+  onMoveCopy: (entry: Entry) => void;
   onDelete: (entry: Entry) => void;
 }
 
@@ -43,6 +45,7 @@ export function FileList({
   onOpenDir,
   onDownload,
   onRename,
+  onMoveCopy,
   onDelete,
 }: Props) {
   const someSelected = entries.some(
@@ -133,6 +136,13 @@ export function FileList({
                       onClick={() => onRename(entry)}
                     >
                       <FontAwesomeIcon icon={faPen} />
+                    </button>
+                    <button
+                      className="icon-btn"
+                      title="复制 / 移动到"
+                      onClick={() => onMoveCopy(entry)}
+                    >
+                      <FontAwesomeIcon icon={faCopy} />
                     </button>
                     <button
                       className="icon-btn icon-btn--danger"

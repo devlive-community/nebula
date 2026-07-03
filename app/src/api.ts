@@ -44,3 +44,6 @@ export const createFolder = (account: string, path: string) =>
 
 export const rename = (account: string, from: string, to: string) =>
   invoke<void>("rename", { account, from, to });
+
+export const copy = (account: string, from: string, to: string) =>
+  invoke<void>("copy", { account, from, to });
