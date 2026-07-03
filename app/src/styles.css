@@ -392,6 +392,48 @@ button {
   word-break: break-all;
 }
 
+/* ---------- Upload progress ---------- */
+.upload-progress {
+  border-top: 1px solid var(--border);
+  padding: 12px 20px;
+  background: var(--bg-elev);
+}
+
+.upload-progress__info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.upload-progress__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 12px;
+}
+
+.upload-progress__pct {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.upload-progress__track {
+  height: 6px;
+  background: var(--bg-elev-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.upload-progress__fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.15s ease;
+}
+
 /* ---------- Empty state ---------- */
 .empty-state {
   flex: 1;

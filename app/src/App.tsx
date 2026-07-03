@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCloud, faPlus } from "@fortawesome/free-solid-svg-icons";
-import type { Entry } from "./types";
+import type { Entry, UploadProgress } from "./types";
 import * as api from "./api";
 import { baseName, joinRemote, parentPath } from "./util";
 import { Sidebar } from "./components/Sidebar";
@@ -20,6 +21,16 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
+
+  useEffect(() => {
+    const unlisten = listen<UploadProgress>("upload-progress", (e) => {
+      setProgress(e.payload);
+    });
+    return () => {
+      unlisten.then((off) => off());
+    };
+  }, []);
 
   const refreshAccounts = useCallback(async () => {
     const list = await api.listAccounts();
@@ -99,6 +110,7 @@ export default function App() {
       setError(String(e));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -166,6 +178,27 @@ export default function App() {
               onDownload={download}
               onDelete={remove}
             />
+
+            {progress && progress.total > 0 && (
+              <div className="upload-progress">
+                <div className="upload-progress__info">
+                  <span className="upload-progress__name">
+                    上传 {baseName(progress.path)}
+                  </span>
+                  <span className="upload-progress__pct">
+                    {Math.round((progress.uploaded / progress.total) * 100)}%
+                  </span>
+                </div>
+                <div className="upload-progress__track">
+                  <div
+                    className="upload-progress__fill"
+                    style={{
+                      width: `${(progress.uploaded / progress.total) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="empty-state">
