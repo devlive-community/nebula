@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowUp, faFolder } from "@fortawesome/free-solid-svg-icons";
+import type { Entry } from "../types";
+import * as api from "../api";
+import { baseName, breadcrumbs, joinRemote, parentPath } from "../util";
 
 interface Props {
+  account: string;
   /** 源对象完整路径,如 bucket/a/b.txt。 */
   from: string;
   onCopy: (to: string) => void;
@@ -8,46 +14,114 @@ interface Props {
   onCancel: () => void;
 }
 
-/** 复制 / 移动对象到指定目标路径(支持跨目录 / 跨桶)。 */
-export function MoveCopyDialog({ from, onCopy, onMove, onCancel }: Props) {
-  const [to, setTo] = useState(from);
-  const valid = to.trim() !== "" && to.trim() !== from;
-  const dest = to.trim();
+/** 级联浏览选择目标目录,再复制 / 移动过去(支持跨目录、跨桶)。 */
+export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Props) {
+  const [pickPath, setPickPath] = useState("");
+  const [dirs, setDirs] = useState<Entry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const entries = await api.browse(account, pickPath);
+      setDirs(entries.filter((e) => e.kind === "directory"));
+    } catch (e) {
+      setErr(String(e));
+      setDirs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [account, pickPath]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const target = pickPath ? joinRemote(pickPath, baseName(from)) : "";
+  const canConfirm = target !== "" && target !== from;
+  const crumbs = breadcrumbs(pickPath);
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal--picker" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
           <h3>复制 / 移动到</h3>
         </div>
+
         <div className="modal__body">
-          <label className="field">
-            <span>源</span>
-            <input value={from} disabled />
-          </label>
-          <label className="field">
-            <span>目标路径(bucket/key,可跨桶)</span>
-            <input
-              value={to}
-              autoFocus
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="如 other-bucket/dir/name.txt"
-            />
-          </label>
+          <div className="picker__bar">
+            <button
+              className="btn"
+              disabled={pickPath === ""}
+              onClick={() => setPickPath(parentPath(pickPath))}
+              title="上一层"
+            >
+              <FontAwesomeIcon icon={faArrowUp} />
+            </button>
+            <div className="picker__crumbs">
+              {crumbs.map((c, i) => (
+                <span key={c.path}>
+                  <button
+                    className="breadcrumb__link"
+                    onClick={() => setPickPath(c.path)}
+                  >
+                    {c.label}
+                  </button>
+                  {i < crumbs.length - 1 && (
+                    <span className="breadcrumb__sep">/</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="picker__list">
+            {loading ? (
+              <div className="picker__state">加载中…</div>
+            ) : err ? (
+              <div className="picker__state">{err}</div>
+            ) : dirs.length === 0 ? (
+              <div className="picker__state">没有子目录</div>
+            ) : (
+              dirs.map((d) => (
+                <button
+                  key={d.path}
+                  className="picker__item"
+                  onClick={() =>
+                    setPickPath(d.path.endsWith("/") ? d.path : d.path + "/")
+                  }
+                >
+                  <FontAwesomeIcon icon={faFolder} className="picker__item-icon" />
+                  <span>{d.name}</span>
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="picker__target">
+            目标:{target || "请进入一个 bucket / 目录"}
+          </div>
         </div>
+
         <div className="modal__footer">
           <button className="btn" onClick={onCancel}>
             取消
           </button>
-          <button className="btn" disabled={!valid} onClick={() => onMove(dest)}>
-            移动
+          <button
+            className="btn"
+            disabled={!canConfirm}
+            onClick={() => onMove(target)}
+          >
+            移动到此
           </button>
           <button
             className="btn btn--primary"
-            disabled={!valid}
-            onClick={() => onCopy(dest)}
+            disabled={!canConfirm}
+            onClick={() => onCopy(target)}
           >
-            复制
+            复制到此
           </button>
         </div>
       </div>

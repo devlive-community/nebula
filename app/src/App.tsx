@@ -505,8 +505,9 @@ export default function App() {
         />
       )}
 
-      {moveCopyTarget && (
+      {moveCopyTarget && current && (
         <MoveCopyDialog
+          account={current}
           from={moveCopyTarget.path}
           onCopy={(to) => doMoveCopy("copy", to)}
           onMove={(to) => doMoveCopy("move", to)}

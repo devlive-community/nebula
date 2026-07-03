@@ -612,6 +612,70 @@ button {
   width: 360px;
 }
 
+.modal--picker {
+  width: 480px;
+}
+
+.picker__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.picker__crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  overflow: hidden;
+}
+
+.picker__list {
+  height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 4px;
+}
+
+.picker__state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+}
+
+.picker__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.picker__item:hover {
+  background: var(--bg-elev-2);
+}
+
+.picker__item-icon {
+  color: var(--primary);
+}
+
+.picker__target {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
 .confirm__message {
   margin: 0;
   color: var(--text-dim);
