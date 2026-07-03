@@ -16,6 +16,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { MoveCopyDialog } from "./components/MoveCopyDialog";
 import { ShareDialog } from "./components/ShareDialog";
+import { FileDetails } from "./components/FileDetails";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -30,6 +31,7 @@ export default function App() {
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [moveCopyTarget, setMoveCopyTarget] = useState<Entry | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
 
   const SHARE_MINUTES = 60;
@@ -41,10 +43,11 @@ export default function App() {
   const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  // 切换账号 / 目录时清空过滤词与选择。
+  // 切换账号 / 目录时清空过滤词、选择与详情。
   useEffect(() => {
     setFilter("");
     setSelected(new Set());
+    setDetailsEntry(null);
   }, [current, path]);
 
   const visibleEntries = useMemo(() => {
@@ -434,12 +437,22 @@ export default function App() {
               onToggleSelect={toggleSelect}
               onToggleSelectAll={toggleSelectAll}
               onOpenDir={(e) => setPath(e.path.endsWith("/") ? e.path : e.path + "/")}
+              onOpenDetails={setDetailsEntry}
               onDownload={download}
               onRename={setRenameTarget}
               onMoveCopy={setMoveCopyTarget}
               onShare={share}
               onDelete={setPendingDelete}
             />
+
+            {detailsEntry && (
+              <FileDetails
+                entry={detailsEntry}
+                onClose={() => setDetailsEntry(null)}
+                onDownload={download}
+                onShare={share}
+              />
+            )}
 
             {transfer && transfer.total > 0 && (
               <div className="upload-progress">

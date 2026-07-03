@@ -521,6 +521,103 @@ button {
   word-break: break-all;
 }
 
+/* ---------- File details drawer ---------- */
+.details {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  z-index: 40;
+  background: var(--bg-elev);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.details__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.details__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.details__close {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 15px;
+}
+
+.details__close:hover {
+  color: var(--text);
+}
+
+.details__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.details__hero-icon {
+  font-size: 40px;
+  color: var(--primary);
+}
+
+.details__hero-name {
+  font-size: 14px;
+  text-align: center;
+  word-break: break-all;
+}
+
+.details__rows {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 14px;
+}
+
+.details__row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 14px;
+}
+
+.details__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.details__value {
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-all;
+  user-select: text;
+}
+
+.details__actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.details__actions .btn {
+  flex: 1;
+}
+
 /* ---------- Upload progress ---------- */
 .upload-progress {
   border-top: 1px solid var(--border);

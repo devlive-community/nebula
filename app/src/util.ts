@@ -7,6 +7,44 @@ export function formatBytes(size: number): string {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** 按扩展名粗略猜测文件类型,用于详情展示。 */
+export function guessType(name: string): string {
+  const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  if (!ext) return "文件";
+  const map: Record<string, string> = {
+    jpg: "图片",
+    jpeg: "图片",
+    png: "图片",
+    gif: "图片",
+    webp: "图片",
+    svg: "图片",
+    mp4: "视频",
+    mov: "视频",
+    mkv: "视频",
+    webm: "视频",
+    mp3: "音频",
+    wav: "音频",
+    flac: "音频",
+    pdf: "PDF",
+    zip: "压缩包",
+    tar: "压缩包",
+    gz: "压缩包",
+    rar: "压缩包",
+    txt: "文本",
+    md: "文本",
+    json: "JSON",
+    csv: "CSV",
+    html: "网页",
+    css: "样式",
+    js: "代码",
+    ts: "代码",
+    rs: "代码",
+    py: "代码",
+    go: "代码",
+  };
+  return map[ext] ?? ext.toUpperCase();
+}
+
 /** 把 ISO 时间(如 2026-07-03T08:12:04.000Z)格式化为本地时区的可读字符串。 */
 export function formatDate(iso: string | null): string {
   if (!iso) return "—";

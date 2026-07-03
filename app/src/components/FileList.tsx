@@ -27,6 +27,7 @@ interface Props {
   onToggleSelect: (path: string) => void;
   onToggleSelectAll: () => void;
   onOpenDir: (entry: Entry) => void;
+  onOpenDetails: (entry: Entry) => void;
   onDownload: (entry: Entry) => void;
   onRename: (entry: Entry) => void;
   onMoveCopy: (entry: Entry) => void;
@@ -45,6 +46,7 @@ export function FileList({
   onToggleSelect,
   onToggleSelectAll,
   onOpenDir,
+  onOpenDetails,
   onDownload,
   onRename,
   onMoveCopy,
@@ -116,7 +118,12 @@ export function FileList({
                     {entry.name}
                   </button>
                 ) : (
-                  <span className="row__name">{entry.name}</span>
+                  <button
+                    className="row__name-link"
+                    onClick={() => onOpenDetails(entry)}
+                  >
+                    {entry.name}
+                  </button>
                 )}
               </span>
               <span className="col-size">{isDir ? "—" : formatBytes(entry.size)}</span>
