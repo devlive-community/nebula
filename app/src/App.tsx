@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCloud, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faCloud, faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-icons";
 import type { DownloadProgress, Entry, Transfer, UploadProgress } from "./types";
 import * as api from "./api";
 import { baseName, joinRemote, parentPath } from "./util";
@@ -28,6 +29,7 @@ export default function App() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingBatchDelete, setPendingBatchDelete] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [filter, setFilter] = useState("");
   const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
@@ -143,6 +145,43 @@ export default function App() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // 拖拽上传:用 ref 持有最新处理逻辑,拖放监听只注册一次。
+  const onDropRef = useRef<(paths: string[]) => void>(() => {});
+  onDropRef.current = async (paths: string[]) => {
+    if (!current || !path || paths.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      for (const local of paths) {
+        await api.uploadFile(current, joinRemote(path, baseName(local)), local);
+      }
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+      setTransfer(null);
+    }
+  };
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        const t = event.payload.type;
+        if (t === "enter" || t === "over") setDragOver(true);
+        else if (t === "leave") setDragOver(false);
+        else if (t === "drop") {
+          setDragOver(false);
+          onDropRef.current(event.payload.paths);
+        }
+      })
+      .then((f) => {
+        unlisten = f;
+      });
+    return () => unlisten?.();
+  }, []);
 
   const selectAccount = (id: string) => {
     setCurrent(id);
@@ -306,6 +345,12 @@ export default function App() {
       />
 
       <main className="main">
+        {dragOver && current && path !== "" && (
+          <div className="drop-overlay">
+            <FontAwesomeIcon icon={faCloudArrowUp} className="drop-overlay__icon" />
+            <span>松开以上传到当前目录</span>
+          </div>
+        )}
         {current ? (
           <>
             <div className="main__header">
