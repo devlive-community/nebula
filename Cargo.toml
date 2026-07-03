@@ -7,6 +7,8 @@
 
 [workspace]
 resolver = "2"
+# Tauri app 独立构建(依赖 webview 系统库),不纳入根 workspace 的 CI 编译。
+exclude = ["app"]
 members = [
     # 公共底座(可发布)
     "crates/cloud-core",
