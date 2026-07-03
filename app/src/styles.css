@@ -209,6 +209,37 @@ button {
   flex: 1;
 }
 
+.toolbar__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 10px;
+  margin-left: 4px;
+  min-width: 200px;
+}
+
+.toolbar__search-icon {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.toolbar__search-input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  padding: 7px 0;
+  width: 100%;
+}
+
+.toolbar__search-input::placeholder {
+  color: var(--text-faint);
+}
+
 .toolbar__busy {
   color: var(--text-dim);
   font-size: 13px;
@@ -282,6 +313,29 @@ button {
   letter-spacing: 0.05em;
   color: var(--text-faint);
   border-bottom: 1px solid var(--border);
+}
+
+.col-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.col-sort:hover {
+  color: var(--text);
+}
+
+.col-sort__icon {
+  font-size: 11px;
+  color: var(--primary);
 }
 
 .filelist__body {

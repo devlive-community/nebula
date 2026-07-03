@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -22,6 +22,40 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
+  const [filter, setFilter] = useState("");
+  const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  // 切换账号 / 目录时清空过滤词。
+  useEffect(() => {
+    setFilter("");
+  }, [current, path]);
+
+  const visibleEntries = useMemo(() => {
+    const f = filter.trim().toLowerCase();
+    const filtered = f
+      ? entries.filter((e) => e.name.toLowerCase().includes(f))
+      : entries;
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      // 目录始终排在文件前面。
+      if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1;
+      let cmp = 0;
+      if (sortKey === "name") cmp = a.name.localeCompare(b.name);
+      else if (sortKey === "size") cmp = a.size - b.size;
+      else cmp = (a.last_modified ?? "").localeCompare(b.last_modified ?? "");
+      return cmp * dir;
+    });
+  }, [entries, filter, sortKey, sortDir]);
+
+  const toggleSort = (key: "name" | "size" | "modified") => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
 
   useEffect(() => {
     const unUpload = listen<UploadProgress>("upload-progress", (e) => {
@@ -178,6 +212,8 @@ export default function App() {
                 canGoUp={path !== ""}
                 canUpload={path !== ""}
                 busy={busy}
+                filter={filter}
+                onFilter={setFilter}
                 onUp={() => setPath(parentPath(path))}
                 onRefresh={load}
                 onUpload={upload}
@@ -187,8 +223,11 @@ export default function App() {
             {error && <div className="error-banner">{error}</div>}
 
             <FileList
-              entries={entries}
+              entries={visibleEntries}
               loading={loading}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
               onOpenDir={(e) => setPath(e.path.endsWith("/") ? e.path : e.path + "/")}
               onDownload={download}
               onDelete={remove}
