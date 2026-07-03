@@ -312,8 +312,29 @@ button {
   justify-content: center;
 }
 
-.col-check input {
+.checkbox {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: #fff;
+  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.checkbox:hover {
+  border-color: var(--primary);
+}
+
+.checkbox--on {
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .filelist__head {

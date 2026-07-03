@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faDownload,
@@ -11,6 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { formatBytes, formatDate } from "../util";
+import { Checkbox } from "./Checkbox";
 
 type SortKey = "name" | "size" | "modified";
 
@@ -45,15 +45,9 @@ export function FileList({
   onRename,
   onDelete,
 }: Props) {
-  const headerCheck = useRef<HTMLInputElement>(null);
   const someSelected = entries.some(
     (e) => e.kind === "file" && selected.has(e.path),
   );
-  useEffect(() => {
-    if (headerCheck.current) {
-      headerCheck.current.indeterminate = someSelected && !allSelected;
-    }
-  }, [someSelected, allSelected]);
 
   if (loading) {
     return <div className="filelist__state">加载中…</div>;
@@ -78,10 +72,10 @@ export function FileList({
     <div className="filelist">
       <div className="filelist__head">
         <span className="col-check">
-          <input
-            ref={headerCheck}
-            type="checkbox"
+          <Checkbox
             checked={allSelected}
+            indeterminate={someSelected && !allSelected}
+            title="全选 / 取消全选"
             onChange={onToggleSelectAll}
           />
         </span>
@@ -101,8 +95,7 @@ export function FileList({
             >
               <span className="col-check">
                 {!isDir && (
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selected.has(entry.path)}
                     onChange={() => onToggleSelect(entry.path)}
                   />
