@@ -161,14 +161,31 @@ impl OssClient {
         part_size: usize,
         content_type: Option<&str>,
     ) -> Result<()> {
+        self.upload_multipart_progress(bucket, key, data, part_size, content_type, |_, _| {})
+            .await
+    }
+
+    /// 同 [`Self::upload_multipart`],但每传完一个分片回调一次 `(已上传字节, 总字节)`。
+    pub async fn upload_multipart_progress<F: FnMut(u64, u64)>(
+        &self,
+        bucket: &str,
+        key: &str,
+        data: impl Into<Bytes>,
+        part_size: usize,
+        content_type: Option<&str>,
+        mut on_progress: F,
+    ) -> Result<()> {
         let data: Bytes = data.into();
         let part_size = part_size.max(MIN_PART_SIZE);
+        let total = data.len() as u64;
+        on_progress(0, total);
+
         let upload_id = self
             .initiate_multipart_upload(bucket, key, content_type)
             .await?;
 
         let outcome = self
-            .upload_all_parts(bucket, key, &upload_id, &data, part_size)
+            .upload_all_parts(bucket, key, &upload_id, &data, part_size, &mut on_progress)
             .await;
         match outcome {
             Ok(parts) => {
@@ -187,15 +204,17 @@ impl OssClient {
         }
     }
 
-    /// 顺序上传所有分片,返回 `(part_number, etag)` 列表。
-    async fn upload_all_parts(
+    /// 顺序上传所有分片,每片完成后回调累计进度;返回 `(part_number, etag)` 列表。
+    async fn upload_all_parts<F: FnMut(u64, u64)>(
         &self,
         bucket: &str,
         key: &str,
         upload_id: &str,
         data: &Bytes,
         part_size: usize,
+        on_progress: &mut F,
     ) -> Result<Vec<(u32, String)>> {
+        let total = data.len() as u64;
         let mut parts = Vec::new();
         let mut offset = 0usize;
         let mut part_number = 1u32;
@@ -207,6 +226,7 @@ impl OssClient {
                 .await?;
             parts.push((part_number, etag));
             offset = end;
+            on_progress(offset as u64, total);
             part_number += 1;
             if offset >= data.len() {
                 break;

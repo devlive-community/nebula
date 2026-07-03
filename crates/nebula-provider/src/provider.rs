@@ -7,6 +7,9 @@ use crate::capabilities::Capabilities;
 use crate::entry::Entry;
 use crate::error::Result;
 
+/// 进度回调:`(已处理字节, 总字节)`。适配层在传输过程中多次调用。
+pub type ProgressFn<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
+
 /// 一个存储 provider 实例(通常 = 一个云账号)。
 ///
 /// # 路径约定
@@ -38,6 +41,23 @@ pub trait StorageProvider: Send + Sync {
 
     /// 上传 / 覆盖单个对象。
     async fn write(&self, path: &str, data: Bytes, content_type: Option<&str>) -> Result<()>;
+
+    /// 带进度的上传。默认实现直接调用 [`write`](Self::write),成功后回报 100%;
+    /// 支持分块上传的适配层可覆盖以回报中间进度。
+    async fn write_with_progress(
+        &self,
+        path: &str,
+        data: Bytes,
+        content_type: Option<&str>,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let total = data.len() as u64;
+        let result = self.write(path, data, content_type).await;
+        if result.is_ok() {
+            progress(total, total);
+        }
+        result
+    }
 
     /// 删除单个对象。
     async fn delete(&self, path: &str) -> Result<()>;

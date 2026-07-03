@@ -12,3 +12,6 @@ async-trait = "0.1"
 bytes = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

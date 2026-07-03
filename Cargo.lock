@@ -1093,6 +1093,7 @@ dependencies = [
  "bytes",
  "serde",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

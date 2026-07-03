@@ -5,7 +5,16 @@
 use app_core::App;
 use bytes::Bytes;
 use nebula_provider::Entry;
-use tauri::{Manager, State};
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, Manager, State};
+
+/// 上传进度事件负载,发往前端 `upload-progress`。
+#[derive(Clone, Serialize)]
+struct UploadProgress {
+    path: String,
+    uploaded: u64,
+    total: u64,
+}
 
 /// 列出已注册账号。
 #[tauri::command]
@@ -54,21 +63,36 @@ async fn stat(state: State<'_, App>, account: String, path: String) -> Result<En
 /// 把本地文件上传到远端路径。
 #[tauri::command]
 async fn upload_file(
+    app: AppHandle,
     state: State<'_, App>,
     account: String,
     remote_path: String,
     local_path: String,
     content_type: Option<String>,
 ) -> Result<(), String> {
-    let app = state.inner().clone();
+    let core = state.inner().clone();
     let data = tokio::fs::read(&local_path)
         .await
         .map_err(|e| format!("读取本地文件失败: {e}"))?;
-    app.upload(
+
+    let event_path = remote_path.clone();
+    let progress = move |uploaded: u64, total: u64| {
+        let _ = app.emit(
+            "upload-progress",
+            UploadProgress {
+                path: event_path.clone(),
+                uploaded,
+                total,
+            },
+        );
+    };
+
+    core.upload_with_progress(
         &account,
         &remote_path,
         Bytes::from(data),
         content_type.as_deref(),
+        &progress,
     )
     .await
     .map_err(|e| e.to_string())

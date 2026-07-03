@@ -11,7 +11,9 @@ use bytes::Bytes;
 use futures::StreamExt;
 
 use aliyun_oss::{ListEntry, OssClient, OssError};
-use nebula_provider::{path, Capabilities, Entry, ProviderError, Result, StorageProvider};
+use nebula_provider::{
+    path, Capabilities, Entry, ProgressFn, ProviderError, Result, StorageProvider,
+};
 
 /// 超过该大小的上传自动改用分片上传。
 const MULTIPART_THRESHOLD: usize = 16 * 1024 * 1024;
@@ -168,6 +170,39 @@ impl StorageProvider for AliyunProvider {
                 .put_object(bucket, key, data, content_type)
                 .await
                 .map_err(map_err)
+        }
+    }
+
+    async fn write_with_progress(
+        &self,
+        path: &str,
+        data: Bytes,
+        content_type: Option<&str>,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        let total = data.len() as u64;
+        if should_multipart(data.len()) {
+            self.client
+                .upload_multipart_progress(
+                    bucket,
+                    key,
+                    data,
+                    MULTIPART_PART_SIZE,
+                    content_type,
+                    progress,
+                )
+                .await
+                .map_err(map_err)
+        } else {
+            // 小文件单请求上传:开始 0%,成功后 100%。
+            progress(0, total);
+            self.client
+                .put_object(bucket, key, data, content_type)
+                .await
+                .map_err(map_err)?;
+            progress(total, total);
+            Ok(())
         }
     }
 

@@ -18,7 +18,7 @@ use nebula_provider::{Entry, ProviderRegistry, StorageProvider};
 use provider_aliyun::AliyunProvider;
 
 pub use error::{AppError, Result};
-pub use nebula_provider::{Capabilities, EntryKind};
+pub use nebula_provider::{Capabilities, EntryKind, ProgressFn};
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use store::{AccountRecord, AccountStore};
 
@@ -169,6 +169,21 @@ impl App {
         Ok(self
             .provider(account)?
             .write(path, data, content_type)
+            .await?)
+    }
+
+    /// 带进度的上传:`progress(已上传字节, 总字节)` 会在传输过程中被多次调用。
+    pub async fn upload_with_progress(
+        &self,
+        account: &str,
+        path: &str,
+        data: Bytes,
+        content_type: Option<&str>,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .write_with_progress(path, data, content_type, progress)
             .await?)
     }
 

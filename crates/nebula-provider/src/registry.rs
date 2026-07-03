@@ -110,4 +110,15 @@ mod tests {
         assert!(!reg.remove("x"));
         assert!(reg.get("x").is_none());
     }
+
+    #[tokio::test]
+    async fn default_write_with_progress_reports_total_once() {
+        let p = DummyProvider { id: "x".into() };
+        let seen = std::sync::Mutex::new(Vec::<(u64, u64)>::new());
+        let cb = |uploaded, total| seen.lock().unwrap().push((uploaded, total));
+        p.write_with_progress("k", Bytes::from_static(b"hello"), None, &cb)
+            .await
+            .unwrap();
+        assert_eq!(*seen.lock().unwrap(), vec![(5, 5)]);
+    }
 }
