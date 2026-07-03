@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faDownload,
@@ -44,6 +45,16 @@ export function FileList({
   onRename,
   onDelete,
 }: Props) {
+  const headerCheck = useRef<HTMLInputElement>(null);
+  const someSelected = entries.some(
+    (e) => e.kind === "file" && selected.has(e.path),
+  );
+  useEffect(() => {
+    if (headerCheck.current) {
+      headerCheck.current.indeterminate = someSelected && !allSelected;
+    }
+  }, [someSelected, allSelected]);
+
   if (loading) {
     return <div className="filelist__state">加载中…</div>;
   }
@@ -68,6 +79,7 @@ export function FileList({
       <div className="filelist__head">
         <span className="col-check">
           <input
+            ref={headerCheck}
             type="checkbox"
             checked={allSelected}
             onChange={onToggleSelectAll}
@@ -87,7 +99,7 @@ export function FileList({
               className={`row ${isDir ? "row--dir" : ""}`}
               onDoubleClick={() => isDir && onOpenDir(entry)}
             >
-              <span className="col-check" onClick={(e) => e.stopPropagation()}>
+              <span className="col-check">
                 {!isDir && (
                   <input
                     type="checkbox"
