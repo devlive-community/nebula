@@ -206,6 +206,11 @@ impl App {
         Ok(self.provider(account)?.rename(from, to).await?)
     }
 
+    /// 复制对象到新路径(保留原对象)。
+    pub async fn copy(&self, account: &str, from: &str, to: &str) -> Result<()> {
+        Ok(self.provider(account)?.copy(from, to).await?)
+    }
+
     /// 按 id 解析 provider,未注册则报 [`AppError::NoSuchProvider`]。
     fn provider(&self, account: &str) -> Result<Arc<dyn StorageProvider>> {
         self.registry
