@@ -38,3 +38,6 @@ export const downloadFile = (account: string, remotePath: string, localPath: str
 
 export const deletePath = (account: string, path: string) =>
   invoke<void>("delete", { account, path });
+
+export const createFolder = (account: string, path: string) =>
+  invoke<void>("create_folder", { account, path });

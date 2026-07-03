@@ -533,6 +533,43 @@ button {
   overflow: hidden;
 }
 
+.modal--sm {
+  width: 360px;
+}
+
+.confirm__message {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.prompt__input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 11px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
+.prompt__input:focus {
+  border-color: var(--primary);
+}
+
+.btn--danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #e03444;
+  border-color: #e03444;
+}
+
 .modal__header {
   display: flex;
   align-items: center;

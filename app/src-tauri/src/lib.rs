@@ -156,6 +156,15 @@ async fn delete(state: State<'_, App>, account: String, path: String) -> Result<
     app.delete(&account, &path).await.map_err(|e| e.to_string())
 }
 
+/// 新建"文件夹":写一个以 `/` 结尾的零字节对象作为目录占位。
+#[tauri::command]
+async fn create_folder(state: State<'_, App>, account: String, path: String) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.upload(&account, &path, Bytes::new(), None)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 启动 Tauri 应用。账号存到应用数据目录下的 `nebula.db`。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -177,6 +186,7 @@ pub fn run() {
             upload_file,
             download_file,
             delete,
+            create_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

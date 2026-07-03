@@ -11,6 +11,8 @@ import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { PromptDialog } from "./components/PromptDialog";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -21,6 +23,8 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
+  const [showNewFolder, setShowNewFolder] = useState(false);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [filter, setFilter] = useState("");
   const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
@@ -178,13 +182,30 @@ export default function App() {
     }
   };
 
-  const remove = async (entry: Entry) => {
-    if (!current) return;
-    if (!window.confirm(`确定删除 ${entry.name}?`)) return;
+  const doDelete = async () => {
+    const entry = pendingDelete;
+    setPendingDelete(null);
+    if (!current || !entry) return;
     setBusy(true);
     setError(null);
     try {
       await api.deletePath(current, entry.path);
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createFolder = async (name: string) => {
+    setShowNewFolder(false);
+    if (!current || !path) return;
+    const folderPath = joinRemote(path, name).replace(/\/+$/, "") + "/";
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createFolder(current, folderPath);
       await load();
     } catch (e) {
       setError(String(e));
@@ -217,6 +238,7 @@ export default function App() {
                 onUp={() => setPath(parentPath(path))}
                 onRefresh={load}
                 onUpload={upload}
+                onNewFolder={() => setShowNewFolder(true)}
               />
             </div>
 
@@ -230,7 +252,7 @@ export default function App() {
               onSort={toggleSort}
               onOpenDir={(e) => setPath(e.path.endsWith("/") ? e.path : e.path + "/")}
               onDownload={download}
-              onDelete={remove}
+              onDelete={setPendingDelete}
             />
 
             {transfer && transfer.total > 0 && (
@@ -268,6 +290,27 @@ export default function App() {
 
       {showForm && (
         <AccountForm onSubmit={addAccount} onClose={() => setShowForm(false)} />
+      )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="删除确认"
+          message={`确定删除 ${pendingDelete.name}?此操作不可恢复。`}
+          danger
+          confirmLabel="删除"
+          onConfirm={doDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {showNewFolder && (
+        <PromptDialog
+          title="新建文件夹"
+          placeholder="文件夹名称"
+          submitLabel="创建"
+          onSubmit={createFolder}
+          onCancel={() => setShowNewFolder(false)}
+        />
       )}
     </div>
   );
