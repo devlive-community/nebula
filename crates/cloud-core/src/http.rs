@@ -15,11 +15,15 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
-    /// 用带合理默认值(30s 超时、Nebula UA)的客户端创建。
+    /// 用带合理默认值的客户端创建。
+    ///
+    /// 注意用 `read_timeout`(每次读取的超时)而非 `timeout`(整个请求的超时):
+    /// 后者会把流式下载的整段 body 读取算进去,大文件超时后被中断,表现为
+    /// "error decoding response body"。`read_timeout` 只要求数据持续到达即可。
     pub fn new() -> Self {
         let inner = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(30))
+            .read_timeout(Duration::from_secs(60))
             .user_agent(concat!("nebula-cloud-core/", env!("CARGO_PKG_VERSION")))
             .build()
             .expect("default reqwest client should build");
