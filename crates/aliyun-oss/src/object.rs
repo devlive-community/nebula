@@ -109,6 +109,50 @@ impl OssClient {
         Ok(())
     }
 
+    /// 服务端复制对象(支持同桶 / 跨桶),无需下载再上传。
+    pub async fn copy_object(
+        &self,
+        src_bucket: &str,
+        src_key: &str,
+        dst_bucket: &str,
+        dst_key: &str,
+    ) -> Result<()> {
+        let date = now_gmt();
+        let request = self.build_copy_request(src_bucket, src_key, dst_bucket, dst_key, &date)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 组装并签名一次 CopyObject 请求。抽出 `date` 便于确定性测试。
+    fn build_copy_request(
+        &self,
+        src_bucket: &str,
+        src_key: &str,
+        dst_bucket: &str,
+        dst_key: &str,
+        date: &str,
+    ) -> Result<Request> {
+        let copy_source = format!("/{src_bucket}/{src_key}");
+        // x-oss-copy-source 属于 x-oss- 头,需计入 CanonicalizedOSSHeaders。
+        let oss_headers =
+            sign::canonicalized_oss_headers([("x-oss-copy-source", copy_source.as_str())]);
+        let canonical = format!("/{dst_bucket}/{dst_key}");
+        let sts = sign::string_to_sign("PUT", "", "", date, &oss_headers, &canonical);
+        let authorization =
+            sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
+
+        let url = format!("{}/{}", self.bucket_base_url(dst_bucket), dst_key);
+        self.http()
+            .inner()
+            .request(Method::PUT, &url)
+            .header(DATE, date)
+            .header(AUTHORIZATION, authorization)
+            .header("x-oss-copy-source", &copy_source)
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(OssError::from)
+    }
+
     /// 读取对象元信息(HEAD)。
     pub async fn head_object(&self, bucket: &str, key: &str) -> Result<ObjectMeta> {
         let date = now_gmt();
@@ -296,6 +340,37 @@ mod tests {
         assert_eq!(
             req.headers().get(CONTENT_TYPE).unwrap().to_str().unwrap(),
             "text/plain"
+        );
+    }
+
+    #[test]
+    fn copy_request_signs_copy_source_header() {
+        let client = test_client();
+        let date = "Thu, 17 Nov 2005 18:49:58 GMT";
+        let req = client
+            .build_copy_request("srcb", "a.txt", "dstb", "b.txt", date)
+            .unwrap();
+
+        assert_eq!(req.method(), Method::PUT);
+        assert_eq!(
+            req.url().as_str(),
+            "https://dstb.oss-cn-hangzhou.aliyuncs.com/b.txt"
+        );
+        assert_eq!(
+            req.headers()
+                .get("x-oss-copy-source")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "/srcb/a.txt"
+        );
+
+        // 签名需把 x-oss-copy-source 计入 CanonicalizedOSSHeaders,资源为目标对象。
+        let oss_headers = sign::canonicalized_oss_headers([("x-oss-copy-source", "/srcb/a.txt")]);
+        let sts = sign::string_to_sign("PUT", "", "", date, &oss_headers, "/dstb/b.txt");
+        assert_eq!(
+            req.headers().get(AUTHORIZATION).unwrap().to_str().unwrap(),
+            sign::authorization(client.access_key_id(), client.access_key_secret(), &sts)
         );
     }
 

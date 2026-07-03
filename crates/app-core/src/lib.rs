@@ -201,6 +201,11 @@ impl App {
         Ok(self.provider(account)?.delete(path).await?)
     }
 
+    /// 重命名 / 移动对象。
+    pub async fn rename(&self, account: &str, from: &str, to: &str) -> Result<()> {
+        Ok(self.provider(account)?.rename(from, to).await?)
+    }
+
     /// 按 id 解析 provider,未注册则报 [`AppError::NoSuchProvider`]。
     fn provider(&self, account: &str) -> Result<Arc<dyn StorageProvider>> {
         self.registry

@@ -165,6 +165,20 @@ async fn create_folder(state: State<'_, App>, account: String, path: String) -> 
         .map_err(|e| e.to_string())
 }
 
+/// 重命名 / 移动对象。
+#[tauri::command]
+async fn rename(
+    state: State<'_, App>,
+    account: String,
+    from: String,
+    to: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.rename(&account, &from, &to)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 启动 Tauri 应用。账号存到应用数据目录下的 `nebula.db`。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -187,6 +201,7 @@ pub fn run() {
             download_file,
             delete,
             create_folder,
+            rename,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

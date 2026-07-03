@@ -223,6 +223,15 @@ impl StorageProvider for AliyunProvider {
             .await
             .map_err(map_err)
     }
+
+    async fn copy(&self, from: &str, to: &str) -> Result<()> {
+        let (src_bucket, src_key) = require_object(from)?;
+        let (dst_bucket, dst_key) = require_object(to)?;
+        self.client
+            .copy_object(src_bucket, src_key, dst_bucket, dst_key)
+            .await
+            .map_err(map_err)
+    }
 }
 
 #[cfg(test)]

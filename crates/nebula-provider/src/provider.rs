@@ -78,4 +78,16 @@ pub trait StorageProvider: Send + Sync {
 
     /// 删除单个对象。
     async fn delete(&self, path: &str) -> Result<()>;
+
+    /// 复制对象。默认实现下载再上传;支持服务端复制的适配层应覆盖以提升效率。
+    async fn copy(&self, from: &str, to: &str) -> Result<()> {
+        let data = self.read(from).await?;
+        self.write(to, data, None).await
+    }
+
+    /// 重命名(移动)对象:复制到新路径后删除原对象。
+    async fn rename(&self, from: &str, to: &str) -> Result<()> {
+        self.copy(from, to).await?;
+        self.delete(from).await
+    }
 }
