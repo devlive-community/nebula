@@ -1091,6 +1091,7 @@ version = "1.0.0"
 dependencies = [
  "async-trait",
  "bytes",
+ "futures",
  "serde",
  "thiserror",
  "tokio",

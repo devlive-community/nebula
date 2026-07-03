@@ -23,5 +23,5 @@ pub mod registry;
 pub use capabilities::Capabilities;
 pub use entry::{Entry, EntryKind};
 pub use error::{ProviderError, Result};
-pub use provider::{ProgressFn, StorageProvider};
+pub use provider::{ByteStream, ProgressFn, StorageProvider};
 pub use registry::ProviderRegistry;

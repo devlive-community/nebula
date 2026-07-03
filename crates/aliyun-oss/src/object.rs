@@ -6,6 +6,7 @@
 use std::time::SystemTime;
 
 use bytes::Bytes;
+use futures::StreamExt;
 use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, DATE, ETAG, LAST_MODIFIED};
 use reqwest::{Method, Request, Response, StatusCode};
 use serde::Deserialize;
@@ -78,6 +79,24 @@ impl OssClient {
         let resp = self.http().execute(request).await?;
         let resp = check_status(resp).await?;
         Ok(resp.bytes().await.map_err(cloud_core::CoreError::from)?)
+    }
+
+    /// 流式下载一个对象,返回 `(内容长度, 分块字节流)`,用于边下边写并报进度。
+    pub async fn get_object_stream(
+        &self,
+        bucket: &str,
+        key: &str,
+    ) -> Result<(Option<u64>, impl futures::Stream<Item = Result<Bytes>>)> {
+        let date = now_gmt();
+        let request =
+            self.build_signed_request(Method::GET, bucket, key, Payload::default(), &date)?;
+        let resp = self.http().execute(request).await?;
+        let resp = check_status(resp).await?;
+        let len = resp.content_length();
+        let stream = resp
+            .bytes_stream()
+            .map(|r| r.map_err(|e| OssError::Core(cloud_core::CoreError::from(e))));
+        Ok((len, stream))
     }
 
     /// 删除一个对象。对象不存在时 OSS 也返回 204,视为成功。

@@ -1,7 +1,10 @@
 //! 统一存储抽象:App 只依赖 [`StorageProvider`],不感知具体是哪家云。
 
+use std::pin::Pin;
+
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::Stream;
 
 use crate::capabilities::Capabilities;
 use crate::entry::Entry;
@@ -9,6 +12,9 @@ use crate::error::Result;
 
 /// 进度回调:`(已处理字节, 总字节)`。适配层在传输过程中多次调用。
 pub type ProgressFn<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
+
+/// 分块字节流,用于流式下载(边下边写、可报进度)。
+pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>;
 
 /// 一个存储 provider 实例(通常 = 一个云账号)。
 ///
@@ -38,6 +44,17 @@ pub trait StorageProvider: Send + Sync {
 
     /// 下载单个对象的完整内容。
     async fn read(&self, path: &str) -> Result<Bytes>;
+
+    /// 流式下载:返回 `(内容长度, 分块流)`,用于边下边写并报告进度。
+    ///
+    /// 默认实现回退到 [`read`](Self::read)(整块作为单个分块);支持流式的适配层可
+    /// 覆盖以获得真实的分块与进度。
+    async fn read_stream(&self, path: &str) -> Result<(Option<u64>, ByteStream)> {
+        let data = self.read(path).await?;
+        let len = data.len() as u64;
+        let stream = futures::stream::once(async move { Ok(data) });
+        Ok((Some(len), Box::pin(stream)))
+    }
 
     /// 上传 / 覆盖单个对象。
     async fn write(&self, path: &str, data: Bytes, content_type: Option<&str>) -> Result<()>;

@@ -2290,6 +2290,7 @@ version = "1.0.0"
 dependencies = [
  "app-core",
  "bytes",
+ "futures",
  "nebula-provider",
  "serde",
  "serde_json",
@@ -2305,6 +2306,7 @@ version = "1.0.0"
 dependencies = [
  "async-trait",
  "bytes",
+ "futures",
  "serde",
  "thiserror 2.0.18",
 ]

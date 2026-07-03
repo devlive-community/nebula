@@ -18,7 +18,7 @@ use nebula_provider::{Entry, ProviderRegistry, StorageProvider};
 use provider_aliyun::AliyunProvider;
 
 pub use error::{AppError, Result};
-pub use nebula_provider::{Capabilities, EntryKind, ProgressFn};
+pub use nebula_provider::{ByteStream, Capabilities, EntryKind, ProgressFn};
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use store::{AccountRecord, AccountStore};
 
@@ -156,6 +156,15 @@ impl App {
     /// 下载对象内容。
     pub async fn download(&self, account: &str, path: &str) -> Result<Bytes> {
         Ok(self.provider(account)?.read(path).await?)
+    }
+
+    /// 流式下载:返回 `(内容长度, 分块流)`,供调用方边写边报进度。
+    pub async fn download_stream(
+        &self,
+        account: &str,
+        path: &str,
+    ) -> Result<(Option<u64>, ByteStream)> {
+        Ok(self.provider(account)?.read_stream(path).await?)
     }
 
     /// 上传 / 覆盖对象。

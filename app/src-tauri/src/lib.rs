@@ -16,6 +16,14 @@ struct UploadProgress {
     total: u64,
 }
 
+/// 下载进度事件负载,发往前端 `download-progress`。
+#[derive(Clone, Serialize)]
+struct DownloadProgress {
+    path: String,
+    downloaded: u64,
+    total: u64,
+}
+
 /// 列出已注册账号。
 #[tauri::command]
 fn list_accounts(state: State<'_, App>) -> Vec<String> {
@@ -98,20 +106,45 @@ async fn upload_file(
     .map_err(|e| e.to_string())
 }
 
-/// 下载远端对象到本地路径。
+/// 流式下载远端对象到本地路径,边写边发 `download-progress` 事件。
 #[tauri::command]
 async fn download_file(
+    app: AppHandle,
     state: State<'_, App>,
     account: String,
     remote_path: String,
     local_path: String,
 ) -> Result<(), String> {
-    let app = state.inner().clone();
-    let data = app
-        .download(&account, &remote_path)
+    use futures::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
+    let core = state.inner().clone();
+    let (total, mut stream) = core
+        .download_stream(&account, &remote_path)
         .await
         .map_err(|e| e.to_string())?;
-    tokio::fs::write(&local_path, &data)
+    let total = total.unwrap_or(0);
+
+    let mut file = tokio::fs::File::create(&local_path)
+        .await
+        .map_err(|e| format!("创建本地文件失败: {e}"))?;
+    let mut downloaded = 0u64;
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("写入本地文件失败: {e}"))?;
+        downloaded += chunk.len() as u64;
+        let _ = app.emit(
+            "download-progress",
+            DownloadProgress {
+                path: remote_path.clone(),
+                downloaded,
+                total,
+            },
+        );
+    }
+    file.flush()
         .await
         .map_err(|e| format!("写入本地文件失败: {e}"))
 }

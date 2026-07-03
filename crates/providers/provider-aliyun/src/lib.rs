@@ -12,7 +12,7 @@ use futures::StreamExt;
 
 use aliyun_oss::{ListEntry, OssClient, OssError};
 use nebula_provider::{
-    path, Capabilities, Entry, ProgressFn, ProviderError, Result, StorageProvider,
+    path, ByteStream, Capabilities, Entry, ProgressFn, ProviderError, Result, StorageProvider,
 };
 
 /// 超过该大小的上传自动改用分片上传。
@@ -156,6 +156,16 @@ impl StorageProvider for AliyunProvider {
     async fn read(&self, path: &str) -> Result<Bytes> {
         let (bucket, key) = require_object(path)?;
         self.client.get_object(bucket, key).await.map_err(map_err)
+    }
+
+    async fn read_stream(&self, path: &str) -> Result<(Option<u64>, ByteStream)> {
+        let (bucket, key) = require_object(path)?;
+        let (len, stream) = self
+            .client
+            .get_object_stream(bucket, key)
+            .await
+            .map_err(map_err)?;
+        Ok((len, Box::pin(stream.map(|r| r.map_err(map_err)))))
     }
 
     async fn write(&self, path: &str, data: Bytes, content_type: Option<&str>) -> Result<()> {
