@@ -3,6 +3,7 @@ import { useState } from "react";
 interface Props {
   title: string;
   placeholder?: string;
+  initial?: string;
   submitLabel?: string;
   onSubmit: (value: string) => void;
   onCancel: () => void;
@@ -11,11 +12,12 @@ interface Props {
 export function PromptDialog({
   title,
   placeholder,
+  initial = "",
   submitLabel = "确定",
   onSubmit,
   onCancel,
 }: Props) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initial);
   const trimmed = value.trim();
 
   return (

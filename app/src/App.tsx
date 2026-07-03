@@ -24,6 +24,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
+  const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [filter, setFilter] = useState("");
@@ -198,6 +199,23 @@ export default function App() {
     }
   };
 
+  const doRename = async (newName: string) => {
+    const entry = renameTarget;
+    setRenameTarget(null);
+    if (!current || !entry || newName === entry.name) return;
+    const to = joinRemote(parentPath(entry.path), newName);
+    setBusy(true);
+    setError(null);
+    try {
+      await api.rename(current, entry.path, to);
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const createFolder = async (name: string) => {
     setShowNewFolder(false);
     if (!current || !path) return;
@@ -252,6 +270,7 @@ export default function App() {
               onSort={toggleSort}
               onOpenDir={(e) => setPath(e.path.endsWith("/") ? e.path : e.path + "/")}
               onDownload={download}
+              onRename={setRenameTarget}
               onDelete={setPendingDelete}
             />
 
@@ -310,6 +329,17 @@ export default function App() {
           submitLabel="创建"
           onSubmit={createFolder}
           onCancel={() => setShowNewFolder(false)}
+        />
+      )}
+
+      {renameTarget && (
+        <PromptDialog
+          title="重命名"
+          placeholder="新名称"
+          initial={renameTarget.name}
+          submitLabel="重命名"
+          onSubmit={doRename}
+          onCancel={() => setRenameTarget(null)}
         />
       )}
     </div>

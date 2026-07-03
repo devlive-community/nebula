@@ -300,7 +300,7 @@ button {
 .filelist__head,
 .row {
   display: grid;
-  grid-template-columns: 1fr 120px 220px 90px;
+  grid-template-columns: 1fr 120px 200px 120px;
   align-items: center;
   gap: 8px;
   padding: 0 20px;

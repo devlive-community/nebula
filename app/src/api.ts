@@ -41,3 +41,6 @@ export const deletePath = (account: string, path: string) =>
 
 export const createFolder = (account: string, path: string) =>
   invoke<void>("create_folder", { account, path });
+
+export const rename = (account: string, from: string, to: string) =>
+  invoke<void>("rename", { account, from, to });

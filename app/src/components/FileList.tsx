@@ -3,6 +3,7 @@ import {
   faDownload,
   faFile,
   faFolder,
+  faPen,
   faSortDown,
   faSortUp,
   faTrash,
@@ -20,6 +21,7 @@ interface Props {
   onSort: (key: SortKey) => void;
   onOpenDir: (entry: Entry) => void;
   onDownload: (entry: Entry) => void;
+  onRename: (entry: Entry) => void;
   onDelete: (entry: Entry) => void;
 }
 
@@ -31,6 +33,7 @@ export function FileList({
   onSort,
   onOpenDir,
   onDownload,
+  onRename,
   onDelete,
 }: Props) {
   if (loading) {
@@ -94,6 +97,13 @@ export function FileList({
                       onClick={() => onDownload(entry)}
                     >
                       <FontAwesomeIcon icon={faDownload} />
+                    </button>
+                    <button
+                      className="icon-btn"
+                      title="重命名"
+                      onClick={() => onRename(entry)}
+                    >
+                      <FontAwesomeIcon icon={faPen} />
                     </button>
                     <button
                       className="icon-btn icon-btn--danger"
