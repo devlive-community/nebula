@@ -3,7 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCloud, faPlus } from "@fortawesome/free-solid-svg-icons";
-import type { Entry, UploadProgress } from "./types";
+import type { DownloadProgress, Entry, Transfer, UploadProgress } from "./types";
 import * as api from "./api";
 import { baseName, joinRemote, parentPath } from "./util";
 import { Sidebar } from "./components/Sidebar";
@@ -21,14 +21,28 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [progress, setProgress] = useState<UploadProgress | null>(null);
+  const [transfer, setTransfer] = useState<Transfer | null>(null);
 
   useEffect(() => {
-    const unlisten = listen<UploadProgress>("upload-progress", (e) => {
-      setProgress(e.payload);
+    const unUpload = listen<UploadProgress>("upload-progress", (e) => {
+      setTransfer({
+        label: "上传",
+        path: e.payload.path,
+        done: e.payload.uploaded,
+        total: e.payload.total,
+      });
+    });
+    const unDownload = listen<DownloadProgress>("download-progress", (e) => {
+      setTransfer({
+        label: "下载",
+        path: e.payload.path,
+        done: e.payload.downloaded,
+        total: e.payload.total,
+      });
     });
     return () => {
-      unlisten.then((off) => off());
+      unUpload.then((off) => off());
+      unDownload.then((off) => off());
     };
   }, []);
 
@@ -110,7 +124,7 @@ export default function App() {
       setError(String(e));
     } finally {
       setBusy(false);
-      setProgress(null);
+      setTransfer(null);
     }
   };
 
@@ -126,6 +140,7 @@ export default function App() {
       setError(String(e));
     } finally {
       setBusy(false);
+      setTransfer(null);
     }
   };
 
@@ -179,21 +194,21 @@ export default function App() {
               onDelete={remove}
             />
 
-            {progress && progress.total > 0 && (
+            {transfer && transfer.total > 0 && (
               <div className="upload-progress">
                 <div className="upload-progress__info">
                   <span className="upload-progress__name">
-                    上传 {baseName(progress.path)}
+                    {transfer.label} {baseName(transfer.path)}
                   </span>
                   <span className="upload-progress__pct">
-                    {Math.round((progress.uploaded / progress.total) * 100)}%
+                    {Math.round((transfer.done / transfer.total) * 100)}%
                   </span>
                 </div>
                 <div className="upload-progress__track">
                   <div
                     className="upload-progress__fill"
                     style={{
-                      width: `${(progress.uploaded / progress.total) * 100}%`,
+                      width: `${(transfer.done / transfer.total) * 100}%`,
                     }}
                   />
                 </div>
