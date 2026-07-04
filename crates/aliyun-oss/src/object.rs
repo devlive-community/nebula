@@ -11,7 +11,7 @@ use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, DATE, ETAG, L
 use reqwest::{Method, Request, Response, StatusCode, Url};
 use serde::Deserialize;
 
-use crate::client::OssClient;
+use crate::client::{encode_key, OssClient};
 use crate::error::{OssError, Result};
 use crate::sign;
 
@@ -132,7 +132,8 @@ impl OssClient {
         dst_key: &str,
         date: &str,
     ) -> Result<Request> {
-        let copy_source = format!("/{src_bucket}/{src_key}");
+        // copy-source 头值需 URL 编码;签名对其按编码后的值计算(与实际发送一致)。
+        let copy_source = format!("/{src_bucket}/{}", encode_key(src_key));
         // x-oss-copy-source 属于 x-oss- 头,需计入 CanonicalizedOSSHeaders。
         let oss_headers =
             sign::canonicalized_oss_headers([("x-oss-copy-source", copy_source.as_str())]);
@@ -141,7 +142,11 @@ impl OssClient {
         let authorization =
             sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
 
-        let url = format!("{}/{}", self.bucket_base_url(dst_bucket), dst_key);
+        let url = format!(
+            "{}/{}",
+            self.bucket_base_url(dst_bucket),
+            encode_key(dst_key)
+        );
         self.http()
             .inner()
             .request(Method::PUT, &url)
@@ -169,8 +174,12 @@ impl OssClient {
         let sts = sign::string_to_sign("GET", "", "", &expiration.to_string(), "", &canonical);
         let signature = sign::signature(self.access_key_secret(), &sts);
 
-        let mut url = Url::parse(&format!("{}/{}", self.bucket_base_url(bucket), key))
-            .map_err(|e| OssError::Core(cloud_core::CoreError::InvalidRequest(e.to_string())))?;
+        let mut url = Url::parse(&format!(
+            "{}/{}",
+            self.bucket_base_url(bucket),
+            encode_key(key)
+        ))
+        .map_err(|e| OssError::Core(cloud_core::CoreError::InvalidRequest(e.to_string())))?;
         url.query_pairs_mut()
             .append_pair("OSSAccessKeyId", self.access_key_id())
             .append_pair("Expires", &expiration.to_string())
@@ -221,7 +230,7 @@ impl OssClient {
         let authorization =
             sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
 
-        let url = format!("{}/{}", self.bucket_base_url(bucket), key);
+        let url = format!("{}/{}", self.bucket_base_url(bucket), encode_key(key));
         let mut builder = self
             .http()
             .inner()

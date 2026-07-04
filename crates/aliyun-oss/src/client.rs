@@ -3,6 +3,21 @@
 //! 本增量只覆盖构造与 endpoint 拼接;对象 / 桶操作在后续增量加入。
 
 use cloud_core::HttpClient;
+use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+
+/// 对象 key 放进 URL path 时的百分号编码集:除 `A-Za-z0-9 - _ . ~ /` 外全部编码。
+/// 保留 `/` 作为路径分隔符;签名用的 CanonicalizedResource 仍用未编码的原始 key。
+const OSS_PATH: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'_')
+    .remove(b'.')
+    .remove(b'~')
+    .remove(b'/');
+
+/// 把对象 key 编码成可安全放进 URL path 的形式(保留 `/`)。
+pub(crate) fn encode_key(key: &str) -> String {
+    utf8_percent_encode(key, OSS_PATH).to_string()
+}
 
 /// 阿里云 OSS 客户端。可低成本 clone(内部 HTTP 客户端引用计数)。
 #[derive(Debug, Clone)]
@@ -89,6 +104,14 @@ mod tests {
     fn accepts_bare_endpoint() {
         let c = OssClient::new("id", "secret", "oss-cn-hangzhou.aliyuncs.com");
         assert_eq!(c.endpoint(), "oss-cn-hangzhou.aliyuncs.com");
+    }
+
+    #[test]
+    fn encode_key_percent_encodes_specials_but_keeps_slash() {
+        assert_eq!(encode_key("dir/a.mp4"), "dir/a.mp4");
+        assert_eq!(encode_key("dir/ .mp4"), "dir/%20.mp4"); // 前导空格保留为 %20
+        assert_eq!(encode_key("a b+c#d"), "a%20b%2Bc%23d");
+        assert_eq!(encode_key("图片.png"), "%E5%9B%BE%E7%89%87.png");
     }
 
     #[test]

@@ -33,6 +33,7 @@ dependencies = [
  "cloud-core",
  "futures",
  "httpdate",
+ "percent-encoding",
  "quick-xml",
  "reqwest",
  "serde",

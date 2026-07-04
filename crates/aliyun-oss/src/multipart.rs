@@ -10,7 +10,7 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, DATE, ETAG};
 use reqwest::{Method, Request};
 use serde::Deserialize;
 
-use crate::client::OssClient;
+use crate::client::{encode_key, OssClient};
 use crate::error::{OssError, Result};
 use crate::object::{check_status, now_gmt};
 use crate::sign;
@@ -264,7 +264,12 @@ impl OssClient {
             })
             .collect::<Vec<_>>()
             .join("&");
-        let url = format!("{}/{}?{}", self.bucket_base_url(bucket), req.key, query);
+        let url = format!(
+            "{}/{}?{}",
+            self.bucket_base_url(bucket),
+            encode_key(req.key),
+            query
+        );
 
         let mut builder = self
             .http()
