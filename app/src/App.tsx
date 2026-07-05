@@ -25,6 +25,7 @@ import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
+import { FileGrid } from "./components/FileGrid";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { MoveCopyDialog } from "./components/MoveCopyDialog";
@@ -63,6 +64,14 @@ export default function App() {
     name: string;
     kind: "image" | "video";
   } | null>(null);
+  const [view, setView] = useState<"list" | "grid">(
+    () => (localStorage.getItem("nebula-view") as "list" | "grid") || "list",
+  );
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    localStorage.setItem("nebula-view", view);
+  }, [view]);
 
   const openDir = (entry: Entry) =>
     setPath(entry.path.endsWith("/") ? entry.path : entry.path + "/");
@@ -198,6 +207,31 @@ export default function App() {
   );
   const dirCount = visibleEntries.length - visibleFiles.length;
   const totalSize = visibleFiles.reduce((sum, e) => sum + e.size, 0);
+
+  // 网格视图下,为可见图片批量生成缩略图预签名链接。
+  useEffect(() => {
+    if (view !== "grid" || !current) return;
+    const imgs = visibleEntries
+      .filter((e) => e.kind === "file" && previewKind(e.name) === "image")
+      .map((e) => e.path);
+    if (imgs.length === 0) {
+      setThumbs({});
+      return;
+    }
+    let cancelled = false;
+    api
+      .presignBatch(current, imgs, 600)
+      .then((urls) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        imgs.forEach((p, i) => (map[p] = urls[i]));
+        setThumbs(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [view, current, visibleEntries]);
   const allSelected =
     visibleFiles.length > 0 && visibleFiles.every((f) => selected.has(f.path));
 
@@ -577,9 +611,13 @@ export default function App() {
                 canUpload={path !== ""}
                 busy={busy}
                 filter={filter}
+                view={view}
                 onFilter={setFilter}
                 onUp={() => setPath(parentPath(path))}
                 onRefresh={load}
+                onToggleView={() =>
+                  setView((v) => (v === "list" ? "grid" : "list"))
+                }
                 onUpload={upload}
                 onUploadFolder={uploadFolder}
                 onNewFolder={() => setShowNewFolder(true)}
@@ -607,21 +645,34 @@ export default function App() {
               </div>
             )}
 
-            <FileList
-              entries={visibleEntries}
-              loading={loading}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              selected={selected}
-              allSelected={allSelected}
-              onSort={toggleSort}
-              onToggleSelect={toggleSelect}
-              onToggleSelectAll={toggleSelectAll}
-              onOpenDir={openDir}
-              onOpenFile={openPreview}
-              onOpenDetails={setDetailsEntry}
-              onContext={(entry, x, y) => setMenu({ x, y, entry })}
-            />
+            {view === "list" ? (
+              <FileList
+                entries={visibleEntries}
+                loading={loading}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                selected={selected}
+                allSelected={allSelected}
+                onSort={toggleSort}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
+                onOpenDir={openDir}
+                onOpenFile={openPreview}
+                onOpenDetails={setDetailsEntry}
+                onContext={(entry, x, y) => setMenu({ x, y, entry })}
+              />
+            ) : (
+              <FileGrid
+                entries={visibleEntries}
+                loading={loading}
+                thumbs={thumbs}
+                selected={selected}
+                onToggleSelect={toggleSelect}
+                onOpenDir={openDir}
+                onOpenFile={openPreview}
+                onContext={(entry, x, y) => setMenu({ x, y, entry })}
+              />
+            )}
 
             {detailsEntry && (
               <FileDetails

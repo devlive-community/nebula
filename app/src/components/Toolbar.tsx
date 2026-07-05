@@ -3,8 +3,10 @@ import {
   faArrowUp,
   faFolderOpen,
   faFolderPlus,
+  faList,
   faMagnifyingGlass,
   faRotateRight,
+  faTableCells,
   faUpload,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -13,9 +15,11 @@ interface Props {
   canUpload: boolean;
   busy: boolean;
   filter: string;
+  view: "list" | "grid";
   onFilter: (value: string) => void;
   onUp: () => void;
   onRefresh: () => void;
+  onToggleView: () => void;
   onUpload: () => void;
   onUploadFolder: () => void;
   onNewFolder: () => void;
@@ -26,9 +30,11 @@ export function Toolbar({
   canUpload,
   busy,
   filter,
+  view,
   onFilter,
   onUp,
   onRefresh,
+  onToggleView,
   onUpload,
   onUploadFolder,
   onNewFolder,
@@ -52,6 +58,13 @@ export function Toolbar({
       </div>
       <div className="toolbar__spacer" />
       {busy && <span className="toolbar__busy">处理中…</span>}
+      <button
+        className="btn"
+        onClick={onToggleView}
+        title={view === "list" ? "网格视图" : "列表视图"}
+      >
+        <FontAwesomeIcon icon={view === "list" ? faTableCells : faList} />
+      </button>
       <button
         className="btn"
         disabled={!canUpload}

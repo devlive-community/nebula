@@ -54,6 +54,12 @@ export const presign = (account: string, path: string, expiresSecs: number) =>
 export const expandUploadPaths = (paths: string[]) =>
   invoke<UploadEntry[]>("expand_upload_paths", { paths });
 
+export const presignBatch = (
+  account: string,
+  paths: string[],
+  expiresSecs: number,
+) => invoke<string[]>("presign_batch", { account, paths, expiresSecs });
+
 export const getSettings = () => invoke<Settings>("get_settings");
 
 export const saveSettings = (settings: Settings) =>
