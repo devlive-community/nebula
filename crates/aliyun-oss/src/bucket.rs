@@ -151,11 +151,16 @@ impl OssClient {
 
         let parsed: ListBucketResult = quick_xml::de::from_str(&body)
             .map_err(|e| OssError::Core(CoreError::InvalidResponse(e.to_string())))?;
-        let next = next_marker(&parsed);
+        // 响应带 encoding-type=url,key / marker 均为 URL 编码,需解码回原文。
+        let next = next_marker(&parsed).map(|m| url_decode(&m));
         let items = parsed
             .contents
             .into_iter()
-            .map(ObjectSummary::from)
+            .map(|c| {
+                let mut o = ObjectSummary::from(c);
+                o.key = url_decode(&o.key);
+                o
+            })
             .collect();
         Ok(Page { items, next })
     }
@@ -187,19 +192,18 @@ impl OssClient {
 
         let parsed: ListBucketResult = quick_xml::de::from_str(&body)
             .map_err(|e| OssError::Core(CoreError::InvalidResponse(e.to_string())))?;
-        let next = next_marker(&parsed);
+        let next = next_marker(&parsed).map(|m| url_decode(&m));
 
         let mut items: Vec<ListEntry> = parsed
             .common_prefixes
             .into_iter()
-            .map(|p| ListEntry::Prefix(p.prefix))
+            .map(|p| ListEntry::Prefix(url_decode(&p.prefix)))
             .collect();
-        items.extend(
-            parsed
-                .contents
-                .into_iter()
-                .map(|c| ListEntry::Object(c.into())),
-        );
+        items.extend(parsed.contents.into_iter().map(|c| {
+            let mut o = ObjectSummary::from(c);
+            o.key = url_decode(&o.key);
+            ListEntry::Object(o)
+        }));
         Ok(Page { items, next })
     }
 
@@ -231,6 +235,8 @@ impl OssClient {
             if let Some(d) = delimiter {
                 qp.append_pair("delimiter", d);
             }
+            // 让返回的 Key / Prefix / Marker 以 URL 编码给出,避免特殊字符在 XML 中丢失。
+            qp.append_pair("encoding-type", "url");
         }
 
         self.http()
@@ -349,6 +355,13 @@ impl OssClient {
     }
 }
 
+/// URL 解码(配合 `encoding-type=url`),非法字节按 lossy 处理。
+fn url_decode(s: &str) -> String {
+    percent_encoding::percent_decode_str(s)
+        .decode_utf8_lossy()
+        .into_owned()
+}
+
 /// 下一页游标:未截断则无;截断时优先用 `NextMarker`,否则退回本页最后一个 Key。
 fn next_marker(result: &ListBucketResult) -> Option<String> {
     if !result.is_truncated {
@@ -411,6 +424,22 @@ mod tests {
         assert!(!query.contains("prefix="));
         assert!(!query.contains("marker="));
         assert!(!query.contains("delimiter="));
+    }
+
+    #[test]
+    fn list_request_sets_encoding_type() {
+        let client = test_client();
+        let req = client
+            .build_list_request("b", None, "", None, "date")
+            .unwrap();
+        assert!(req.url().query().unwrap().contains("encoding-type=url"));
+    }
+
+    #[test]
+    fn url_decode_restores_specials() {
+        assert_eq!(url_decode("dir/%20a.mp4"), "dir/ a.mp4");
+        assert_eq!(url_decode("%E5%9B%BE%E7%89%87.png"), "图片.png");
+        assert_eq!(url_decode("plain.txt"), "plain.txt");
     }
 
     #[test]
