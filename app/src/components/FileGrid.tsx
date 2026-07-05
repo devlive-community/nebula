@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFile, faFolder } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
@@ -12,6 +13,8 @@ interface Props {
   onOpenDir: (entry: Entry) => void;
   onOpenFile: (entry: Entry) => void;
   onContext: (entry: Entry, x: number, y: number) => void;
+  onDragStartFile: (entry: Entry) => void;
+  onDropDir: (dir: Entry) => void;
 }
 
 export function FileGrid({
@@ -23,7 +26,10 @@ export function FileGrid({
   onOpenDir,
   onOpenFile,
   onContext,
+  onDragStartFile,
+  onDropDir,
 }: Props) {
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   if (loading) {
     return <div className="filelist__state">加载中…</div>;
   }
@@ -39,7 +45,29 @@ export function FileGrid({
         return (
           <div
             key={entry.path}
-            className={`card ${selected.has(entry.path) ? "card--selected" : ""}`}
+            className={`card ${selected.has(entry.path) ? "card--selected" : ""} ${
+              dropTarget === entry.path ? "card--drop" : ""
+            }`}
+            draggable={!isDir}
+            onDragStart={() => !isDir && onDragStartFile(entry)}
+            onDragOver={
+              isDir
+                ? (e) => {
+                    e.preventDefault();
+                    setDropTarget(entry.path);
+                  }
+                : undefined
+            }
+            onDragLeave={isDir ? () => setDropTarget(null) : undefined}
+            onDrop={
+              isDir
+                ? (e) => {
+                    e.preventDefault();
+                    setDropTarget(null);
+                    onDropDir(entry);
+                  }
+                : undefined
+            }
             onDoubleClick={() => (isDir ? onOpenDir(entry) : onOpenFile(entry))}
             onContextMenu={(e) => {
               e.preventDefault();

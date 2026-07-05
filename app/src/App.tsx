@@ -503,6 +503,37 @@ export default function App() {
     }
   };
 
+  // 应用内拖拽移动:拖动的文件路径集合。
+  const dragPathsRef = useRef<string[]>([]);
+  const onDragStartFile = (entry: Entry) => {
+    dragPathsRef.current =
+      selected.has(entry.path) && selected.size > 0
+        ? [...selected]
+        : [entry.path];
+  };
+  const onDropDir = async (dir: Entry) => {
+    const srcs = dragPathsRef.current;
+    dragPathsRef.current = [];
+    if (!current || srcs.length === 0) return;
+    const targetDir = dir.path.endsWith("/") ? dir.path : dir.path + "/";
+    const moves = srcs
+      .map((from) => ({ from, to: targetDir + baseName(from) }))
+      .filter((m) => m.to !== m.from);
+    if (moves.length === 0) return;
+    setBusy(true);
+    setError(null);
+    await runPool(moves, settings.concurrency, async (m) => {
+      try {
+        await api.rename(current, m.from, m.to);
+      } catch (e) {
+        setError(String(e));
+      }
+    });
+    clearSelection();
+    await load();
+    setBusy(false);
+  };
+
   const doMoveCopy = async (mode: "copy" | "move", to: string) => {
     const entry = moveCopyTarget;
     setMoveCopyTarget(null);
@@ -673,6 +704,8 @@ export default function App() {
                 onOpenFile={openPreview}
                 onOpenDetails={setDetailsEntry}
                 onContext={(entry, x, y) => setMenu({ x, y, entry })}
+                onDragStartFile={onDragStartFile}
+                onDropDir={onDropDir}
               />
             ) : (
               <FileGrid
@@ -684,6 +717,8 @@ export default function App() {
                 onOpenDir={openDir}
                 onOpenFile={openPreview}
                 onContext={(entry, x, y) => setMenu({ x, y, entry })}
+                onDragStartFile={onDragStartFile}
+                onDropDir={onDropDir}
               />
             )}
 

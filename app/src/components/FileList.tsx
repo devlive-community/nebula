@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFile,
@@ -25,6 +26,8 @@ interface Props {
   onOpenFile: (entry: Entry) => void;
   onOpenDetails: (entry: Entry) => void;
   onContext: (entry: Entry, x: number, y: number) => void;
+  onDragStartFile: (entry: Entry) => void;
+  onDropDir: (dir: Entry) => void;
 }
 
 export function FileList({
@@ -41,7 +44,10 @@ export function FileList({
   onOpenFile,
   onOpenDetails,
   onContext,
+  onDragStartFile,
+  onDropDir,
 }: Props) {
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const someSelected = entries.some(
     (e) => e.kind === "file" && selected.has(e.path),
   );
@@ -86,7 +92,29 @@ export function FileList({
           return (
             <div
               key={entry.path}
-              className={`row ${isDir ? "row--dir" : ""}`}
+              className={`row ${isDir ? "row--dir" : ""} ${
+                dropTarget === entry.path ? "row--drop" : ""
+              }`}
+              draggable={!isDir}
+              onDragStart={() => !isDir && onDragStartFile(entry)}
+              onDragOver={
+                isDir
+                  ? (e) => {
+                      e.preventDefault();
+                      setDropTarget(entry.path);
+                    }
+                  : undefined
+              }
+              onDragLeave={isDir ? () => setDropTarget(null) : undefined}
+              onDrop={
+                isDir
+                  ? (e) => {
+                      e.preventDefault();
+                      setDropTarget(null);
+                      onDropDir(entry);
+                    }
+                  : undefined
+              }
               onDoubleClick={() => (isDir ? onOpenDir(entry) : onOpenFile(entry))}
               onContextMenu={(e) => {
                 e.preventDefault();
