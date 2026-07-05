@@ -14,6 +14,12 @@ export interface DownloadProgress {
   total: number;
 }
 
+/** 应用设置(与 Rust 端 app_core::Settings 对应)。 */
+export interface Settings {
+  share_expiry_secs: number;
+  concurrency: number;
+}
+
 /** 传输任务列表中的一项。 */
 export interface TransferItem {
   id: string;

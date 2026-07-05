@@ -162,8 +162,14 @@ button {
   margin-top: 12px;
 }
 
-.sidebar__theme {
+.sidebar__footer {
+  display: flex;
+  gap: 8px;
   margin-top: 8px;
+}
+
+.sidebar__footer .btn {
+  flex: 1;
 }
 
 /* ---------- Main ---------- */

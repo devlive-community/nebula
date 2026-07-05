@@ -7,14 +7,12 @@ import { faCloud, faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-ico
 import type {
   DownloadProgress,
   Entry,
+  Settings,
   TransferItem,
   UploadProgress,
 } from "./types";
 import * as api from "./api";
 import { baseName, joinRemote, parentPath, runPool } from "./util";
-
-/** 批量传输的最大并发数。 */
-const TRANSFER_CONCURRENCY = 3;
 import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
@@ -26,6 +24,7 @@ import { MoveCopyDialog } from "./components/MoveCopyDialog";
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TransferPanel } from "./components/TransferPanel";
+import { SettingsDialog } from "./components/SettingsDialog";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -42,8 +41,25 @@ export default function App() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [settings, setSettings] = useState<Settings>({
+    share_expiry_secs: 3600,
+    concurrency: 3,
+  });
+  const [showSettings, setShowSettings] = useState(false);
 
-  const SHARE_MINUTES = 60;
+  useEffect(() => {
+    api.getSettings().then(setSettings).catch(() => {});
+  }, []);
+
+  const saveSettings = async (next: Settings) => {
+    setShowSettings(false);
+    setSettings(next);
+    try {
+      await api.saveSettings(next);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingBatchDelete, setPendingBatchDelete] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -204,7 +220,7 @@ export default function App() {
   onDropRef.current = async (paths: string[]) => {
     if (!current || !path || paths.length === 0) return;
     setBusy(true);
-    await runPool(paths, TRANSFER_CONCURRENCY, (local) => {
+    await runPool(paths, settings.concurrency, (local) => {
       const remote = joinRemote(path, baseName(local));
       return runTransfer(remote, "上传", baseName(local), () =>
         api.uploadFile(current, remote, local),
@@ -286,7 +302,7 @@ export default function App() {
     const dir = await open({ directory: true, title: "选择下载到的文件夹" });
     if (typeof dir !== "string") return;
     setBusy(true);
-    await runPool([...selected], TRANSFER_CONCURRENCY, (p) =>
+    await runPool([...selected], settings.concurrency, (p) =>
       runTransfer(p, "下载", baseName(p), () =>
         api.downloadFile(current, p, `${dir}/${baseName(p)}`),
       ),
@@ -373,7 +389,11 @@ export default function App() {
     if (!current) return;
     setError(null);
     try {
-      const url = await api.presign(current, entry.path, SHARE_MINUTES * 60);
+      const url = await api.presign(
+        current,
+        entry.path,
+        settings.share_expiry_secs,
+      );
       setShareUrl(url);
     } catch (e) {
       setError(String(e));
@@ -406,6 +426,7 @@ export default function App() {
         onAdd={() => setShowForm(true)}
         onRemove={removeAccount}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        onSettings={() => setShowSettings(true)}
       />
 
       <main className="main">
@@ -560,8 +581,16 @@ export default function App() {
       {shareUrl && (
         <ShareDialog
           url={shareUrl}
-          minutes={SHARE_MINUTES}
+          minutes={Math.round(settings.share_expiry_secs / 60)}
           onClose={() => setShareUrl(null)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsDialog
+          settings={settings}
+          onSave={saveSettings}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>
