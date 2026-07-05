@@ -25,6 +25,7 @@ import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TransferPanel } from "./components/TransferPanel";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -46,6 +47,12 @@ export default function App() {
     concurrency: 3,
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(
+    null,
+  );
+
+  const openDir = (entry: Entry) =>
+    setPath(entry.path.endsWith("/") ? entry.path : entry.path + "/");
 
   useEffect(() => {
     api.getSettings().then(setSettings).catch(() => {});
@@ -581,13 +588,9 @@ export default function App() {
               onSort={toggleSort}
               onToggleSelect={toggleSelect}
               onToggleSelectAll={toggleSelectAll}
-              onOpenDir={(e) => setPath(e.path.endsWith("/") ? e.path : e.path + "/")}
+              onOpenDir={openDir}
               onOpenDetails={setDetailsEntry}
-              onDownload={download}
-              onRename={setRenameTarget}
-              onMoveCopy={setMoveCopyTarget}
-              onShare={share}
-              onDelete={setPendingDelete}
+              onContext={(entry, x, y) => setMenu({ x, y, entry })}
             />
 
             {detailsEntry && (
@@ -700,6 +703,29 @@ export default function App() {
           onClose={() => setShowSettings(false)}
         />
       )}
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={contextItems(menu.entry)}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
   );
+
+  function contextItems(entry: Entry): MenuItem[] {
+    if (entry.kind === "directory") {
+      return [{ label: "打开", onClick: () => openDir(entry) }];
+    }
+    return [
+      { label: "详情", onClick: () => setDetailsEntry(entry) },
+      { label: "下载", onClick: () => download(entry) },
+      { label: "重命名", onClick: () => setRenameTarget(entry) },
+      { label: "复制 / 移动到", onClick: () => setMoveCopyTarget(entry) },
+      { label: "分享链接", onClick: () => share(entry) },
+      { label: "删除", danger: true, onClick: () => setPendingDelete(entry) },
+    ];
+  }
 }

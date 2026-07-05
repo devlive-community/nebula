@@ -349,7 +349,7 @@ button {
 .filelist__head,
 .row {
   display: grid;
-  grid-template-columns: 32px 1fr 100px 160px 180px;
+  grid-template-columns: 32px 1fr 120px 220px;
   align-items: center;
   gap: 8px;
   padding: 0 20px;
@@ -533,6 +533,43 @@ button {
 
 .batch-bar__spacer {
   flex: 1;
+}
+
+/* ---------- Context menu ---------- */
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 180px;
+  padding: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.context-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.context-menu__item:hover {
+  background: var(--bg-elev-2);
+}
+
+.context-menu__item--danger {
+  color: var(--danger);
+}
+
+.context-menu__item--danger:hover {
+  background: rgba(239, 71, 87, 0.12);
 }
 
 /* ---------- Error banner ---------- */

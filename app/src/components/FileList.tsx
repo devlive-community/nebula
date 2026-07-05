@@ -1,14 +1,9 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faCopy,
-  faDownload,
   faFile,
   faFolder,
-  faLink,
-  faPen,
   faSortDown,
   faSortUp,
-  faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { formatBytes, formatDate } from "../util";
@@ -28,11 +23,7 @@ interface Props {
   onToggleSelectAll: () => void;
   onOpenDir: (entry: Entry) => void;
   onOpenDetails: (entry: Entry) => void;
-  onDownload: (entry: Entry) => void;
-  onRename: (entry: Entry) => void;
-  onMoveCopy: (entry: Entry) => void;
-  onShare: (entry: Entry) => void;
-  onDelete: (entry: Entry) => void;
+  onContext: (entry: Entry, x: number, y: number) => void;
 }
 
 export function FileList({
@@ -47,11 +38,7 @@ export function FileList({
   onToggleSelectAll,
   onOpenDir,
   onOpenDetails,
-  onDownload,
-  onRename,
-  onMoveCopy,
-  onShare,
-  onDelete,
+  onContext,
 }: Props) {
   const someSelected = entries.some(
     (e) => e.kind === "file" && selected.has(e.path),
@@ -90,7 +77,6 @@ export function FileList({
         {header("name", "名称", "col-name")}
         {header("size", "大小", "col-size")}
         {header("modified", "修改时间", "col-modified")}
-        <span className="col-actions" />
       </div>
       <div className="filelist__body">
         {entries.map((entry) => {
@@ -100,6 +86,10 @@ export function FileList({
               key={entry.path}
               className={`row ${isDir ? "row--dir" : ""}`}
               onDoubleClick={() => isDir && onOpenDir(entry)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onContext(entry, e.clientX, e.clientY);
+              }}
             >
               <span className="col-check">
                 {!isDir && (
@@ -113,63 +103,18 @@ export function FileList({
                 <span className="row__icon">
                   <FontAwesomeIcon icon={isDir ? faFolder : faFile} />
                 </span>
-                {isDir ? (
-                  <button className="row__name-link" onClick={() => onOpenDir(entry)}>
-                    {entry.name}
-                  </button>
-                ) : (
-                  <button
-                    className="row__name-link"
-                    onClick={() => onOpenDetails(entry)}
-                  >
-                    {entry.name}
-                  </button>
-                )}
+                <button
+                  className="row__name-link"
+                  onClick={() =>
+                    isDir ? onOpenDir(entry) : onOpenDetails(entry)
+                  }
+                >
+                  {entry.name}
+                </button>
               </span>
               <span className="col-size">{isDir ? "—" : formatBytes(entry.size)}</span>
               <span className="col-modified">
                 {isDir ? "—" : formatDate(entry.last_modified)}
-              </span>
-              <span className="col-actions">
-                {!isDir && (
-                  <>
-                    <button
-                      className="icon-btn"
-                      title="下载"
-                      onClick={() => onDownload(entry)}
-                    >
-                      <FontAwesomeIcon icon={faDownload} />
-                    </button>
-                    <button
-                      className="icon-btn"
-                      title="重命名"
-                      onClick={() => onRename(entry)}
-                    >
-                      <FontAwesomeIcon icon={faPen} />
-                    </button>
-                    <button
-                      className="icon-btn"
-                      title="复制 / 移动到"
-                      onClick={() => onMoveCopy(entry)}
-                    >
-                      <FontAwesomeIcon icon={faCopy} />
-                    </button>
-                    <button
-                      className="icon-btn"
-                      title="分享链接"
-                      onClick={() => onShare(entry)}
-                    >
-                      <FontAwesomeIcon icon={faLink} />
-                    </button>
-                    <button
-                      className="icon-btn icon-btn--danger"
-                      title="删除"
-                      onClick={() => onDelete(entry)}
-                    >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                  </>
-                )}
               </span>
             </div>
           );
