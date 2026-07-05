@@ -233,6 +233,14 @@ export default function App() {
     void uploadLocalPaths(paths);
   };
 
+  // 全局键盘快捷键:用 ref 持最新逻辑,监听只注册一次。
+  const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => onKeyRef.current(e);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWebview()
@@ -458,6 +466,49 @@ export default function App() {
       setError(String(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const anyModalOpen =
+    showForm ||
+    !!pendingDelete ||
+    !!renameTarget ||
+    !!moveCopyTarget ||
+    !!shareUrl ||
+    showNewFolder ||
+    pendingBatchDelete ||
+    showSettings;
+
+  onKeyRef.current = (e: KeyboardEvent) => {
+    const el = e.target as HTMLElement | null;
+    const typing =
+      !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+
+    if (e.key === "Escape") {
+      if (showSettings) setShowSettings(false);
+      else if (shareUrl) setShareUrl(null);
+      else if (moveCopyTarget) setMoveCopyTarget(null);
+      else if (renameTarget) setRenameTarget(null);
+      else if (showNewFolder) setShowNewFolder(false);
+      else if (showForm) setShowForm(false);
+      else if (pendingBatchDelete) setPendingBatchDelete(false);
+      else if (pendingDelete) setPendingDelete(null);
+      else if (detailsEntry) setDetailsEntry(null);
+      return;
+    }
+
+    if (typing || anyModalOpen || !current) return;
+    const mod = e.metaKey || e.ctrlKey;
+
+    if (mod && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      setSelected(new Set(visibleFiles.map((f) => f.path)));
+    } else if ((e.key === "Delete" || e.key === "Backspace") && selected.size > 0) {
+      e.preventDefault();
+      setPendingBatchDelete(true);
+    } else if (mod && e.key === "ArrowUp" && path !== "") {
+      e.preventDefault();
+      setPath(parentPath(path));
     }
   };
 
