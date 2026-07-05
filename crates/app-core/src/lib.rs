@@ -25,6 +25,15 @@ pub use settings::Settings;
 pub use store::{AccountRecord, AccountStore};
 
 const VENDOR_ALIYUN: &str = "aliyun";
+
+/// 账号的非敏感信息(不含密钥),供编辑回填用。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AccountInfo {
+    pub id: String,
+    pub vendor: String,
+    pub access_key_id: String,
+    pub endpoint: String,
+}
 /// 钥匙串里存储密钥用的服务名。
 const KEYRING_SERVICE: &str = "org.devlive.nebula";
 
@@ -143,6 +152,22 @@ impl App {
     /// 列出已注册的账号 id(字典序)。
     pub fn accounts(&self) -> Vec<String> {
         self.registry.ids()
+    }
+
+    /// 读取某账号的非敏感信息(不含密钥),用于编辑回填。
+    pub fn account_info(&self, id: &str) -> Option<AccountInfo> {
+        let store = self.store.as_ref()?;
+        store
+            .list()
+            .ok()?
+            .into_iter()
+            .find(|r| r.id == id)
+            .map(|r| AccountInfo {
+                id: r.id,
+                vendor: r.vendor,
+                access_key_id: r.access_key_id,
+                endpoint: r.endpoint,
+            })
     }
 
     /// 浏览某账号下某路径(桶 / 前缀)的条目。

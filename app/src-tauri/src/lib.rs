@@ -2,7 +2,7 @@
 //!
 //! 业务逻辑都在 `app-core`(可 `cargo test`),这里只做 JS ↔ Rust 的桥接与本地文件读写。
 
-use app_core::{App, Settings};
+use app_core::{AccountInfo, App, Settings};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
@@ -48,6 +48,12 @@ fn add_aliyun_account(
 #[tauri::command]
 fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
     state.remove_account(&id).map_err(|e| e.to_string())
+}
+
+/// 读取账号非敏感信息(编辑回填用)。
+#[tauri::command]
+fn get_account(state: State<'_, App>, id: String) -> Option<AccountInfo> {
+    state.account_info(&id)
 }
 
 /// 浏览某账号下某路径(桶 / 前缀)。
@@ -302,6 +308,7 @@ pub fn run() {
             list_accounts,
             add_aliyun_account,
             remove_account,
+            get_account,
             browse,
             stat,
             upload_file,
