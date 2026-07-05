@@ -227,30 +227,8 @@ export default function App() {
 
   // 拖拽上传:用 ref 持有最新处理逻辑,拖放监听只注册一次。
   const onDropRef = useRef<(paths: string[]) => void>(() => {});
-  onDropRef.current = async (paths: string[]) => {
-    if (!current || !path || paths.length === 0) return;
-    setBusy(true);
-    let entries: { local: string; rel: string }[];
-    try {
-      // 展开文件夹为文件列表(递归,保留相对路径)。
-      entries = await api.expandUploadPaths(paths);
-    } catch (e) {
-      setError(String(e));
-      setBusy(false);
-      return;
-    }
-    await runPool(entries, settings.concurrency, (en) =>
-      startTransfer({
-        id: joinRemote(path, en.rel),
-        kind: "上传",
-        name: en.rel,
-        account: current,
-        remote: joinRemote(path, en.rel),
-        local: en.local,
-      }),
-    );
-    await load();
-    setBusy(false);
+  onDropRef.current = (paths: string[]) => {
+    void uploadLocalPaths(paths);
   };
 
   useEffect(() => {
@@ -339,22 +317,49 @@ export default function App() {
     setBusy(false);
   };
 
-  const upload = async () => {
-    if (!current || !path) return;
-    const selected = await open({ multiple: false, title: "选择要上传的文件" });
-    if (typeof selected !== "string") return;
-    const remote = joinRemote(path, baseName(selected));
+  // 上传一组本地路径(文件或文件夹)到当前目录,文件夹递归、保留相对路径。
+  const uploadLocalPaths = async (localPaths: string[]) => {
+    if (!current || !path || localPaths.length === 0) return;
     setBusy(true);
-    await startTransfer({
-      id: remote,
-      kind: "上传",
-      name: baseName(selected),
-      account: current,
-      remote,
-      local: selected,
-    });
+    let entries: { local: string; rel: string }[];
+    try {
+      entries = await api.expandUploadPaths(localPaths);
+    } catch (e) {
+      setError(String(e));
+      setBusy(false);
+      return;
+    }
+    await runPool(entries, settings.concurrency, (en) =>
+      startTransfer({
+        id: joinRemote(path, en.rel),
+        kind: "上传",
+        name: en.rel,
+        account: current,
+        remote: joinRemote(path, en.rel),
+        local: en.local,
+      }),
+    );
     await load();
     setBusy(false);
+  };
+
+  const toPathList = (sel: string | string[] | null): string[] =>
+    Array.isArray(sel) ? sel : typeof sel === "string" ? [sel] : [];
+
+  const upload = async () => {
+    if (!current || !path) return;
+    const sel = await open({ multiple: true, title: "选择要上传的文件" });
+    await uploadLocalPaths(toPathList(sel));
+  };
+
+  const uploadFolder = async () => {
+    if (!current || !path) return;
+    const sel = await open({
+      directory: true,
+      multiple: true,
+      title: "选择要上传的文件夹",
+    });
+    await uploadLocalPaths(toPathList(sel));
   };
 
   const download = async (entry: Entry) => {
@@ -487,6 +492,7 @@ export default function App() {
                 onUp={() => setPath(parentPath(path))}
                 onRefresh={load}
                 onUpload={upload}
+                onUploadFolder={uploadFolder}
                 onNewFolder={() => setShowNewFolder(true)}
               />
             </div>

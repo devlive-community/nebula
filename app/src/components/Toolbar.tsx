@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowUp,
+  faFolderOpen,
   faFolderPlus,
   faMagnifyingGlass,
   faRotateRight,
@@ -16,6 +17,7 @@ interface Props {
   onUp: () => void;
   onRefresh: () => void;
   onUpload: () => void;
+  onUploadFolder: () => void;
   onNewFolder: () => void;
 }
 
@@ -28,6 +30,7 @@ export function Toolbar({
   onUp,
   onRefresh,
   onUpload,
+  onUploadFolder,
   onNewFolder,
 }: Props) {
   return (
@@ -56,6 +59,14 @@ export function Toolbar({
         title="在当前目录新建文件夹"
       >
         <FontAwesomeIcon icon={faFolderPlus} /> 新建文件夹
+      </button>
+      <button
+        className="btn"
+        disabled={!canUpload}
+        onClick={onUploadFolder}
+        title="上传文件夹到当前目录"
+      >
+        <FontAwesomeIcon icon={faFolderOpen} /> 上传文件夹
       </button>
       <button
         className="btn btn--primary"
