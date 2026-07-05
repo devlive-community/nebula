@@ -3,6 +3,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 
 interface Props {
+  /** 编辑模式的回填值;不传为新增。 */
+  initial?: { id: string; accessKeyId: string; endpoint: string };
   onSubmit: (
     id: string,
     accessKeyId: string,
@@ -12,11 +14,14 @@ interface Props {
   onClose: () => void;
 }
 
-export function AccountForm({ onSubmit, onClose }: Props) {
-  const [id, setId] = useState("");
-  const [ak, setAk] = useState("");
+export function AccountForm({ initial, onSubmit, onClose }: Props) {
+  const editing = !!initial;
+  const [id, setId] = useState(initial?.id ?? "");
+  const [ak, setAk] = useState(initial?.accessKeyId ?? "");
   const [sk, setSk] = useState("");
-  const [endpoint, setEndpoint] = useState("oss-cn-hangzhou.aliyuncs.com");
+  const [endpoint, setEndpoint] = useState(
+    initial?.endpoint ?? "oss-cn-hangzhou.aliyuncs.com",
+  );
 
   const valid = id && ak && sk && endpoint;
 
@@ -24,7 +29,7 @@ export function AccountForm({ onSubmit, onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>添加阿里云 OSS 账号</h3>
+          <h3>{editing ? "编辑阿里云 OSS 账号" : "添加阿里云 OSS 账号"}</h3>
           <button className="modal__close" onClick={onClose}>
             <FontAwesomeIcon icon={faXmark} />
           </button>
@@ -37,7 +42,8 @@ export function AccountForm({ onSubmit, onClose }: Props) {
               value={id}
               onChange={(e) => setId(e.target.value)}
               placeholder="如 aliyun-main"
-              autoFocus
+              disabled={editing}
+              autoFocus={!editing}
             />
           </label>
           <label className="field">
@@ -45,7 +51,7 @@ export function AccountForm({ onSubmit, onClose }: Props) {
             <input value={ak} onChange={(e) => setAk(e.target.value)} />
           </label>
           <label className="field">
-            <span>AccessKeySecret</span>
+            <span>AccessKeySecret{editing ? "(请重新输入)" : ""}</span>
             <input
               type="password"
               value={sk}
@@ -71,7 +77,7 @@ export function AccountForm({ onSubmit, onClose }: Props) {
             disabled={!valid}
             onClick={() => onSubmit(id, ak, sk, endpoint)}
           >
-            添加
+            {editing ? "保存" : "添加"}
           </button>
         </div>
       </div>

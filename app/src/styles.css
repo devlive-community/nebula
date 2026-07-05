@@ -139,7 +139,7 @@ button {
   white-space: nowrap;
 }
 
-.account-item__remove {
+.account-item__action {
   background: none;
   border: none;
   color: var(--text-faint);
@@ -149,11 +149,16 @@ button {
   border-radius: 4px;
 }
 
-.account-item:hover .account-item__remove {
+.account-item:hover .account-item__action {
   opacity: 1;
 }
 
-.account-item__remove:hover {
+.account-item__action:hover {
+  color: var(--text);
+  background: var(--bg-elev-2);
+}
+
+.account-item__action--danger:hover {
   color: var(--danger);
   background: rgba(239, 71, 87, 0.12);
 }

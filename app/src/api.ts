@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Entry, Settings, UploadEntry } from "./types";
+import type { AccountInfo, Entry, Settings, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -13,6 +13,9 @@ export const addAliyunAccount = (
 ) => invoke<void>("add_aliyun_account", { id, accessKeyId, accessKeySecret, endpoint });
 
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
+
+export const getAccount = (id: string) =>
+  invoke<AccountInfo | null>("get_account", { id });
 
 export const browse = (account: string, path: string) =>
   invoke<Entry[]>("browse", { account, path });

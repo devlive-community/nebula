@@ -14,6 +14,14 @@ export interface DownloadProgress {
   total: number;
 }
 
+/** 账号非敏感信息(编辑回填用,与 Rust 端 AccountInfo 对应)。 */
+export interface AccountInfo {
+  id: string;
+  vendor: string;
+  access_key_id: string;
+  endpoint: string;
+}
+
 /** 展开后待上传的一项:本地路径 + 相对(远端)路径。 */
 export interface UploadEntry {
   local: string;

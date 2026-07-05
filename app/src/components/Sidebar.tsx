@@ -3,6 +3,7 @@ import {
   faCloud,
   faGear,
   faMoon,
+  faPen,
   faPlus,
   faSun,
   faXmark,
@@ -14,6 +15,7 @@ interface Props {
   theme: "dark" | "light";
   onSelect: (id: string) => void;
   onAdd: () => void;
+  onEdit: (id: string) => void;
   onRemove: (id: string) => void;
   onToggleTheme: () => void;
   onSettings: () => void;
@@ -25,6 +27,7 @@ export function Sidebar({
   theme,
   onSelect,
   onAdd,
+  onEdit,
   onRemove,
   onToggleTheme,
   onSettings,
@@ -48,7 +51,17 @@ export function Sidebar({
             <span className="account-item__dot" />
             <span className="account-item__name">{id}</span>
             <button
-              className="account-item__remove"
+              className="account-item__action"
+              title="编辑账号"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(id);
+              }}
+            >
+              <FontAwesomeIcon icon={faPen} />
+            </button>
+            <button
+              className="account-item__action account-item__action--danger"
               title="移除账号"
               onClick={(e) => {
                 e.stopPropagation();

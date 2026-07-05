@@ -5,6 +5,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCloud, faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-icons";
 import type {
+  AccountInfo,
   DownloadProgress,
   Entry,
   Settings,
@@ -45,6 +46,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editInfo, setEditInfo] = useState<AccountInfo | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [moveCopyTarget, setMoveCopyTarget] = useState<Entry | null>(null);
@@ -341,12 +343,22 @@ export default function App() {
     endpoint: string,
   ) => {
     setShowForm(false);
+    setEditInfo(null);
     setError(null);
     try {
       await api.addAliyunAccount(id, ak, sk, endpoint);
       await refreshAccounts();
       setCurrent(id);
       setPath("");
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const editAccount = async (id: string) => {
+    try {
+      const info = await api.getAccount(id);
+      if (info) setEditInfo(info);
     } catch (e) {
       setError(String(e));
     }
@@ -590,6 +602,7 @@ export default function App() {
         theme={theme}
         onSelect={selectAccount}
         onAdd={() => setShowForm(true)}
+        onEdit={editAccount}
         onRemove={removeAccount}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         onSettings={() => setShowSettings(true)}
@@ -712,8 +725,23 @@ export default function App() {
         )}
       </main>
 
-      {showForm && (
-        <AccountForm onSubmit={addAccount} onClose={() => setShowForm(false)} />
+      {(showForm || editInfo) && (
+        <AccountForm
+          initial={
+            editInfo
+              ? {
+                  id: editInfo.id,
+                  accessKeyId: editInfo.access_key_id,
+                  endpoint: editInfo.endpoint,
+                }
+              : undefined
+          }
+          onSubmit={addAccount}
+          onClose={() => {
+            setShowForm(false);
+            setEditInfo(null);
+          }}
+        />
       )}
 
       {pendingDelete && (
