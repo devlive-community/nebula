@@ -12,7 +12,7 @@ import type {
   UploadProgress,
 } from "./types";
 import * as api from "./api";
-import { baseName, joinRemote, parentPath, runPool } from "./util";
+import { baseName, formatBytes, joinRemote, parentPath, runPool } from "./util";
 import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
@@ -160,6 +160,8 @@ export default function App() {
     () => visibleEntries.filter((e) => e.kind === "file"),
     [visibleEntries],
   );
+  const dirCount = visibleEntries.length - visibleFiles.length;
+  const totalSize = visibleFiles.reduce((sum, e) => sum + e.size, 0);
   const allSelected =
     visibleFiles.length > 0 && visibleFiles.every((f) => selected.has(f.path));
 
@@ -544,6 +546,15 @@ export default function App() {
                 onDownload={download}
                 onShare={share}
               />
+            )}
+
+            {!loading && (
+              <div className="statusbar">
+                {dirCount} 个目录 · {visibleFiles.length} 个文件 · 共{" "}
+                {formatBytes(totalSize)}
+                {filter && " · 已过滤"}
+                {selected.size > 0 && ` · 已选 ${selected.size}`}
+              </div>
             )}
 
             {Object.keys(transfers).length > 0 && (

@@ -644,6 +644,16 @@ button {
   flex: 1;
 }
 
+/* ---------- Status bar ---------- */
+.statusbar {
+  flex: none;
+  border-top: 1px solid var(--border);
+  padding: 6px 20px;
+  font-size: 12px;
+  color: var(--text-faint);
+  background: var(--bg-elev);
+}
+
 /* ---------- Transfer panel ---------- */
 .transfers {
   border-top: 1px solid var(--border);
