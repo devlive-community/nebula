@@ -7,6 +7,25 @@ export function formatBytes(size: number): string {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** 以最多 `limit` 个并发执行 `worker`,全部完成后 resolve。 */
+export async function runPool<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let cursor = 0;
+  const runners = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (cursor < items.length) {
+        const item = items[cursor++];
+        await worker(item);
+      }
+    },
+  );
+  await Promise.all(runners);
+}
+
 /** 按扩展名粗略猜测文件类型,用于详情展示。 */
 export function guessType(name: string): string {
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";

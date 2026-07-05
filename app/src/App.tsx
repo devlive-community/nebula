@@ -11,7 +11,10 @@ import type {
   UploadProgress,
 } from "./types";
 import * as api from "./api";
-import { baseName, joinRemote, parentPath } from "./util";
+import { baseName, joinRemote, parentPath, runPool } from "./util";
+
+/** 批量传输的最大并发数。 */
+const TRANSFER_CONCURRENCY = 3;
 import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
@@ -201,12 +204,12 @@ export default function App() {
   onDropRef.current = async (paths: string[]) => {
     if (!current || !path || paths.length === 0) return;
     setBusy(true);
-    for (const local of paths) {
+    await runPool(paths, TRANSFER_CONCURRENCY, (local) => {
       const remote = joinRemote(path, baseName(local));
-      await runTransfer(remote, "上传", baseName(local), () =>
+      return runTransfer(remote, "上传", baseName(local), () =>
         api.uploadFile(current, remote, local),
       );
-    }
+    });
     await load();
     setBusy(false);
   };
@@ -283,11 +286,11 @@ export default function App() {
     const dir = await open({ directory: true, title: "选择下载到的文件夹" });
     if (typeof dir !== "string") return;
     setBusy(true);
-    for (const p of selected) {
-      await runTransfer(p, "下载", baseName(p), () =>
+    await runPool([...selected], TRANSFER_CONCURRENCY, (p) =>
+      runTransfer(p, "下载", baseName(p), () =>
         api.downloadFile(current, p, `${dir}/${baseName(p)}`),
-      );
-    }
+      ),
+    );
     clearSelection();
     setBusy(false);
   };
