@@ -95,6 +95,7 @@ dependencies = [
  "nebula-provider",
  "provider-aliyun",
  "rusqlite",
+ "serde",
  "thiserror 2.0.18",
 ]
 

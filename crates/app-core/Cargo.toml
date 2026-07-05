@@ -12,6 +12,7 @@ publish = false
 nebula-provider = { path = "../nebula-provider" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
 bytes = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 rusqlite = { version = "0.32", features = ["bundled"] }
 # 纯 Rust 后端(zbus + crypto-rust),避免 Linux CI 依赖 openssl/dbus 系统库。

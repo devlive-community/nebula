@@ -9,6 +9,7 @@
 
 mod error;
 mod secret;
+mod settings;
 mod store;
 
 use std::sync::Arc;
@@ -20,6 +21,7 @@ use provider_aliyun::AliyunProvider;
 pub use error::{AppError, Result};
 pub use nebula_provider::{ByteStream, Capabilities, EntryKind, ProgressFn};
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
+pub use settings::Settings;
 pub use store::{AccountRecord, AccountStore};
 
 const VENDOR_ALIYUN: &str = "aliyun";
@@ -216,6 +218,34 @@ impl App {
         Ok(self.provider(account)?.presign(path, expires_secs).await?)
     }
 
+    /// 读取应用设置(无存储或未设置时返回默认值)。
+    pub fn settings(&self) -> Settings {
+        let mut s = Settings::default();
+        let Some(store) = &self.store else {
+            return s;
+        };
+        if let Ok(Some(v)) = store.get_setting("share_expiry_secs") {
+            if let Ok(n) = v.parse() {
+                s.share_expiry_secs = n;
+            }
+        }
+        if let Ok(Some(v)) = store.get_setting("concurrency") {
+            if let Ok(n) = v.parse() {
+                s.concurrency = n;
+            }
+        }
+        s
+    }
+
+    /// 保存应用设置到 SQLite。
+    pub fn save_settings(&self, settings: &Settings) -> Result<()> {
+        if let Some(store) = &self.store {
+            store.set_setting("share_expiry_secs", &settings.share_expiry_secs.to_string())?;
+            store.set_setting("concurrency", &settings.concurrency.to_string())?;
+        }
+        Ok(())
+    }
+
     /// 按 id 解析 provider,未注册则报 [`AppError::NoSuchProvider`]。
     fn provider(&self, account: &str) -> Result<Arc<dyn StorageProvider>> {
         self.registry
@@ -386,6 +416,29 @@ mod tests {
         {
             let app = App::with_store_and_secrets(&path, secrets.clone()).unwrap();
             assert!(app.accounts().is_empty());
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn settings_default_and_persist() {
+        // 无存储:返回默认值。
+        assert_eq!(App::new().settings().concurrency, 3);
+
+        let path = temp_db("settings");
+        let secrets: Arc<dyn SecretStore> = Arc::new(MemorySecrets::default());
+        {
+            let app = App::with_store_and_secrets(&path, secrets.clone()).unwrap();
+            let mut s = app.settings();
+            s.share_expiry_secs = 1800;
+            s.concurrency = 5;
+            app.save_settings(&s).unwrap();
+        }
+        {
+            let app = App::with_store_and_secrets(&path, secrets.clone()).unwrap();
+            let s = app.settings();
+            assert_eq!(s.share_expiry_secs, 1800);
+            assert_eq!(s.concurrency, 5);
         }
         let _ = std::fs::remove_file(&path);
     }

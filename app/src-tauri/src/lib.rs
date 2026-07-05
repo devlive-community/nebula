@@ -2,7 +2,7 @@
 //!
 //! 业务逻辑都在 `app-core`(可 `cargo test`),这里只做 JS ↔ Rust 的桥接与本地文件读写。
 
-use app_core::App;
+use app_core::{App, Settings};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
@@ -207,6 +207,18 @@ async fn presign(
         .map_err(|e| e.to_string())
 }
 
+/// 读取应用设置。
+#[tauri::command]
+fn get_settings(state: State<'_, App>) -> Settings {
+    state.settings()
+}
+
+/// 保存应用设置。
+#[tauri::command]
+fn save_settings(state: State<'_, App>, settings: Settings) -> Result<(), String> {
+    state.save_settings(&settings).map_err(|e| e.to_string())
+}
+
 /// 启动 Tauri 应用。账号存到应用数据目录下的 `nebula.db`。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -232,6 +244,8 @@ pub fn run() {
             rename,
             copy,
             presign,
+            get_settings,
+            save_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

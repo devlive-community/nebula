@@ -51,6 +51,7 @@ dependencies = [
  "nebula-provider",
  "provider-aliyun",
  "rusqlite",
+ "serde",
  "thiserror",
  "tokio",
 ]
