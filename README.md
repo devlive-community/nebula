@@ -19,17 +19,25 @@
 ```
 nebula/
 ├─ crates/
-│  ├─ cloud-core/         公共底座(HTTP / 签名积木 / 错误 / 重试 / 分页)
-│  ├─ aliyun-oss/         阿里云对象存储 SDK(可发布)
-│  ├─ tencent-cos/        腾讯云对象存储 SDK(可发布)
-│  ├─ huawei-obs/         华为云对象存储 SDK(可发布)
-│  ├─ ...                 其余厂商 SDK
-│  ├─ nebula-provider/    App 统一抽象 trait
-│  └─ providers/          适配层(SDK → StorageProvider,App 私有)
-└─ app/                   Tauri 桌面应用(src-tauri 后端 + src 前端)
+│  ├─ cloud-core/               公共底座(HTTP / 签名积木 / 错误 / 重试 / 分页)
+│  ├─ aliyun-oss/               阿里云对象存储 SDK(对象/桶/列举/分片/预签名)
+│  ├─ nebula-provider/          App 统一抽象 trait(StorageProvider)
+│  ├─ providers/provider-aliyun 适配层(aliyun-oss → StorageProvider)
+│  └─ app-core/                 App 业务逻辑(账号/传输/设置,框架无关,可 cargo test)
+└─ app/                         Tauri 桌面应用(src-tauri 后端 + src 前端)
 ```
 
-完整规划见 [PLAN.md](./PLAN.md)。
+> 当前已实现阿里云 OSS 一家(全链路真账号验证过)。新增厂商 = 按
+> [SDK 开发手册](./docs/sdk-playbook.md) 写一个 `<vendor>` SDK + 一个 provider 适配层,
+> 在 `app-core` 注册即可,App 界面无需改动。完整规划见 [PLAN.md](./PLAN.md)。
+
+## 应用功能
+
+账号(SQLite + 系统钥匙串)· 浏览(目录逐层 / 列表·网格视图 / 排序 / 过滤 / 详情 / 图片预览)
+· 上传(拖拽文件·文件夹 / 多选 / 自动分片 / 进度)· 下载(流式 / 批量)· 重命名 / 复制·移动(级联选择器)
+· 分享(预签名链接)· 新建文件夹 · 删除(单个 / 批量)· 传输面板(并发 / 重试)· 设置 · 明暗主题 · 快捷键 · 右键菜单。
+
+App 的运行与打包见 [app/README.md](./app/README.md)。
 
 ## 开发约定
 
