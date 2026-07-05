@@ -78,29 +78,39 @@ export default function App() {
       prev[id] ? { ...prev, [id]: { ...prev[id], done, total } } : prev,
     );
 
-  const runTransfer = async (
-    id: string,
-    kind: "上传" | "下载",
-    name: string,
-    fn: () => Promise<void>,
-  ) => {
+  type TransferSpec = {
+    id: string;
+    kind: "上传" | "下载";
+    name: string;
+    account: string;
+    remote: string;
+    local: string;
+  };
+
+  const startTransfer = async (t: TransferSpec) => {
     setTransfers((prev) => ({
       ...prev,
-      [id]: { id, kind, name, done: 0, total: 0, status: "active" },
+      [t.id]: { ...t, done: 0, total: 0, status: "active" },
     }));
     try {
-      await fn();
+      if (t.kind === "上传") await api.uploadFile(t.account, t.remote, t.local);
+      else await api.downloadFile(t.account, t.remote, t.local);
       setTransfers((prev) =>
-        prev[id]
-          ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
+        prev[t.id]
+          ? { ...prev, [t.id]: { ...prev[t.id], status: "done", done: prev[t.id].total } }
           : prev,
       );
     } catch (e) {
       setError(String(e));
       setTransfers((prev) =>
-        prev[id] ? { ...prev, [id]: { ...prev[id], status: "error" } } : prev,
+        prev[t.id] ? { ...prev, [t.id]: { ...prev[t.id], status: "error" } } : prev,
       );
     }
+  };
+
+  const retryTransfer = (id: string) => {
+    const t = transfers[id];
+    if (t) void startTransfer(t);
   };
 
   const clearTransfers = () =>
@@ -229,12 +239,16 @@ export default function App() {
       setBusy(false);
       return;
     }
-    await runPool(entries, settings.concurrency, (en) => {
-      const remote = joinRemote(path, en.rel);
-      return runTransfer(remote, "上传", en.rel, () =>
-        api.uploadFile(current, remote, en.local),
-      );
-    });
+    await runPool(entries, settings.concurrency, (en) =>
+      startTransfer({
+        id: joinRemote(path, en.rel),
+        kind: "上传",
+        name: en.rel,
+        account: current,
+        remote: joinRemote(path, en.rel),
+        local: en.local,
+      }),
+    );
     await load();
     setBusy(false);
   };
@@ -312,9 +326,14 @@ export default function App() {
     if (typeof dir !== "string") return;
     setBusy(true);
     await runPool([...selected], settings.concurrency, (p) =>
-      runTransfer(p, "下载", baseName(p), () =>
-        api.downloadFile(current, p, `${dir}/${baseName(p)}`),
-      ),
+      startTransfer({
+        id: p,
+        kind: "下载",
+        name: baseName(p),
+        account: current,
+        remote: p,
+        local: `${dir}/${baseName(p)}`,
+      }),
     );
     clearSelection();
     setBusy(false);
@@ -326,9 +345,14 @@ export default function App() {
     if (typeof selected !== "string") return;
     const remote = joinRemote(path, baseName(selected));
     setBusy(true);
-    await runTransfer(remote, "上传", baseName(selected), () =>
-      api.uploadFile(current, remote, selected),
-    );
+    await startTransfer({
+      id: remote,
+      kind: "上传",
+      name: baseName(selected),
+      account: current,
+      remote,
+      local: selected,
+    });
     await load();
     setBusy(false);
   };
@@ -338,9 +362,14 @@ export default function App() {
     const target = await save({ defaultPath: entry.name });
     if (typeof target !== "string") return;
     setBusy(true);
-    await runTransfer(entry.path, "下载", entry.name, () =>
-      api.downloadFile(current, entry.path, target),
-    );
+    await startTransfer({
+      id: entry.path,
+      kind: "下载",
+      name: entry.name,
+      account: current,
+      remote: entry.path,
+      local: target,
+    });
     setBusy(false);
   };
 
@@ -515,6 +544,7 @@ export default function App() {
               <TransferPanel
                 items={Object.values(transfers)}
                 onClear={clearTransfers}
+                onRetry={retryTransfer}
               />
             )}
           </>

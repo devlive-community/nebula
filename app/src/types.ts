@@ -26,11 +26,14 @@ export interface Settings {
   concurrency: number;
 }
 
-/** 传输任务列表中的一项。 */
+/** 传输任务列表中的一项(含重试所需的参数)。 */
 export interface TransferItem {
   id: string;
   kind: "上传" | "下载";
   name: string;
+  account: string;
+  remote: string;
+  local: string;
   done: number;
   total: number;
   status: "active" | "done" | "error";
