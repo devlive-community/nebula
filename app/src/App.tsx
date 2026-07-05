@@ -12,7 +12,14 @@ import type {
   UploadProgress,
 } from "./types";
 import * as api from "./api";
-import { baseName, formatBytes, joinRemote, parentPath, runPool } from "./util";
+import {
+  baseName,
+  formatBytes,
+  joinRemote,
+  parentPath,
+  previewKind,
+  runPool,
+} from "./util";
 import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
@@ -26,6 +33,7 @@ import { FileDetails } from "./components/FileDetails";
 import { TransferPanel } from "./components/TransferPanel";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
+import { PreviewModal } from "./components/PreviewModal";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -50,9 +58,30 @@ export default function App() {
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(
     null,
   );
+  const [preview, setPreview] = useState<{
+    url: string;
+    name: string;
+    kind: "image" | "video";
+  } | null>(null);
 
   const openDir = (entry: Entry) =>
     setPath(entry.path.endsWith("/") ? entry.path : entry.path + "/");
+
+  // 预览图片 / 视频:用预签名链接加载;非可预览类型退回详情。
+  const openPreview = async (entry: Entry) => {
+    const kind = previewKind(entry.name);
+    if (!current || !kind) {
+      setDetailsEntry(entry);
+      return;
+    }
+    setError(null);
+    try {
+      const url = await api.presign(current, entry.path, 600);
+      setPreview({ url, name: entry.name, kind });
+    } catch (e) {
+      setError(String(e));
+    }
+  };
 
   useEffect(() => {
     api.getSettings().then(setSettings).catch(() => {});
@@ -589,6 +618,7 @@ export default function App() {
               onToggleSelect={toggleSelect}
               onToggleSelectAll={toggleSelectAll}
               onOpenDir={openDir}
+              onOpenFile={openPreview}
               onOpenDetails={setDetailsEntry}
               onContext={(entry, x, y) => setMenu({ x, y, entry })}
             />
@@ -712,6 +742,15 @@ export default function App() {
           onClose={() => setMenu(null)}
         />
       )}
+
+      {preview && (
+        <PreviewModal
+          url={preview.url}
+          name={preview.name}
+          kind={preview.kind}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 
@@ -719,13 +758,18 @@ export default function App() {
     if (entry.kind === "directory") {
       return [{ label: "打开", onClick: () => openDir(entry) }];
     }
-    return [
+    const items: MenuItem[] = [];
+    if (previewKind(entry.name)) {
+      items.push({ label: "预览", onClick: () => openPreview(entry) });
+    }
+    items.push(
       { label: "详情", onClick: () => setDetailsEntry(entry) },
       { label: "下载", onClick: () => download(entry) },
       { label: "重命名", onClick: () => setRenameTarget(entry) },
       { label: "复制 / 移动到", onClick: () => setMoveCopyTarget(entry) },
       { label: "分享链接", onClick: () => share(entry) },
       { label: "删除", danger: true, onClick: () => setPendingDelete(entry) },
-    ];
+    );
+    return items;
   }
 }

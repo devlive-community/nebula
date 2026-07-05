@@ -26,6 +26,15 @@ export async function runPool<T>(
   await Promise.all(runners);
 }
 
+/** 判断文件是否可预览(图片 / 视频),返回预览类型或 null。 */
+export function previewKind(name: string): "image" | "video" | null {
+  const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"].includes(ext))
+    return "image";
+  if (["mp4", "webm", "mov", "m4v", "ogg"].includes(ext)) return "video";
+  return null;
+}
+
 /** 按扩展名粗略猜测文件类型,用于详情展示。 */
 export function guessType(name: string): string {
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";

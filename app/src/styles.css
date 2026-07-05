@@ -535,6 +535,56 @@ button {
   flex: 1;
 }
 
+/* ---------- Preview modal ---------- */
+.preview {
+  display: flex;
+  flex-direction: column;
+  max-width: 90vw;
+  max-height: 90vh;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.preview__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview__name {
+  font-size: 13px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview__close {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 15px;
+  flex: none;
+}
+
+.preview__close:hover {
+  color: var(--text);
+}
+
+.preview__media {
+  max-width: 90vw;
+  max-height: calc(90vh - 44px);
+  object-fit: contain;
+  background: #000;
+  display: block;
+}
+
 /* ---------- Context menu ---------- */
 .context-menu {
   position: fixed;

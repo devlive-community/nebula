@@ -22,6 +22,7 @@ interface Props {
   onToggleSelect: (path: string) => void;
   onToggleSelectAll: () => void;
   onOpenDir: (entry: Entry) => void;
+  onOpenFile: (entry: Entry) => void;
   onOpenDetails: (entry: Entry) => void;
   onContext: (entry: Entry, x: number, y: number) => void;
 }
@@ -37,6 +38,7 @@ export function FileList({
   onToggleSelect,
   onToggleSelectAll,
   onOpenDir,
+  onOpenFile,
   onOpenDetails,
   onContext,
 }: Props) {
@@ -85,7 +87,7 @@ export function FileList({
             <div
               key={entry.path}
               className={`row ${isDir ? "row--dir" : ""}`}
-              onDoubleClick={() => isDir && onOpenDir(entry)}
+              onDoubleClick={() => (isDir ? onOpenDir(entry) : onOpenFile(entry))}
               onContextMenu={(e) => {
                 e.preventDefault();
                 onContext(entry, e.clientX, e.clientY);
