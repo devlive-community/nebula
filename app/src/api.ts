@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Entry, Settings } from "./types";
+import type { Entry, Settings, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -50,6 +50,9 @@ export const copy = (account: string, from: string, to: string) =>
 
 export const presign = (account: string, path: string, expiresSecs: number) =>
   invoke<string>("presign", { account, path, expiresSecs });
+
+export const expandUploadPaths = (paths: string[]) =>
+  invoke<UploadEntry[]>("expand_upload_paths", { paths });
 
 export const getSettings = () => invoke<Settings>("get_settings");
 

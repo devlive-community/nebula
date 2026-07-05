@@ -220,10 +220,19 @@ export default function App() {
   onDropRef.current = async (paths: string[]) => {
     if (!current || !path || paths.length === 0) return;
     setBusy(true);
-    await runPool(paths, settings.concurrency, (local) => {
-      const remote = joinRemote(path, baseName(local));
-      return runTransfer(remote, "上传", baseName(local), () =>
-        api.uploadFile(current, remote, local),
+    let entries: { local: string; rel: string }[];
+    try {
+      // 展开文件夹为文件列表(递归,保留相对路径)。
+      entries = await api.expandUploadPaths(paths);
+    } catch (e) {
+      setError(String(e));
+      setBusy(false);
+      return;
+    }
+    await runPool(entries, settings.concurrency, (en) => {
+      const remote = joinRemote(path, en.rel);
+      return runTransfer(remote, "上传", en.rel, () =>
+        api.uploadFile(current, remote, en.local),
       );
     });
     await load();
@@ -433,7 +442,7 @@ export default function App() {
         {dragOver && current && path !== "" && (
           <div className="drop-overlay">
             <FontAwesomeIcon icon={faCloudArrowUp} className="drop-overlay__icon" />
-            <span>松开以上传到当前目录</span>
+            <span>松开以上传到当前目录(文件夹将递归上传)</span>
           </div>
         )}
         {current ? (

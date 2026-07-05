@@ -207,6 +207,59 @@ async fn presign(
         .map_err(|e| e.to_string())
 }
 
+/// 一个待上传的本地文件:本地绝对路径 + 相对(远端)路径。
+#[derive(Clone, Serialize)]
+struct UploadEntry {
+    local: String,
+    rel: String,
+}
+
+/// 把拖入的本地路径(文件或文件夹)展开成文件列表,文件夹递归并保留相对路径。
+#[tauri::command]
+fn expand_upload_paths(paths: Vec<String>) -> Result<Vec<UploadEntry>, String> {
+    let mut out = Vec::new();
+    for p in paths {
+        let path = std::path::Path::new(&p);
+        let base = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if path.is_dir() {
+            collect_dir(path, &base, &mut out).map_err(|e| e.to_string())?;
+        } else if path.is_file() {
+            out.push(UploadEntry {
+                local: p,
+                rel: base,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// 递归收集目录下的文件,`rel_prefix` 为其相对根路径。
+fn collect_dir(
+    dir: &std::path::Path,
+    rel_prefix: &str,
+    out: &mut Vec<UploadEntry>,
+) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let rel = format!("{rel_prefix}/{name}");
+        let child = entry.path();
+        if file_type.is_dir() {
+            collect_dir(&child, &rel, out)?;
+        } else if file_type.is_file() {
+            out.push(UploadEntry {
+                local: child.to_string_lossy().into_owned(),
+                rel,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// 读取应用设置。
 #[tauri::command]
 fn get_settings(state: State<'_, App>) -> Settings {
@@ -244,6 +297,7 @@ pub fn run() {
             rename,
             copy,
             presign,
+            expand_upload_paths,
             get_settings,
             save_settings,
         ])

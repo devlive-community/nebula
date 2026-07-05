@@ -14,6 +14,12 @@ export interface DownloadProgress {
   total: number;
 }
 
+/** 展开后待上传的一项:本地路径 + 相对(远端)路径。 */
+export interface UploadEntry {
+  local: string;
+  rel: string;
+}
+
 /** 应用设置(与 Rust 端 app_core::Settings 对应)。 */
 export interface Settings {
   share_expiry_secs: number;
