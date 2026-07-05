@@ -260,6 +260,20 @@ fn collect_dir(
     Ok(())
 }
 
+/// 批量生成预签名链接(网格缩略图用)。
+#[tauri::command]
+async fn presign_batch(
+    state: State<'_, App>,
+    account: String,
+    paths: Vec<String>,
+    expires_secs: u64,
+) -> Result<Vec<String>, String> {
+    let app = state.inner().clone();
+    app.presign_batch(&account, &paths, expires_secs)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 读取应用设置。
 #[tauri::command]
 fn get_settings(state: State<'_, App>) -> Settings {
@@ -297,6 +311,7 @@ pub fn run() {
             rename,
             copy,
             presign,
+            presign_batch,
             expand_upload_paths,
             get_settings,
             save_settings,

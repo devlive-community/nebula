@@ -218,6 +218,21 @@ impl App {
         Ok(self.provider(account)?.presign(path, expires_secs).await?)
     }
 
+    /// 批量生成预签名链接(用于网格缩略图)。顺序对应 `paths`。
+    pub async fn presign_batch(
+        &self,
+        account: &str,
+        paths: &[String],
+        expires_secs: u64,
+    ) -> Result<Vec<String>> {
+        let provider = self.provider(account)?;
+        let mut out = Vec::with_capacity(paths.len());
+        for p in paths {
+            out.push(provider.presign(p, expires_secs).await?);
+        }
+        Ok(out)
+    }
+
     /// 读取应用设置(无存储或未设置时返回默认值)。
     pub fn settings(&self) -> Settings {
         let mut s = Settings::default();
