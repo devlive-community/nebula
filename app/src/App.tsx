@@ -3,7 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCloud, faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-icons";
 import type {
   AccountInfo,
   DownloadProgress,
@@ -36,6 +36,7 @@ import { TransferPanel } from "./components/TransferPanel";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { PreviewModal } from "./components/PreviewModal";
+import { Logo } from "./components/Logo";
 
 export default function App() {
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -750,7 +751,7 @@ export default function App() {
           </>
         ) : (
           <div className="empty-state">
-            <FontAwesomeIcon icon={faCloud} className="empty-state__icon" />
+            <Logo size={72} />
             <h2>欢迎使用 Nebula</h2>
             <p>添加一个云账号开始管理你的对象存储</p>
             <button className="btn btn--primary" onClick={() => setShowForm(true)}>

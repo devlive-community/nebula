@@ -1,6 +1,5 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faCloud,
   faGear,
   faMoon,
   faPen,
@@ -8,6 +7,7 @@ import {
   faSun,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
+import { Logo } from "./Logo";
 
 interface Props {
   accounts: string[];
@@ -35,7 +35,7 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar__brand">
-        <FontAwesomeIcon icon={faCloud} className="sidebar__logo" />
+        <Logo size={24} />
         <span>Nebula</span>
       </div>
 
