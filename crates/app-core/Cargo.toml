@@ -15,12 +15,12 @@ bytes = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 rusqlite = { version = "0.32", features = ["bundled"] }
-# 纯 Rust 后端(zbus + crypto-rust),避免 Linux CI 依赖 openssl/dbus 系统库。
+# 各平台原生后端:macOS Keychain / Windows Credential / Linux 内核 keyutils
+# (linux-native 为纯 Rust,不依赖 libdbus / openssl 等系统库,CI 可直接编译)。
 keyring = { version = "3", default-features = false, features = [
     "apple-native",
     "windows-native",
-    "sync-secret-service",
-    "crypto-rust",
+    "linux-native",
 ] }
 
 [dev-dependencies]
