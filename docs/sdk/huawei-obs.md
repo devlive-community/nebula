@@ -68,7 +68,7 @@ XML `<Error>`:`Code` / `Message` / `RequestId` → `ObsError::Api { status, code
 - [x] 5 对象操作 put/get/delete/head(含 copy / 预签名)
 - [x] 6 list_objects 分页(含 list_dir 目录折叠)
 - [x] 7 桶管理 list/create/delete
-- [ ] 8 分片上传
+- [x] 8 分片上传(子资源签名)
 - [ ] 9 smoke 真账号跑通
 
 ## 待办 / 后续

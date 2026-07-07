@@ -12,6 +12,7 @@
 //! - [`sign`] — OBS 专有签名(HMAC-SHA1,Header 方式)
 //! - [`object`] — 对象操作:put / get / delete / head / copy / 预签名
 //! - [`bucket`] — 桶操作:列举对象、列举 / 创建 / 删除 bucket(自动翻页)
+//! - [`multipart`] — 分片上传(大文件)
 //! - [`error::ObsError`] — 错误类型
 //!
 //! 本 crate 只依赖 [`cloud_core`] 与 reqwest,不感知任何上层应用。
@@ -19,6 +20,7 @@
 pub mod bucket;
 pub mod client;
 pub mod error;
+pub mod multipart;
 pub mod object;
 pub mod sign;
 
