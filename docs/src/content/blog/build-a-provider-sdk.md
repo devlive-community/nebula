@@ -6,7 +6,7 @@ description: Nebula 的每家云都是从零手写的独立 Rust SDK。这篇按
 tags: ['开发', 'SDK']
 ---
 
-> 完整规范见仓库里的 [SDK 开发手册](https://github.com/devlive-community/nebula/blob/main/docs/sdk-playbook.md);本文是它的实操版,配合厂商规格卡一起看。
+> 完整规范见仓库里的 [SDK 开发手册](https://github.com/devlive-community/nebula/blob/dev/docs/sdk-playbook.md);本文是它的实操版,配合厂商规格卡一起看。
 
 Nebula 的架构把"厂商差异"关在最底层:
 
