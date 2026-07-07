@@ -19,7 +19,7 @@ members = [
     # "crates/aliyun-pan",
     # "crates/tencent-cos",
     # "crates/tencent-cloud-api",
-    # "crates/huawei-obs",
+    "crates/huawei-obs",
     # "crates/huawei-openapi",
     # "crates/aws-s3",
 

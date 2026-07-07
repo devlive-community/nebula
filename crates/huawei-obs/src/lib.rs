@@ -1,0 +1,15 @@
+//! # huawei-obs
+//!
+//! 手写的华为云 OBS(对象存储)异步 Rust SDK,不依赖任何聚合库。
+//!
+//! OBS 的签名体系与阿里云 OSS 高度同构(HMAC-SHA1 + base64 的 V2 风格 Header 签名),
+//! 主要差异是 canonical 头前缀 `x-obs-`、授权词 `OBS`,以及
+//! `obs.{region}.myhuaweicloud.com` 的 endpoint 域名。
+//!
+//! 当前增量提供:
+//!
+//! - [`sign`] — OBS 专有签名(HMAC-SHA1,Header 方式)
+//!
+//! 本 crate 只依赖 [`cloud_core`] 与 reqwest,不感知任何上层应用。
+
+pub mod sign;

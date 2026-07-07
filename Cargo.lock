@@ -470,6 +470,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
+name = "huawei-obs"
+version = "1.0.0"
+dependencies = [
+ "bytes",
+ "cloud-core",
+ "futures",
+ "httpdate",
+ "percent-encoding",
+ "quick-xml",
+ "reqwest",
+ "serde",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "hyper"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
