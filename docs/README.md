@@ -1,4 +1,9 @@
-# Nebula 官网
+# Nebula 官网 / 文档
+
+本目录既是 Nebula 的**官方站点**,也放**开发文档**:
+
+- 站点:Vue 3 + Vite + vite-ssg + Tailwind + vue-i18n(下面),部署到 GitHub Pages。
+- 开发文档:[`sdk-playbook.md`](./sdk-playbook.md)(SDK 开发手册)与 [`sdk/`](./sdk/)(厂商规格卡)—— 松散 Markdown,不参与站点构建。
 
 Nebula 的官方站点,Vue 3 + Vite + vite-ssg + Tailwind + vue-i18n。首页 / 下载 / 博客 /
 发布日志,发布日志与博客由 `src/content/**` 下的 Markdown 驱动(vite-ssg 全量静态预渲染)。

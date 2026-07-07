@@ -1,11 +1,11 @@
-name: Website
+name: Docs
 
 on:
   push:
     branches: [main, dev]
     paths:
-      - "website/**"
-      - ".github/workflows/website.yml"
+      - "docs/**"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: website
+        working-directory: docs
     steps:
       - uses: actions/checkout@v4
       - name: Install pnpm
@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: website/pnpm-lock.yaml
+          cache-dependency-path: docs/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Build
@@ -42,7 +42,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: website/dist
+          path: docs/dist
 
   deploy:
     needs: build
