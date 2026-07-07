@@ -74,5 +74,5 @@ XML `<Error>`:`Code` / `Message` / `RequestId` → `ObsError::Api { status, code
 ## 待办 / 后续
 
 - [ ] 首次试发布 crates.io(查名 + `cargo publish --dry-run`)
-- [ ] provider-huawei 适配层 + app-core 注册
+- [x] provider-huawei 适配层 + app-core 注册(`App::add_huawei_account`)
 - [ ] 分片上传并发化

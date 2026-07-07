@@ -39,6 +39,7 @@ dependencies = [
  "keyring",
  "nebula-provider",
  "provider-aliyun",
+ "provider-huawei",
  "rusqlite",
  "serde",
  "thiserror",
@@ -860,6 +861,18 @@ dependencies = [
  "async-trait",
  "bytes",
  "futures",
+ "nebula-provider",
+ "tokio",
+]
+
+[[package]]
+name = "provider-huawei"
+version = "1.0.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "huawei-obs",
  "nebula-provider",
  "tokio",
 ]

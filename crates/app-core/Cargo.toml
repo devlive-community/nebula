@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 nebula-provider = { path = "../nebula-provider" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
+provider-huawei = { path = "../providers/provider-huawei" }
 bytes = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

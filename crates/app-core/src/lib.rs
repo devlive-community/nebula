@@ -17,6 +17,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use nebula_provider::{Entry, ProviderRegistry, StorageProvider};
 use provider_aliyun::AliyunProvider;
+use provider_huawei::HuaweiProvider;
 
 pub use error::{AppError, Result};
 pub use nebula_provider::{ByteStream, Capabilities, EntryKind, ProgressFn};
@@ -25,6 +26,7 @@ pub use settings::Settings;
 pub use store::{AccountRecord, AccountStore};
 
 const VENDOR_ALIYUN: &str = "aliyun";
+const VENDOR_HUAWEI: &str = "huawei";
 
 /// 账号的非敏感信息(不含密钥),供编辑回填用。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -98,13 +100,20 @@ impl App {
 
     /// 按厂商把一条记录 + 密钥注册为 provider(未知厂商忽略)。
     fn register_record(&self, rec: &AccountRecord, secret: &str) {
-        if rec.vendor == VENDOR_ALIYUN {
-            self.registry.register(Arc::new(AliyunProvider::new(
+        match rec.vendor.as_str() {
+            VENDOR_ALIYUN => self.registry.register(Arc::new(AliyunProvider::new(
                 rec.id.clone(),
                 rec.access_key_id.clone(),
                 secret.to_string(),
                 rec.endpoint.clone(),
-            )));
+            ))),
+            VENDOR_HUAWEI => self.registry.register(Arc::new(HuaweiProvider::new(
+                rec.id.clone(),
+                rec.access_key_id.clone(),
+                secret.to_string(),
+                rec.endpoint.clone(),
+            ))),
+            _ => {}
         }
     }
 
@@ -130,6 +139,33 @@ impl App {
             id,
             vendor: VENDOR_ALIYUN.to_string(),
             access_key_id: access_key_id.into(),
+            access_key_secret: String::new(),
+            endpoint: endpoint.into(),
+        };
+        if let Some(store) = &self.store {
+            store.upsert(&rec)?;
+        }
+        self.register_record(&rec, &secret);
+        Ok(())
+    }
+
+    /// 便捷:新增一个华为云 OBS 账号。密钥进钥匙串,元信息进 SQLite。
+    pub fn add_huawei_account(
+        &self,
+        id: impl Into<String>,
+        access_key: impl Into<String>,
+        secret_key: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Result<()> {
+        let id = id.into();
+        let secret = secret_key.into();
+        self.secrets.set(&id, &secret)?;
+
+        // secret_key 不落 SQLite,置空;真实密钥在钥匙串。
+        let rec = AccountRecord {
+            id,
+            vendor: VENDOR_HUAWEI.to_string(),
+            access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
         };
@@ -479,6 +515,28 @@ mod tests {
             let s = app.settings();
             assert_eq!(s.share_expiry_secs, 1800);
             assert_eq!(s.concurrency, 5);
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn huawei_account_registers_provider() {
+        let path = temp_db("huawei");
+        let secrets: Arc<dyn SecretStore> = Arc::new(MemorySecrets::default());
+        {
+            let app = App::with_store_and_secrets(&path, secrets.clone()).unwrap();
+            app.add_huawei_account("obs-acc", "ak", "sk", "obs.cn-north-4.myhuaweicloud.com")
+                .unwrap();
+            assert_eq!(app.accounts(), vec!["obs-acc"]);
+        }
+        {
+            // 重开:华为账号应从库 + 密钥库重新注册。
+            let app = App::with_store_and_secrets(&path, secrets.clone()).unwrap();
+            assert_eq!(app.accounts(), vec!["obs-acc"]);
+            assert_eq!(
+                app.account_info("obs-acc").unwrap().vendor,
+                VENDOR_HUAWEI.to_string()
+            );
         }
         let _ = std::fs::remove_file(&path);
     }
