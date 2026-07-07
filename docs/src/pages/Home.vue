@@ -47,7 +47,7 @@
       </div>
 
       <div class="lg:pl-4">
-        <AppWindow/>
+        <CloudHub/>
       </div>
     </div>
 
@@ -56,6 +56,18 @@
       <div class="flex w-max animate-marquee gap-12 px-6 text-slate-400 font-mono text-sm">
         <span v-for="(v, idx) in marquee" :key="idx" class="whitespace-nowrap">{{ v }}</span>
       </div>
+    </div>
+  </section>
+
+  <!-- 界面预览 -->
+  <section class="max-w-6xl mx-auto px-5 pt-20">
+    <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <div>
+        <p class="text-sm font-semibold tracking-wide text-brand-600 dark:text-brand-400">{{ t('preview.tag') }}</p>
+        <h2 class="mt-2 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">{{ t('preview.title') }}</h2>
+        <p class="mt-4 text-slate-600 dark:text-slate-400 leading-relaxed">{{ t('preview.desc') }}</p>
+      </div>
+      <AppWindow/>
     </div>
   </section>
 
@@ -83,6 +95,7 @@
 import {computed, ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import AppWindow from '../components/AppWindow.vue'
+import CloudHub from '../components/CloudHub.vue'
 import {latestRelease} from '../content/releases'
 
 const {t} = useI18n()

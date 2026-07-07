@@ -14,6 +14,11 @@ const messages = {
       download: '立即下载',
       github: '在 GitHub 查看'
     },
+    preview: {
+      tag: '界面预览',
+      title: '像本地文件管理器一样管云',
+      desc: '左侧切换云账号,右侧逐层浏览桶与目录;拖拽上传、批量下载、分片进度都在同一个窗口里完成。'
+    },
     features: {
       tag: '核心优势',
       title: '一个应用,搞定云上文件',
@@ -58,6 +63,11 @@ const messages = {
       subtitle: 'A cross-platform desktop app — browse, upload, download, share and manage transfers in one place. Built with Rust + Tauri, native and lightweight.',
       download: 'Download now',
       github: 'View on GitHub'
+    },
+    preview: {
+      tag: 'Preview',
+      title: 'Manage the cloud like a local file manager',
+      desc: 'Switch cloud accounts on the left, drill into buckets and folders on the right; drag-to-upload, batch download and chunked progress all in one window.'
     },
     features: {
       tag: 'Why Nebula',
