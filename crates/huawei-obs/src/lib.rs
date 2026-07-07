@@ -8,8 +8,15 @@
 //!
 //! 当前增量提供:
 //!
+//! - [`client::ObsClient`] — 客户端构造与 endpoint 拼接
 //! - [`sign`] — OBS 专有签名(HMAC-SHA1,Header 方式)
+//! - [`error::ObsError`] — 错误类型
 //!
 //! 本 crate 只依赖 [`cloud_core`] 与 reqwest,不感知任何上层应用。
 
+pub mod client;
+pub mod error;
 pub mod sign;
+
+pub use client::ObsClient;
+pub use error::{ObsError, Result};

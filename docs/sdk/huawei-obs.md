@@ -63,8 +63,8 @@ XML `<Error>`:`Code` / `Message` / `RequestId` → `ObsError::Api { status, code
 
 - [x] 1 crate 骨架
 - [x] 2 签名(官方向量单测通过)
-- [ ] 3 client
-- [ ] 4 error
+- [x] 3 client
+- [x] 4 error
 - [ ] 5 对象操作 put/get/delete/head
 - [ ] 6 list_objects 分页
 - [ ] 7 桶管理 list/create/delete
