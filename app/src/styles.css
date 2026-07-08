@@ -115,6 +115,9 @@ body.resizing {
   flex: 1;
   overflow-y: auto;
   margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sidebar__empty {
