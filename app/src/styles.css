@@ -982,6 +982,7 @@ button {
   align-items: center;
   justify-content: center;
   z-index: 100;
+  animation: backdrop-fade 0.18s ease;
 }
 
 .modal {
@@ -991,6 +992,7 @@ button {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+  animation: modal-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal--sm {
@@ -1230,6 +1232,8 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow);
+  transform-origin: top center;
+  animation: select-drop 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .select__option {
@@ -1245,6 +1249,7 @@ button {
   padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
+  transition: background 0.12s, color 0.12s;
 }
 
 .select__option:hover {
@@ -1253,6 +1258,47 @@ button {
 
 .select__option--active {
   color: var(--primary);
+}
+
+/* ---------- Animations ---------- */
+@keyframes backdrop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes select-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+/* 尊重系统"减少动态效果"偏好。 */
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal,
+  .select__panel {
+    animation: none;
+  }
 }
 
 .modal__footer {
