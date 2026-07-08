@@ -52,7 +52,7 @@ export function AboutDialog({ onClose }: Props) {
           </div>
 
           <div className="about__meta">
-            <span>MIT OR Apache-2.0</span>
+            <span>MIT License</span>
             <span>© 2026 Devlive Community</span>
           </div>
         </div>

@@ -54,4 +54,4 @@ App 的运行与打包见 [app/README.md](./app/README.md)。
 
 ## License
 
-MIT OR Apache-2.0
+[MIT](./LICENSE)
