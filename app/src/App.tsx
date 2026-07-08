@@ -37,6 +37,8 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { PreviewModal } from "./components/PreviewModal";
 import { AboutDialog } from "./components/AboutDialog";
+import { UpdateDialog } from "./components/UpdateDialog";
+import { checkForUpdate, type Update } from "./update";
 import { Logo } from "./components/Logo";
 
 export default function App() {
@@ -65,6 +67,8 @@ export default function App() {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [update, setUpdate] = useState<Update | null>(null);
+  const [updateFlash, setUpdateFlash] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(
     null,
   );
@@ -335,6 +339,7 @@ export default function App() {
     else if (action === "toggle-theme")
       setTheme((t) => (t === "dark" ? "light" : "dark"));
     else if (action === "refresh") void load();
+    else if (action === "check-update") void runUpdateCheck(true);
   };
   useEffect(() => {
     const un = listen<string>("menu-action", (e) => onMenuRef.current(e.payload));
@@ -342,6 +347,35 @@ export default function App() {
       un.then((off) => off());
     };
   }, []);
+
+  // 检查更新:`manual` 为菜单手动触发(会给出"已是最新/失败"反馈);启动时静默检查。
+  const runUpdateCheck = async (manual: boolean) => {
+    if (manual) setUpdateFlash("正在检查更新…");
+    try {
+      const found = await checkForUpdate();
+      if (found) {
+        setUpdate(found);
+        if (manual) setUpdateFlash(null);
+      } else if (manual) {
+        setUpdateFlash("当前已是最新版本");
+      }
+    } catch (e) {
+      if (manual) setUpdateFlash(`检查更新失败:${e}`);
+    }
+  };
+
+  // 启动后静默检查一次新版本(失败不打扰)。
+  useEffect(() => {
+    void runUpdateCheck(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 更新提示条几秒后自动消失(下载弹窗打开时不显示)。
+  useEffect(() => {
+    if (!updateFlash) return;
+    const t = setTimeout(() => setUpdateFlash(null), 4000);
+    return () => clearTimeout(t);
+  }, [updateFlash]);
 
   // 拖拽上传:用 ref 持有最新处理逻辑,拖放监听只注册一次。
   const onDropRef = useRef<(paths: string[]) => void>(() => {});
@@ -904,6 +938,12 @@ export default function App() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+
+      {update && (
+        <UpdateDialog update={update} onClose={() => setUpdate(null)} />
+      )}
+
+      {updateFlash && <div className="update-flash">{updateFlash}</div>}
 
       {menu && (
         <ContextMenu

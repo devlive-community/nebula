@@ -3,5 +3,10 @@
   "identifier": "default",
   "description": "Nebula default capability set",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:default"]
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "updater:default",
+    "process:default"
+  ]
 }

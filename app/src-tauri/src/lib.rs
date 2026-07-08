@@ -330,12 +330,14 @@ fn setup_menu(app: &AppHandle) -> tauri::Result<()> {
     let toggle_theme = MenuItemBuilder::with_id("toggle-theme", "切换主题")
         .accelerator("CmdOrCtrl+Shift+L")
         .build(app)?;
+    let check_update = MenuItemBuilder::with_id("check-update", "检查更新…").build(app)?;
 
     // 自定义"关于"项(点击弹出 App 自绘的关于弹窗,替代系统默认关于面板)。
     let about = MenuItemBuilder::with_id("about", "关于 Nebula").build(app)?;
 
     let app_menu = SubmenuBuilder::new(app, "Nebula")
         .item(&about)
+        .item(&check_update)
         .separator()
         .item(&settings)
         .separator()
@@ -372,6 +374,8 @@ fn setup_menu(app: &AppHandle) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             setup_menu(app.handle())?;
             let dir = app.path().app_data_dir()?;
@@ -383,7 +387,8 @@ pub fn run() {
         .on_menu_event(|app, event| {
             // 只转发自定义项;系统预定义项(退出/复制等)自行处理。
             match event.id().as_ref() {
-                id @ ("about" | "settings" | "add-account" | "refresh" | "toggle-theme") => {
+                id @ ("about" | "check-update" | "settings" | "add-account" | "refresh"
+                | "toggle-theme") => {
                     let _ = app.emit("menu-action", id);
                 }
                 _ => {}
