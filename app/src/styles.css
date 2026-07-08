@@ -47,6 +47,7 @@ body {
   color: var(--text);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -751,6 +752,7 @@ body.resizing {
   font-size: 13px;
   color: var(--text);
   word-break: break-all;
+  -webkit-user-select: text;
   user-select: text;
 }
 
@@ -1099,6 +1101,7 @@ body.resizing {
   word-break: break-all;
   max-height: 120px;
   overflow-y: auto;
+  -webkit-user-select: text;
   user-select: text;
 }
 
