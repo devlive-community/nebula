@@ -1175,6 +1175,86 @@ button {
   cursor: not-allowed;
 }
 
+/* ---------- Custom select ---------- */
+.select {
+  position: relative;
+}
+
+.select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 11px;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.select__trigger:hover:not(:disabled) {
+  border-color: var(--text-faint);
+}
+
+.select__trigger--open {
+  border-color: var(--primary);
+}
+
+.select__trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.select__chevron {
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: transform 0.15s;
+}
+
+.select__trigger--open .select__chevron {
+  transform: rotate(180deg);
+}
+
+.select__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 210;
+  padding: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.select__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.select__option:hover {
+  background: var(--bg-elev-2);
+}
+
+.select__option--active {
+  color: var(--primary);
+}
+
 .modal__footer {
   display: flex;
   justify-content: flex-end;

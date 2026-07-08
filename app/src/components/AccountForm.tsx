@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import { Select } from "./Select";
 
 /** 支持的云厂商及其表单文案 / 默认值。新增厂商在此追加一项即可。 */
 const VENDORS = {
@@ -74,17 +75,15 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
         <div className="modal__body">
           <label className="field">
             <span>云厂商</span>
-            <select
+            <Select
               value={vendor}
-              onChange={(e) => changeVendor(e.target.value as Vendor)}
               disabled={editing}
-            >
-              {Object.entries(VENDORS).map(([key, v]) => (
-                <option key={key} value={key}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => changeVendor(v as Vendor)}
+              options={Object.entries(VENDORS).map(([key, v]) => ({
+                value: key,
+                label: v.label,
+              }))}
+            />
           </label>
           <label className="field">
             <span>账号别名</span>
