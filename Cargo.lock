@@ -878,6 +878,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "qiniu-kodo"
+version = "1.2.0"
+dependencies = [
+ "bytes",
+ "cloud-core",
+ "futures",
+ "httpdate",
+ "percent-encoding",
+ "quick-xml",
+ "reqwest",
+ "serde",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "quick-xml"
 version = "0.36.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,22 @@
+[package]
+name = "qiniu-kodo"
+version.workspace = true
+description = "Hand-written async Rust SDK for Qiniu Cloud Kodo via its S3-compatible API (AWS SigV4)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["qiniu", "kodo", "object-storage", "s3"]
+categories = ["api-bindings"]
+
+[dependencies]
+cloud-core = { path = "../cloud-core", version = "1.2.0" }
+thiserror = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+futures = { workspace = true }
+httpdate = "1"
+quick-xml = { version = "0.36", features = ["serialize"] }
+percent-encoding = "2"

@@ -21,6 +21,7 @@ members = [
     # "crates/tencent-cloud-api",
     "crates/huawei-obs",
     # "crates/huawei-openapi",
+    "crates/qiniu-kodo",
     # "crates/aws-s3",
 
     # App 统一抽象 trait(可选发布)
