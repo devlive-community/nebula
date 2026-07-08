@@ -6,6 +6,7 @@ use app_core::{AccountInfo, App, Settings};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
+use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 /// 上传进度事件负载,发往前端 `upload-progress`。
@@ -312,17 +313,83 @@ fn save_settings(state: State<'_, App>, settings: Settings) -> Result<(), String
     state.save_settings(&settings).map_err(|e| e.to_string())
 }
 
+/// 构建并设置应用的自定义原生菜单,替换 Tauri 默认菜单。
+///
+/// 自定义项(设置 / 添加账号 / 刷新 / 切换主题)点击后经 `menu-action` 事件发往前端;
+/// 编辑子菜单保留系统撤销/复制/粘贴等,确保输入框的键盘快捷键仍可用。
+fn setup_menu(app: &AppHandle) -> tauri::Result<()> {
+    let settings = MenuItemBuilder::with_id("settings", "设置…")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
+    let add_account = MenuItemBuilder::with_id("add-account", "添加账号")
+        .accelerator("CmdOrCtrl+N")
+        .build(app)?;
+    let refresh = MenuItemBuilder::with_id("refresh", "刷新")
+        .accelerator("CmdOrCtrl+R")
+        .build(app)?;
+    let toggle_theme = MenuItemBuilder::with_id("toggle-theme", "切换主题")
+        .accelerator("CmdOrCtrl+Shift+L")
+        .build(app)?;
+
+    let about = AboutMetadataBuilder::new()
+        .name(Some("Nebula"))
+        .version(Some(env!("CARGO_PKG_VERSION")))
+        .build();
+
+    let app_menu = SubmenuBuilder::new(app, "Nebula")
+        .about(Some(about))
+        .separator()
+        .item(&settings)
+        .separator()
+        .hide()
+        .hide_others()
+        .show_all()
+        .separator()
+        .quit()
+        .build()?;
+    let account_menu = SubmenuBuilder::new(app, "账号").item(&add_account).build()?;
+    let edit_menu = SubmenuBuilder::new(app, "编辑")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .build()?;
+    let view_menu = SubmenuBuilder::new(app, "视图")
+        .item(&refresh)
+        .item(&toggle_theme)
+        .build()?;
+
+    let menu = MenuBuilder::new(app)
+        .items(&[&app_menu, &account_menu, &edit_menu, &view_menu])
+        .build()?;
+    app.set_menu(menu)?;
+    Ok(())
+}
+
 /// 启动 Tauri 应用。账号存到应用数据目录下的 `nebula.db`。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            setup_menu(app.handle())?;
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             let core = App::with_store(dir.join("nebula.db"))?;
             app.manage(core);
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            // 只转发自定义项;系统预定义项(退出/复制等)自行处理。
+            match event.id().as_ref() {
+                id @ ("settings" | "add-account" | "refresh" | "toggle-theme") => {
+                    let _ = app.emit("menu-action", id);
+                }
+                _ => {}
+            }
         })
         .invoke_handler(tauri::generate_handler![
             list_accounts,

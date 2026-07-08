@@ -324,6 +324,22 @@ export default function App() {
     load();
   }, [load]);
 
+  // 原生菜单点击 → 前端动作。用 ref 持最新逻辑,事件监听只注册一次。
+  const onMenuRef = useRef<(action: string) => void>(() => {});
+  onMenuRef.current = (action: string) => {
+    if (action === "settings") setShowSettings(true);
+    else if (action === "add-account") setShowForm(true);
+    else if (action === "toggle-theme")
+      setTheme((t) => (t === "dark" ? "light" : "dark"));
+    else if (action === "refresh") void load();
+  };
+  useEffect(() => {
+    const un = listen<string>("menu-action", (e) => onMenuRef.current(e.payload));
+    return () => {
+      un.then((off) => off());
+    };
+  }, []);
+
   // 拖拽上传:用 ref 持有最新处理逻辑,拖放监听只注册一次。
   const onDropRef = useRef<(paths: string[]) => void>(() => {});
   onDropRef.current = (paths: string[]) => {
