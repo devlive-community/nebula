@@ -29,9 +29,9 @@ nebula/
 └─ app/                         Tauri 桌面应用(src-tauri 后端 + src 前端)
 ```
 
-> 已实现阿里云 OSS(全链路真账号验证过)与华为云 OBS(离线单测全绿,真账号冒烟待验证)。
-> 新增厂商 = 按 [SDK 开发手册](./docs/sdk-playbook.md) 写一个 `<vendor>` SDK + 一个 provider
-> 适配层,在 `app-core` 注册即可,App 界面无需改动。完整规划见 [PLAN.md](./PLAN.md)。
+> 已实现阿里云 OSS 与华为云 OBS 两家,均全链路真账号验证过。新增厂商 = 按
+> [SDK 开发手册](./docs/sdk-playbook.md) 写一个 `<vendor>` SDK + 一个 provider 适配层,
+> 在 `app-core` 注册即可,App 界面无需改动。完整规划见 [PLAN.md](./PLAN.md)。
 
 ## 应用功能
 
