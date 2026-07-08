@@ -44,6 +44,20 @@ fn add_aliyun_account(
         .map_err(|e| e.to_string())
 }
 
+/// 新增一个华为云 OBS 账号(持久化到 SQLite)。
+#[tauri::command]
+fn add_huawei_account(
+    state: State<'_, App>,
+    id: String,
+    access_key_id: String,
+    access_key_secret: String,
+    endpoint: String,
+) -> Result<(), String> {
+    state
+        .add_huawei_account(id, access_key_id, access_key_secret, endpoint)
+        .map_err(|e| e.to_string())
+}
+
 /// 移除账号(从注册表与 SQLite)。
 #[tauri::command]
 fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
@@ -307,6 +321,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_accounts,
             add_aliyun_account,
+            add_huawei_account,
             remove_account,
             get_account,
             browse,

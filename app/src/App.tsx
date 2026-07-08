@@ -338,6 +338,7 @@ export default function App() {
   };
 
   const addAccount = async (
+    vendor: "aliyun" | "huawei",
     id: string,
     ak: string,
     sk: string,
@@ -347,7 +348,9 @@ export default function App() {
     setEditInfo(null);
     setError(null);
     try {
-      await api.addAliyunAccount(id, ak, sk, endpoint);
+      const add =
+        vendor === "huawei" ? api.addHuaweiAccount : api.addAliyunAccount;
+      await add(id, ak, sk, endpoint);
       await refreshAccounts();
       setCurrent(id);
       setPath("");
@@ -767,6 +770,7 @@ export default function App() {
             editInfo
               ? {
                   id: editInfo.id,
+                  vendor: editInfo.vendor,
                   accessKeyId: editInfo.access_key_id,
                   endpoint: editInfo.endpoint,
                 }

@@ -2,10 +2,31 @@ import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 
+/** 支持的云厂商及其表单文案 / 默认值。新增厂商在此追加一项即可。 */
+const VENDORS = {
+  aliyun: {
+    label: "阿里云 OSS",
+    akLabel: "AccessKeyId",
+    skLabel: "AccessKeySecret",
+    endpoint: "oss-cn-hangzhou.aliyuncs.com",
+    idPlaceholder: "如 aliyun-main",
+  },
+  huawei: {
+    label: "华为云 OBS",
+    akLabel: "AccessKey(AK)",
+    skLabel: "SecretKey(SK)",
+    endpoint: "obs.cn-north-4.myhuaweicloud.com",
+    idPlaceholder: "如 huawei-main",
+  },
+} as const;
+
+type Vendor = keyof typeof VENDORS;
+
 interface Props {
   /** 编辑模式的回填值;不传为新增。 */
-  initial?: { id: string; accessKeyId: string; endpoint: string };
+  initial?: { id: string; vendor: string; accessKeyId: string; endpoint: string };
   onSubmit: (
+    vendor: Vendor,
     id: string,
     accessKeyId: string,
     accessKeySecret: string,
@@ -16,12 +37,25 @@ interface Props {
 
 export function AccountForm({ initial, onSubmit, onClose }: Props) {
   const editing = !!initial;
+  const [vendor, setVendor] = useState<Vendor>(
+    (initial?.vendor as Vendor) in VENDORS ? (initial!.vendor as Vendor) : "aliyun",
+  );
   const [id, setId] = useState(initial?.id ?? "");
   const [ak, setAk] = useState(initial?.accessKeyId ?? "");
   const [sk, setSk] = useState("");
+  // 新增时 endpoint 跟随厂商默认;用户手动改过则不再自动覆盖。
   const [endpoint, setEndpoint] = useState(
-    initial?.endpoint ?? "oss-cn-hangzhou.aliyuncs.com",
+    initial?.endpoint ?? VENDORS[vendor].endpoint,
   );
+  const [endpointTouched, setEndpointTouched] = useState(editing);
+
+  const meta = VENDORS[vendor];
+
+  // 切换厂商时,若用户未手动改过 endpoint,则套用新厂商的默认 endpoint。
+  const changeVendor = (next: Vendor) => {
+    setVendor(next);
+    if (!endpointTouched) setEndpoint(VENDORS[next].endpoint);
+  };
 
   const valid = id && ak && sk && endpoint;
 
@@ -29,7 +63,9 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>{editing ? "编辑阿里云 OSS 账号" : "添加阿里云 OSS 账号"}</h3>
+          <h3>
+            {editing ? `编辑${meta.label} 账号` : `添加${meta.label} 账号`}
+          </h3>
           <button className="modal__close" onClick={onClose}>
             <FontAwesomeIcon icon={faXmark} />
           </button>
@@ -37,21 +73,38 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
 
         <div className="modal__body">
           <label className="field">
+            <span>云厂商</span>
+            <select
+              value={vendor}
+              onChange={(e) => changeVendor(e.target.value as Vendor)}
+              disabled={editing}
+            >
+              {Object.entries(VENDORS).map(([key, v]) => (
+                <option key={key} value={key}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
             <span>账号别名</span>
             <input
               value={id}
               onChange={(e) => setId(e.target.value)}
-              placeholder="如 aliyun-main"
+              placeholder={meta.idPlaceholder}
               disabled={editing}
               autoFocus={!editing}
             />
           </label>
           <label className="field">
-            <span>AccessKeyId</span>
+            <span>{meta.akLabel}</span>
             <input value={ak} onChange={(e) => setAk(e.target.value)} />
           </label>
           <label className="field">
-            <span>AccessKeySecret{editing ? "(请重新输入)" : ""}</span>
+            <span>
+              {meta.skLabel}
+              {editing ? "(请重新输入)" : ""}
+            </span>
             <input
               type="password"
               value={sk}
@@ -62,8 +115,11 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
             <span>Endpoint</span>
             <input
               value={endpoint}
-              onChange={(e) => setEndpoint(e.target.value)}
-              placeholder="oss-cn-hangzhou.aliyuncs.com"
+              onChange={(e) => {
+                setEndpoint(e.target.value);
+                setEndpointTouched(true);
+              }}
+              placeholder={meta.endpoint}
             />
           </label>
         </div>
@@ -75,7 +131,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           <button
             className="btn btn--primary"
             disabled={!valid}
-            onClick={() => onSubmit(id, ak, sk, endpoint)}
+            onClick={() => onSubmit(vendor, id, ak, sk, endpoint)}
           >
             {editing ? "保存" : "添加"}
           </button>
