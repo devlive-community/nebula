@@ -54,9 +54,9 @@ ListObjects **V2**(`list-type=2`):`continuation-token` 翻页;或 V1 marker。�
 
 - [x] 1 crate 骨架
 - [x] 2 签名(SigV4 官方向量单测通过)
-- [ ] 3 client
-- [ ] 4 error
-- [ ] 5 对象操作 put/get/delete/head
+- [x] 3 client(SigV4 请求签名器 + 无依赖时间戳)
+- [x] 4 error
+- [x] 5 对象操作 put/get/delete/head(含 copy / SigV4 query 预签名)
 - [ ] 6 list_objects 分页
 - [ ] 7 桶管理 list/create/delete
 - [ ] 8 分片上传
