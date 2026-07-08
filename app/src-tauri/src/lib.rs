@@ -24,10 +24,16 @@ struct DownloadProgress {
     total: u64,
 }
 
-/// 列出已注册账号。
+/// 列出已注册账号(仅 id)。
 #[tauri::command]
 fn list_accounts(state: State<'_, App>) -> Vec<String> {
     state.accounts()
+}
+
+/// 列出账号的非敏感信息(id + 厂商 + endpoint),供 UI 按厂商展示图标。
+#[tauri::command]
+fn list_account_infos(state: State<'_, App>) -> Vec<AccountInfo> {
+    state.account_infos()
 }
 
 /// 新增一个阿里云 OSS 账号(持久化到 SQLite)。
@@ -320,6 +326,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_accounts,
+            list_account_infos,
             add_aliyun_account,
             add_huawei_account,
             remove_account,

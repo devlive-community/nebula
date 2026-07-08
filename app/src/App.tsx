@@ -39,8 +39,12 @@ import { PreviewModal } from "./components/PreviewModal";
 import { Logo } from "./components/Logo";
 
 export default function App() {
-  const [accounts, setAccounts] = useState<string[]>([]);
+  const [accounts, setAccounts] = useState<AccountInfo[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const v = Number(localStorage.getItem("nebula.sidebarWidth"));
+    return v >= 180 && v <= 480 ? v : 240;
+  });
   const [path, setPath] = useState("");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -270,14 +274,34 @@ export default function App() {
   }, []);
 
   const refreshAccounts = useCallback(async () => {
-    const list = await api.listAccounts();
+    const list = await api.listAccountInfos();
     setAccounts(list);
-    setCurrent((cur) => cur ?? list[0] ?? null);
+    setCurrent((cur) => cur ?? list[0]?.id ?? null);
   }, []);
 
   useEffect(() => {
     refreshAccounts();
   }, [refreshAccounts]);
+
+  useEffect(() => {
+    localStorage.setItem("nebula.sidebarWidth", String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  // 拖拽侧栏右边缘调整宽度(限制在 180–480px)。
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const onMove = (ev: MouseEvent) => {
+      setSidebarWidth(Math.min(480, Math.max(180, ev.clientX)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.classList.remove("resizing");
+    };
+    document.body.classList.add("resizing");
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const load = useCallback(async () => {
     if (!current) {
@@ -635,12 +659,19 @@ export default function App() {
         accounts={accounts}
         current={current}
         theme={theme}
+        width={sidebarWidth}
         onSelect={selectAccount}
         onAdd={() => setShowForm(true)}
         onEdit={editAccount}
         onRemove={removeAccount}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         onSettings={() => setShowSettings(true)}
+      />
+
+      <div
+        className="resizer"
+        onMouseDown={startResize}
+        title="拖拽调整宽度"
       />
 
       <main className="main">

@@ -2,26 +2,7 @@ import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { Select } from "./Select";
-
-/** 支持的云厂商及其表单文案 / 默认值。新增厂商在此追加一项即可。 */
-const VENDORS = {
-  aliyun: {
-    label: "阿里云 OSS",
-    akLabel: "AccessKeyId",
-    skLabel: "AccessKeySecret",
-    endpoint: "oss-cn-hangzhou.aliyuncs.com",
-    idPlaceholder: "如 aliyun-main",
-  },
-  huawei: {
-    label: "华为云 OBS",
-    akLabel: "AccessKey(AK)",
-    skLabel: "SecretKey(SK)",
-    endpoint: "obs.cn-north-4.myhuaweicloud.com",
-    idPlaceholder: "如 huawei-main",
-  },
-} as const;
-
-type Vendor = keyof typeof VENDORS;
+import { VENDORS, type Vendor } from "../vendors";
 
 interface Props {
   /** 编辑模式的回填值;不传为新增。 */

@@ -57,13 +57,31 @@ button {
 
 /* ---------- Layout ---------- */
 .layout {
-  display: grid;
-  grid-template-columns: 240px 1fr;
+  display: flex;
   height: 100vh;
+}
+
+/* 侧栏与主区之间的拖拽分隔条(调整侧栏宽度)。 */
+.resizer {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.12s;
+}
+
+.resizer:hover,
+body.resizing .resizer {
+  background: var(--primary);
+}
+
+body.resizing {
+  cursor: col-resize;
 }
 
 /* ---------- Sidebar ---------- */
 .sidebar {
+  flex: 0 0 auto;
+  min-width: 0;
   background: var(--bg-elev);
   border-right: 1px solid var(--border);
   display: flex;
@@ -124,12 +142,11 @@ button {
   color: var(--text);
 }
 
-.account-item__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary);
+.account-item__icon {
+  width: 16px;
+  font-size: 14px;
   flex: none;
+  text-align: center;
 }
 
 .account-item__name {
@@ -180,6 +197,8 @@ button {
 /* ---------- Main ---------- */
 .main {
   position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;

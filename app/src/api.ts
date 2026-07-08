@@ -5,6 +5,9 @@ import type { AccountInfo, Entry, Settings, UploadEntry } from "./types";
 
 export const listAccounts = () => invoke<string[]>("list_accounts");
 
+export const listAccountInfos = () =>
+  invoke<AccountInfo[]>("list_account_infos");
+
 export const addAliyunAccount = (
   id: string,
   accessKeyId: string,

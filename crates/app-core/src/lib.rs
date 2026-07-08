@@ -190,6 +190,16 @@ impl App {
         self.registry.ids()
     }
 
+    /// 列出所有账号的非敏感信息(id + 厂商 + endpoint),按注册 id 字典序。
+    ///
+    /// 供 UI 按厂商展示图标等;无存储时返回空。
+    pub fn account_infos(&self) -> Vec<AccountInfo> {
+        self.accounts()
+            .into_iter()
+            .filter_map(|id| self.account_info(&id))
+            .collect()
+    }
+
     /// 读取某账号的非敏感信息(不含密钥),用于编辑回填。
     pub fn account_info(&self, id: &str) -> Option<AccountInfo> {
         let store = self.store.as_ref()?;
