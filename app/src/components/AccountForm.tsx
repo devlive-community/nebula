@@ -73,7 +73,9 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
         </div>
 
         <div className="modal__body">
-          <label className="field">
+          {/* 用 div 而非 label:label 会把点击转发给关联控件,导致选项点击后
+              触发器又被 toggle 回打开状态。 */}
+          <div className="field">
             <span>云厂商</span>
             <Select
               value={vendor}
@@ -84,7 +86,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
                 label: v.label,
               }))}
             />
-          </label>
+          </div>
           <label className="field">
             <span>账号别名</span>
             <input
