@@ -6,7 +6,7 @@ use app_core::{AccountInfo, App, Settings};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
-use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 /// 上传进度事件负载,发往前端 `upload-progress`。
@@ -331,13 +331,11 @@ fn setup_menu(app: &AppHandle) -> tauri::Result<()> {
         .accelerator("CmdOrCtrl+Shift+L")
         .build(app)?;
 
-    let about = AboutMetadataBuilder::new()
-        .name(Some("Nebula"))
-        .version(Some(env!("CARGO_PKG_VERSION")))
-        .build();
+    // 自定义"关于"项(点击弹出 App 自绘的关于弹窗,替代系统默认关于面板)。
+    let about = MenuItemBuilder::with_id("about", "关于 Nebula").build(app)?;
 
     let app_menu = SubmenuBuilder::new(app, "Nebula")
-        .about(Some(about))
+        .item(&about)
         .separator()
         .item(&settings)
         .separator()
@@ -385,7 +383,7 @@ pub fn run() {
         .on_menu_event(|app, event| {
             // 只转发自定义项;系统预定义项(退出/复制等)自行处理。
             match event.id().as_ref() {
-                id @ ("settings" | "add-account" | "refresh" | "toggle-theme") => {
+                id @ ("about" | "settings" | "add-account" | "refresh" | "toggle-theme") => {
                     let _ = app.emit("menu-action", id);
                 }
                 _ => {}

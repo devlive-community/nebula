@@ -1345,3 +1345,70 @@ body.resizing {
 ::-webkit-scrollbar-thumb:hover {
   opacity: 0.8;
 }
+
+/* ---------- About dialog ---------- */
+.modal--about {
+  width: 380px;
+}
+
+.about {
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.about__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.about__name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.about__version {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.about__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+.about__links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.about__link {
+  color: var(--primary);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.about__sep {
+  color: var(--text-faint);
+}
+
+.about__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+}

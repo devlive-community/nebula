@@ -36,6 +36,7 @@ import { TransferPanel } from "./components/TransferPanel";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { PreviewModal } from "./components/PreviewModal";
+import { AboutDialog } from "./components/AboutDialog";
 import { Logo } from "./components/Logo";
 
 export default function App() {
@@ -63,6 +64,7 @@ export default function App() {
     concurrency: 3,
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(
     null,
   );
@@ -327,7 +329,8 @@ export default function App() {
   // 原生菜单点击 → 前端动作。用 ref 持最新逻辑,事件监听只注册一次。
   const onMenuRef = useRef<(action: string) => void>(() => {});
   onMenuRef.current = (action: string) => {
-    if (action === "settings") setShowSettings(true);
+    if (action === "about") setShowAbout(true);
+    else if (action === "settings") setShowSettings(true);
     else if (action === "add-account") setShowForm(true);
     else if (action === "toggle-theme")
       setTheme((t) => (t === "dark" ? "light" : "dark"));
@@ -899,6 +902,8 @@ export default function App() {
           onClose={() => setShowSettings(false)}
         />
       )}
+
+      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
 
       {menu && (
         <ContextMenu
