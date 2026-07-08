@@ -2,6 +2,7 @@
   --bg: #0f1115;
   --bg-elev: #171a21;
   --bg-elev-2: #1e222b;
+  --bg-hover: #262b36;
   --border: #272c37;
   --text: #e6e9ef;
   --text-dim: #9aa3b2;
@@ -20,6 +21,7 @@
   --bg: #f6f7f9;
   --bg-elev: #ffffff;
   --bg-elev-2: #eef0f3;
+  --bg-hover: #e2e6ec;
   --border: #dfe3e8;
   --text: #1c2128;
   --text-dim: #5a6472;
@@ -339,7 +341,7 @@ body.resizing {
 }
 
 .btn:hover:not(:disabled) {
-  background: #262b36;
+  background: var(--bg-hover);
 }
 
 .btn:disabled {
@@ -453,7 +455,7 @@ body.resizing {
 
 .row {
   height: 46px;
-  border-bottom: 1px solid rgba(39, 44, 55, 0.5);
+  border-bottom: 1px solid var(--border);
   transition: background 0.1s;
 }
 
@@ -666,7 +668,7 @@ body.resizing {
   padding: 10px 14px;
   background: rgba(239, 71, 87, 0.12);
   border: 1px solid rgba(239, 71, 87, 0.35);
-  color: #ffb3bb;
+  color: var(--danger);
   border-radius: 8px;
   font-size: 13px;
   word-break: break-all;
