@@ -22,6 +22,13 @@ export const addHuaweiAccount = (
   endpoint: string,
 ) => invoke<void>("add_huawei_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addQiniuAccount = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_qiniu_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 export const getAccount = (id: string) =>

@@ -16,6 +16,14 @@ export const VENDORS = {
     endpoint: "obs.cn-north-4.myhuaweicloud.com",
     idPlaceholder: "如 huawei-main",
   },
+  qiniu: {
+    label: "七牛云 Kodo",
+    color: "#12b5a5",
+    akLabel: "AccessKey(AK)",
+    skLabel: "SecretKey(SK)",
+    endpoint: "s3.cn-east-1.qiniucs.com",
+    idPlaceholder: "如 qiniu-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;

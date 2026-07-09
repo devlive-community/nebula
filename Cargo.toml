@@ -34,6 +34,7 @@ members = [
     "crates/providers/provider-aliyun",
     # "crates/providers/provider-tencent",
     "crates/providers/provider-huawei",
+    "crates/providers/provider-qiniu",
     # "crates/providers/provider-aws",
 
     # 桌面 App 后端

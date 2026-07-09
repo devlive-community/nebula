@@ -40,6 +40,7 @@ dependencies = [
  "nebula-provider",
  "provider-aliyun",
  "provider-huawei",
+ "provider-qiniu",
  "rusqlite",
  "serde",
  "thiserror",
@@ -874,6 +875,18 @@ dependencies = [
  "futures",
  "huawei-obs",
  "nebula-provider",
+ "tokio",
+]
+
+[[package]]
+name = "provider-qiniu"
+version = "1.2.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "nebula-provider",
+ "qiniu-kodo",
  "tokio",
 ]
 

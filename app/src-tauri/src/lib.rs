@@ -65,6 +65,20 @@ fn add_huawei_account(
         .map_err(|e| e.to_string())
 }
 
+/// 新增一个七牛云 Kodo 账号(S3 兼容,持久化到 SQLite)。
+#[tauri::command]
+fn add_qiniu_account(
+    state: State<'_, App>,
+    id: String,
+    access_key_id: String,
+    access_key_secret: String,
+    endpoint: String,
+) -> Result<(), String> {
+    state
+        .add_qiniu_account(id, access_key_id, access_key_secret, endpoint)
+        .map_err(|e| e.to_string())
+}
+
 /// 移除账号(从注册表与 SQLite)。
 #[tauri::command]
 fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
@@ -399,6 +413,7 @@ pub fn run() {
             list_account_infos,
             add_aliyun_account,
             add_huawei_account,
+            add_qiniu_account,
             remove_account,
             get_account,
             browse,

@@ -84,6 +84,7 @@ dependencies = [
  "nebula-provider",
  "provider-aliyun",
  "provider-huawei",
+ "provider-qiniu",
  "rusqlite",
  "serde",
  "thiserror 2.0.18",
@@ -2689,6 +2690,33 @@ dependencies = [
  "futures",
  "huawei-obs",
  "nebula-provider",
+]
+
+[[package]]
+name = "provider-qiniu"
+version = "1.2.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "nebula-provider",
+ "qiniu-kodo",
+]
+
+[[package]]
+name = "qiniu-kodo"
+version = "1.2.0"
+dependencies = [
+ "bytes",
+ "cloud-core",
+ "futures",
+ "httpdate",
+ "percent-encoding",
+ "quick-xml 0.36.2",
+ "reqwest 0.12.28",
+ "serde",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]

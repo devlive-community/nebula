@@ -415,7 +415,7 @@ export default function App() {
   };
 
   const addAccount = async (
-    vendor: "aliyun" | "huawei",
+    vendor: "aliyun" | "huawei" | "qiniu",
     id: string,
     ak: string,
     sk: string,
@@ -426,7 +426,11 @@ export default function App() {
     setError(null);
     try {
       const add =
-        vendor === "huawei" ? api.addHuaweiAccount : api.addAliyunAccount;
+        vendor === "huawei"
+          ? api.addHuaweiAccount
+          : vendor === "qiniu"
+            ? api.addQiniuAccount
+            : api.addAliyunAccount;
       await add(id, ak, sk, endpoint);
       await refreshAccounts();
       setCurrent(id);

@@ -18,6 +18,7 @@ use bytes::Bytes;
 use nebula_provider::{Entry, ProviderRegistry, StorageProvider};
 use provider_aliyun::AliyunProvider;
 use provider_huawei::HuaweiProvider;
+use provider_qiniu::QiniuProvider;
 
 pub use error::{AppError, Result};
 pub use nebula_provider::{ByteStream, Capabilities, EntryKind, ProgressFn};
@@ -27,6 +28,7 @@ pub use store::{AccountRecord, AccountStore};
 
 const VENDOR_ALIYUN: &str = "aliyun";
 const VENDOR_HUAWEI: &str = "huawei";
+const VENDOR_QINIU: &str = "qiniu";
 
 /// 账号的非敏感信息(不含密钥),供编辑回填用。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -113,6 +115,12 @@ impl App {
                 secret.to_string(),
                 rec.endpoint.clone(),
             ))),
+            VENDOR_QINIU => self.registry.register(Arc::new(QiniuProvider::new(
+                rec.id.clone(),
+                rec.access_key_id.clone(),
+                secret.to_string(),
+                rec.endpoint.clone(),
+            ))),
             _ => {}
         }
     }
@@ -165,6 +173,32 @@ impl App {
         let rec = AccountRecord {
             id,
             vendor: VENDOR_HUAWEI.to_string(),
+            access_key_id: access_key.into(),
+            access_key_secret: String::new(),
+            endpoint: endpoint.into(),
+        };
+        if let Some(store) = &self.store {
+            store.upsert(&rec)?;
+        }
+        self.register_record(&rec, &secret);
+        Ok(())
+    }
+
+    /// 便捷:新增一个七牛云 Kodo 账号(S3 兼容)。密钥进钥匙串,元信息进 SQLite。
+    pub fn add_qiniu_account(
+        &self,
+        id: impl Into<String>,
+        access_key: impl Into<String>,
+        secret_key: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Result<()> {
+        let id = id.into();
+        let secret = secret_key.into();
+        self.secrets.set(&id, &secret)?;
+
+        let rec = AccountRecord {
+            id,
+            vendor: VENDOR_QINIU.to_string(),
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
