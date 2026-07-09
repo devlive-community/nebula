@@ -22,16 +22,18 @@ nebula/
 │  ├─ cloud-core/               公共底座(HTTP / 签名积木 / 错误 / 重试 / 分页)
 │  ├─ aliyun-oss/               阿里云对象存储 SDK(对象/桶/列举/分片/预签名)
 │  ├─ huawei-obs/               华为云对象存储 SDK(对象/桶/列举/分片/预签名)
+│  ├─ qiniu-kodo/               七牛云对象存储 SDK(S3 兼容 + AWS SigV4)
 │  ├─ nebula-provider/          App 统一抽象 trait(StorageProvider)
 │  ├─ providers/provider-aliyun 适配层(aliyun-oss → StorageProvider)
 │  ├─ providers/provider-huawei 适配层(huawei-obs → StorageProvider)
+│  ├─ providers/provider-qiniu  适配层(qiniu-kodo → StorageProvider)
 │  └─ app-core/                 App 业务逻辑(账号/传输/设置,框架无关,可 cargo test)
 └─ app/                         Tauri 桌面应用(src-tauri 后端 + src 前端)
 ```
 
-> 已实现阿里云 OSS 与华为云 OBS 两家,均全链路真账号验证过。新增厂商 = 按
-> [SDK 开发手册](./docs/sdk-playbook.md) 写一个 `<vendor>` SDK + 一个 provider 适配层,
-> 在 `app-core` 注册即可,App 界面无需改动。完整规划见 [PLAN.md](./PLAN.md)。
+> 已实现阿里云 OSS、华为云 OBS(均真账号验证过)与七牛云 Kodo(S3 兼容,离线单测全绿、
+> 真账号冒烟待验证)。新增厂商 = 按 [SDK 开发手册](./docs/sdk-playbook.md) 写一个 `<vendor>`
+> SDK + 一个 provider 适配层,在 `app-core` 注册即可,App 界面无需改动。完整规划见 [PLAN.md](./PLAN.md)。
 
 ## 应用功能
 
@@ -50,7 +52,7 @@ App 的运行与打包见 [app/README.md](./app/README.md)。
 ## 开发文档
 
 - [SDK 开发手册](./docs/sdk-playbook.md) — 从零手写一个厂商 SDK 的标准流程、增量顺序、验收标准
-- 厂商规格卡 `docs/sdk/<crate>.md` — 每家特有的签名/endpoint/进度(见 [aliyun-oss](./docs/sdk/aliyun-oss.md)、[huawei-obs](./docs/sdk/huawei-obs.md),新建用 [_template](./docs/sdk/_template.md))
+- 厂商规格卡 `docs/sdk/<crate>.md` — 每家特有的签名/endpoint/进度(见 [aliyun-oss](./docs/sdk/aliyun-oss.md)、[huawei-obs](./docs/sdk/huawei-obs.md)、[qiniu-kodo](./docs/sdk/qiniu-kodo.md),新建用 [_template](./docs/sdk/_template.md))
 
 ## License
 
