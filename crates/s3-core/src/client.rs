@@ -9,11 +9,11 @@ use cloud_core::HttpClient;
 use reqwest::Request;
 use s3_sigv4::{RequestSpec, SigningParams};
 
-use crate::error::{KodoError, Result};
+use crate::error::{Result, S3Error};
 
 /// 七牛云 Kodo 客户端(S3 兼容)。可低成本 clone。
 #[derive(Debug, Clone)]
-pub struct KodoClient {
+pub struct S3Client {
     access_key: String,
     secret_key: String,
     /// 区域 endpoint,如 `s3.cn-east-1.qiniucs.com`(不含协议)。
@@ -23,7 +23,7 @@ pub struct KodoClient {
     http: HttpClient,
 }
 
-impl KodoClient {
+impl S3Client {
     /// 用凭证与区域 endpoint 创建客户端。region 从 `s3.{region}.qiniucs.com` 解析。
     pub fn new(
         access_key: impl Into<String>,
@@ -92,7 +92,7 @@ impl KodoClient {
         now: SystemTime,
     ) -> Result<Request> {
         s3_sigv4::build_signed_request(self.http(), &self.params(), spec, now)
-            .map_err(KodoError::from)
+            .map_err(S3Error::from)
     }
 }
 
@@ -120,8 +120,8 @@ mod tests {
     use super::*;
     use reqwest::Method;
 
-    fn client() -> KodoClient {
-        KodoClient::new(
+    fn client() -> S3Client {
+        S3Client::new(
             "AKIDEXAMPLE",
             "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
             "s3.cn-east-1.qiniucs.com",
@@ -130,14 +130,14 @@ mod tests {
 
     #[test]
     fn parses_region_and_normalizes_endpoint() {
-        let c = KodoClient::new("a", "b", "https://s3.cn-east-1.qiniucs.com/");
+        let c = S3Client::new("a", "b", "https://s3.cn-east-1.qiniucs.com/");
         assert_eq!(c.endpoint(), "s3.cn-east-1.qiniucs.com");
         assert_eq!(c.region(), "cn-east-1");
     }
 
     #[test]
     fn non_standard_endpoint_has_empty_region() {
-        let c = KodoClient::new("a", "b", "files.example.com");
+        let c = S3Client::new("a", "b", "files.example.com");
         assert_eq!(c.region(), "");
         assert_eq!(c.with_region("cn-east-1").region(), "cn-east-1");
     }

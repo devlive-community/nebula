@@ -10,8 +10,8 @@ use serde::Deserialize;
 
 use s3_sigv4::RequestSpec;
 
-use crate::client::KodoClient;
-use crate::error::{KodoError, Result};
+use crate::client::S3Client;
+use crate::error::{Result, S3Error};
 use crate::object::check_status;
 
 /// 单页返回的每个对象条目。
@@ -105,7 +105,7 @@ struct BucketXml {
 
 const MAX_KEYS: &str = "1000";
 
-impl KodoClient {
+impl S3Client {
     /// 列举某个 bucket 下的对象(可选前缀),自动翻页为一条对象流。
     pub fn list_objects<'a>(
         &'a self,
@@ -186,7 +186,7 @@ impl KodoClient {
         let resp = check_status(self.http().execute(request).await?).await?;
         let body = resp.text().await.map_err(CoreError::from)?;
         quick_xml::de::from_str(&body)
-            .map_err(|e| KodoError::Core(CoreError::InvalidResponse(e.to_string())))
+            .map_err(|e| S3Error::Core(CoreError::InvalidResponse(e.to_string())))
     }
 
     /// 列举当前账号下的所有 bucket(GET Service,单次返回)。
@@ -217,7 +217,7 @@ impl KodoClient {
         let resp = check_status(self.http().execute(request).await?).await?;
         let body = resp.text().await.map_err(CoreError::from)?;
         let parsed: ListAllMyBucketsResult = quick_xml::de::from_str(&body)
-            .map_err(|e| KodoError::Core(CoreError::InvalidResponse(e.to_string())))?;
+            .map_err(|e| S3Error::Core(CoreError::InvalidResponse(e.to_string())))?;
         Ok(parsed
             .buckets
             .bucket

@@ -1,8 +1,8 @@
 //! 分片上传(S3 Multipart Upload)。
 //!
-//! 四步:[`KodoClient::initiate_multipart_upload`] → 多次 [`KodoClient::upload_part`] →
-//! [`KodoClient::complete_multipart_upload`],出错时 [`KodoClient::abort_multipart_upload`]。
-//! 高层 [`KodoClient::upload_multipart`] 按 `part_size` 切分并自动编排(失败自动 abort)。
+//! 四步:[`S3Client::initiate_multipart_upload`] → 多次 [`S3Client::upload_part`] →
+//! [`S3Client::complete_multipart_upload`],出错时 [`S3Client::abort_multipart_upload`]。
+//! 高层 [`S3Client::upload_multipart`] 按 `part_size` 切分并自动编排(失败自动 abort)。
 //!
 //! 分片相关的查询参数(`uploads` / `partNumber` / `uploadId`)由 SigV4 自动签名,
 //! 无需 V2 那样的子资源特判。
@@ -14,8 +14,8 @@ use serde::Deserialize;
 
 use s3_sigv4::RequestSpec;
 
-use crate::client::KodoClient;
-use crate::error::{KodoError, Result};
+use crate::client::S3Client;
+use crate::error::{Result, S3Error};
 use crate::object::{check_status, object_uri};
 
 /// S3 分片下限:除最后一片外,每片至少 5 MiB。
@@ -27,7 +27,7 @@ struct InitiateResult {
     upload_id: String,
 }
 
-impl KodoClient {
+impl S3Client {
     /// 初始化一次分片上传,返回 `UploadId`。
     pub async fn initiate_multipart_upload(
         &self,
@@ -46,7 +46,7 @@ impl KodoClient {
         let resp = check_status(self.http().execute(request).await?).await?;
         let body = resp.text().await.map_err(cloud_core::CoreError::from)?;
         let parsed: InitiateResult = quick_xml::de::from_str(&body)
-            .map_err(|e| KodoError::Core(cloud_core::CoreError::InvalidResponse(e.to_string())))?;
+            .map_err(|e| S3Error::Core(cloud_core::CoreError::InvalidResponse(e.to_string())))?;
         Ok(parsed.upload_id)
     }
 
@@ -76,7 +76,7 @@ impl KodoClient {
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string())
             .ok_or_else(|| {
-                KodoError::Core(cloud_core::CoreError::InvalidResponse(
+                S3Error::Core(cloud_core::CoreError::InvalidResponse(
                     "upload part response missing ETag".into(),
                 ))
             })

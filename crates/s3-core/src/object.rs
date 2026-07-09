@@ -1,7 +1,7 @@
 //! 对象级操作:上传 / 下载 / 删除 / 元信息 / 服务端复制 / 预签名。
 //!
 //! 所有请求经 [`crate::client`] 的 SigV4 签名后由共享 HTTP 客户端发出;非 2xx 响应会被
-//! 解析成 [`KodoError::Api`](读取 S3 的 Error XML)。
+//! 解析成 [`S3Error::Api`](读取 S3 的 Error XML)。
 
 use std::time::SystemTime;
 
@@ -12,8 +12,8 @@ use reqwest::{Method, Response, StatusCode};
 use s3_sigv4::{encode_path, RequestSpec};
 use serde::Deserialize;
 
-use crate::client::KodoClient;
-use crate::error::{KodoError, Result};
+use crate::client::S3Client;
+use crate::error::{Result, S3Error};
 
 /// 对象元信息(HEAD 返回)。
 #[derive(Debug, Clone)]
@@ -35,7 +35,7 @@ struct ErrorBody {
     request_id: Option<String>,
 }
 
-impl KodoClient {
+impl S3Client {
     /// 上传一个对象。
     pub async fn put_object(
         &self,
@@ -88,7 +88,7 @@ impl KodoClient {
         let len = resp.content_length();
         let stream = resp
             .bytes_stream()
-            .map(|r| r.map_err(|e| KodoError::Core(cloud_core::CoreError::from(e))));
+            .map(|r| r.map_err(|e| S3Error::Core(cloud_core::CoreError::from(e))));
         Ok((len, stream))
     }
 
@@ -185,7 +185,7 @@ fn header_string(
         .map(|s| s.to_string())
 }
 
-/// 成功(2xx)原样返回;否则读取 S3 Error XML 转成 [`KodoError::Api`]。
+/// 成功(2xx)原样返回;否则读取 S3 Error XML 转成 [`S3Error::Api`]。
 pub(crate) async fn check_status(resp: Response) -> Result<Response> {
     let status = resp.status();
     if status.is_success() {
@@ -194,13 +194,13 @@ pub(crate) async fn check_status(resp: Response) -> Result<Response> {
     let code = status.as_u16();
     let body = resp.text().await.unwrap_or_default();
     match quick_xml::de::from_str::<ErrorBody>(&body) {
-        Ok(err) => Err(KodoError::Api {
+        Ok(err) => Err(S3Error::Api {
             status: code,
             code: err.code,
             message: err.message,
             request_id: err.request_id,
         }),
-        Err(_) => Err(KodoError::Api {
+        Err(_) => Err(S3Error::Api {
             status: code,
             code: fallback_code(status),
             message: if body.is_empty() {
@@ -229,8 +229,8 @@ mod tests {
         UNIX_EPOCH + Duration::from_secs(secs)
     }
 
-    fn client() -> KodoClient {
-        KodoClient::new(
+    fn client() -> S3Client {
+        S3Client::new(
             "AKIDEXAMPLE",
             "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
             "s3.cn-east-1.qiniucs.com",

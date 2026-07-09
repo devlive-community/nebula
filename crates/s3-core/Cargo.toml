@@ -1,0 +1,21 @@
+[package]
+name = "s3-core"
+version.workspace = true
+description = "Generic async S3-compatible object storage client (AWS SigV4), shared by qiniu-kodo / aws-s3 / R2 / MinIO"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["s3", "object-storage", "sigv4", "aws", "minio"]
+categories = ["api-bindings"]
+
+[dependencies]
+cloud-core = { path = "../cloud-core", version = "1" }
+s3-sigv4 = { path = "../s3-sigv4", version = "1" }
+thiserror = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+futures = { workspace = true }
+quick-xml = { version = "0.36", features = ["serialize"] }

@@ -1,11 +1,11 @@
-//! Kodo SDK 的错误类型。
+//! S3 SDK 的错误类型。
 
 use thiserror::Error;
 
 /// 调用 Kodo(S3 兼容)时可能出现的错误。
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum KodoError {
+pub enum S3Error {
     /// 底层传输 / 编码 / 签名等公共错误。
     #[error(transparent)]
     Core(#[from] cloud_core::CoreError),
@@ -24,5 +24,5 @@ pub enum KodoError {
     },
 }
 
-/// Kodo SDK 的 Result 别名。
-pub type Result<T> = std::result::Result<T, KodoError>;
+/// S3 SDK 的 Result 别名。
+pub type Result<T> = std::result::Result<T, S3Error>;
