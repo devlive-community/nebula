@@ -26,7 +26,7 @@
 crates/<vendor-crate>/
 ├─ Cargo.toml            版本继承 workspace;description/keywords/categories 面向 crates.io
 ├─ examples/
-│  └─ smoke.rs           真账号端到端冒烟(读环境变量凭证)
+│  └─ <vendor>_smoke.rs  真账号端到端冒烟(读环境变量凭证;名字带厂商前缀,见下方注)
 └─ src/
    ├─ lib.rs             模块声明 + 公开 re-export + crate 级文档
    ├─ error.rs           XxxError(thiserror,#[non_exhaustive]);Core 透传 + Api 业务错误
@@ -53,7 +53,12 @@ crates/<vendor-crate>/
 | 6 | 列举对象 `bucket.rs` | list_objects + `cloud_core::paginate` | 离线:签名/查询/XML 解析 + 翻页游标 |
 | 7 | 桶管理 | list/create/delete bucket | 离线:service/bucket-root 签名 |
 | 8 | 分片上传 `multipart.rs` | 四件套 + 高层 + **子资源签名** | 离线:子资源排序签名 + complete body |
-| 9 | `examples/smoke.rs` | 真账号跑通全链路 | ★**用户用真实账号运行通过** |
+| 9 | `examples/<vendor>_smoke.rs` | 真账号跑通全链路 | ★**用户用真实账号运行通过** |
+
+> **示例命名**:example 目标名在整个 workspace 内必须唯一,否则 Windows 下多个同名
+> example 会同时往 `target/debug/examples/<name>.exe` 写、并行链接抢文件报
+> `LNK1104: cannot open file`。所以每家的冒烟文件都带厂商前缀:SDK 用
+> `<vendor>_smoke.rs`,适配层用 `<vendor>_provider_smoke.rs`。
 
 > 分片上传通常需要扩展 `sign.rs` 支持**子资源**(计入 CanonicalizedResource 的特殊参数)。
 

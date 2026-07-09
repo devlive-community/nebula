@@ -1,11 +1,11 @@
-//! 通过统一的 `dyn StorageProvider` 驱动七牛云适配器,证明 SDK 藏在抽象层后也能跑通。
+//! 通过统一的 `dyn StorageProvider` 驱动华为云适配器,证明 SDK 藏在抽象层后也能跑通。
 //!
 //! ```bash
-//! export KODO_ACCESS_KEY=你的AK
-//! export KODO_SECRET_KEY=你的SK
-//! export KODO_ENDPOINT=s3.cn-east-1.qiniucs.com
-//! export KODO_BUCKET=你的bucket名
-//! cargo run -p provider-qiniu --example provider_smoke
+//! export OBS_ACCESS_KEY=你的AK
+//! export OBS_SECRET_KEY=你的SK
+//! export OBS_ENDPOINT=obs.cn-north-4.myhuaweicloud.com
+//! export OBS_BUCKET=你的bucket名
+//! cargo run -p provider-huawei --example huawei_provider_smoke
 //! ```
 
 use std::env;
@@ -13,20 +13,25 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use nebula_provider::{ProviderRegistry, StorageProvider};
-use provider_qiniu::QiniuProvider;
+use provider_huawei::HuaweiProvider;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let ak = env::var("KODO_ACCESS_KEY").expect("需要设置 KODO_ACCESS_KEY");
-    let sk = env::var("KODO_SECRET_KEY").expect("需要设置 KODO_SECRET_KEY");
-    let endpoint = env::var("KODO_ENDPOINT").expect("需要设置 KODO_ENDPOINT");
-    let bucket = env::var("KODO_BUCKET").expect("需要设置 KODO_BUCKET");
+    let ak = env::var("OBS_ACCESS_KEY").expect("需要设置 OBS_ACCESS_KEY");
+    let sk = env::var("OBS_SECRET_KEY").expect("需要设置 OBS_SECRET_KEY");
+    let endpoint = env::var("OBS_ENDPOINT").expect("需要设置 OBS_ENDPOINT");
+    let bucket = env::var("OBS_BUCKET").expect("需要设置 OBS_BUCKET");
 
     // 像 App 一样:构造适配器,放进注册表,之后只用 dyn StorageProvider。
     let registry = ProviderRegistry::new();
-    registry.register(Arc::new(QiniuProvider::new("qiniu-main", ak, sk, endpoint)));
+    registry.register(Arc::new(HuaweiProvider::new(
+        "huawei-main",
+        ak,
+        sk,
+        endpoint,
+    )));
 
-    let provider = registry.get("qiniu-main").expect("provider 已注册");
+    let provider = registry.get("huawei-main").expect("provider 已注册");
     let provider: &dyn StorageProvider = provider.as_ref();
 
     println!(

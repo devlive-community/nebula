@@ -7,7 +7,7 @@
 //! export OBS_SECRET_KEY=你的SK
 //! export OBS_ENDPOINT=obs.cn-north-4.myhuaweicloud.com   # 你 bucket 所在区域
 //! export OBS_BUCKET=你的bucket名
-//! cargo run -p huawei-obs --example smoke
+//! cargo run -p huawei-obs --example huawei_smoke
 //! ```
 //!
 //! 程序会在 bucket 里创建一个临时对象,验证完自动删除。

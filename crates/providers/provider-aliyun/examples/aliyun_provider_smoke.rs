@@ -1,11 +1,11 @@
-//! 通过统一的 `dyn StorageProvider` 驱动华为云适配器,证明 SDK 藏在抽象层后也能跑通。
+//! 通过统一的 `dyn StorageProvider` 驱动阿里云适配器,证明 SDK 藏在抽象层后也能跑通。
 //!
 //! ```bash
-//! export OBS_ACCESS_KEY=你的AK
-//! export OBS_SECRET_KEY=你的SK
-//! export OBS_ENDPOINT=obs.cn-north-4.myhuaweicloud.com
-//! export OBS_BUCKET=你的bucket名
-//! cargo run -p provider-huawei --example provider_smoke
+//! export OSS_ACCESS_KEY_ID=你的AK
+//! export OSS_ACCESS_KEY_SECRET=你的SK
+//! export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+//! export OSS_BUCKET=你的bucket名
+//! cargo run -p provider-aliyun --example aliyun_provider_smoke
 //! ```
 
 use std::env;
@@ -13,25 +13,25 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use nebula_provider::{ProviderRegistry, StorageProvider};
-use provider_huawei::HuaweiProvider;
+use provider_aliyun::AliyunProvider;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let ak = env::var("OBS_ACCESS_KEY").expect("需要设置 OBS_ACCESS_KEY");
-    let sk = env::var("OBS_SECRET_KEY").expect("需要设置 OBS_SECRET_KEY");
-    let endpoint = env::var("OBS_ENDPOINT").expect("需要设置 OBS_ENDPOINT");
-    let bucket = env::var("OBS_BUCKET").expect("需要设置 OBS_BUCKET");
+    let ak = env::var("OSS_ACCESS_KEY_ID").expect("需要设置 OSS_ACCESS_KEY_ID");
+    let sk = env::var("OSS_ACCESS_KEY_SECRET").expect("需要设置 OSS_ACCESS_KEY_SECRET");
+    let endpoint = env::var("OSS_ENDPOINT").expect("需要设置 OSS_ENDPOINT");
+    let bucket = env::var("OSS_BUCKET").expect("需要设置 OSS_BUCKET");
 
     // 像 App 一样:构造适配器,放进注册表,之后只用 dyn StorageProvider。
     let registry = ProviderRegistry::new();
-    registry.register(Arc::new(HuaweiProvider::new(
-        "huawei-main",
+    registry.register(Arc::new(AliyunProvider::new(
+        "aliyun-main",
         ak,
         sk,
         endpoint,
     )));
 
-    let provider = registry.get("huawei-main").expect("provider 已注册");
+    let provider = registry.get("aliyun-main").expect("provider 已注册");
     let provider: &dyn StorageProvider = provider.as_ref();
 
     println!(

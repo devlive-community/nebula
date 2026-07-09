@@ -1,36 +1,34 @@
-//! 用真实 OSS 账号做一次端到端冒烟验证:put → head → list → get → delete。
+//! 用真实七牛云 Kodo 账号(S3 兼容)做一次端到端冒烟:put → head → list → get → delete → multipart。
 //!
 //! 通过环境变量传入凭证(不要把密钥写进代码 / 提交进仓库):
 //!
 //! ```bash
-//! export OSS_ACCESS_KEY_ID=你的AK
-//! export OSS_ACCESS_KEY_SECRET=你的SK
-//! export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com   # 你 bucket 所在区域
-//! export OSS_BUCKET=你的bucket名
-//! cargo run -p aliyun-oss --example smoke
+//! export KODO_ACCESS_KEY=你的AK
+//! export KODO_SECRET_KEY=你的SK
+//! export KODO_ENDPOINT=s3.cn-east-1.qiniucs.com   # 你 bucket 所在区域
+//! export KODO_BUCKET=你的bucket名
+//! cargo run -p qiniu-kodo --example qiniu_smoke
 //! ```
-//!
-//! 程序会在 bucket 里创建一个临时对象,验证完自动删除。
 
 use std::env;
 
-use aliyun_oss::OssClient;
 use futures::StreamExt;
+use qiniu_kodo::KodoClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let ak = env::var("OSS_ACCESS_KEY_ID").expect("需要设置 OSS_ACCESS_KEY_ID");
-    let sk = env::var("OSS_ACCESS_KEY_SECRET").expect("需要设置 OSS_ACCESS_KEY_SECRET");
-    let endpoint = env::var("OSS_ENDPOINT").expect("需要设置 OSS_ENDPOINT");
-    let bucket = env::var("OSS_BUCKET").expect("需要设置 OSS_BUCKET");
+    let ak = env::var("KODO_ACCESS_KEY").expect("需要设置 KODO_ACCESS_KEY");
+    let sk = env::var("KODO_SECRET_KEY").expect("需要设置 KODO_SECRET_KEY");
+    let endpoint = env::var("KODO_ENDPOINT").expect("需要设置 KODO_ENDPOINT");
+    let bucket = env::var("KODO_BUCKET").expect("需要设置 KODO_BUCKET");
 
-    let client = OssClient::new(ak, sk, endpoint);
+    let client = KodoClient::new(ak, sk, endpoint);
     let key = "nebula-smoke-test.txt";
-    let content = b"hello from nebula aliyun-oss smoke test";
+    let content = b"hello from nebula qiniu-kodo smoke test";
 
-    println!("bucket = {bucket}, key = {key}\n");
+    println!("bucket = {bucket}, region = {}\n", client.region());
 
-    // 0) 列举账号下的 bucket(验证 service endpoint 签名路径)
+    // 0) 列举账号下的 bucket
     {
         let stream = client.list_buckets();
         futures::pin_mut!(stream);
@@ -62,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         meta.content_length, meta.content_type, meta.etag
     );
 
-    // 3) 列举(打印前若干个)
+    // 3) 列举
     let stream = client.list_objects(&bucket, None);
     futures::pin_mut!(stream);
     let mut count = 0usize;
@@ -82,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if saw_key { "" } else { "⚠️ 未" }
     );
 
-    // 4) 下载并校验内容
+    // 4) 下载并校验
     let got = client.get_object(&bucket, key).await?;
     assert_eq!(got.as_ref(), content, "下载内容与上传不一致!");
     println!("[4/5] get_object    ✅ 内容与上传一致");
@@ -91,9 +89,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.delete_object(&bucket, key).await?;
     println!("[5/5] delete_object ✅ 已清理临时对象");
 
-    // 6) 分片上传(验证子资源签名路径):造 250KB 数据,强制切成多片
+    // 6) 分片上传(强制多片):造 11MB 数据(每片下限 5MiB)
     let mp_key = "nebula-smoke-multipart.bin";
-    let part_size = aliyun_oss::multipart::MIN_PART_SIZE; // 100KB
+    let part_size = qiniu_kodo::multipart::MIN_PART_SIZE; // 5 MiB
     let big: Vec<u8> = (0..(part_size * 2 + 12345))
         .map(|i| (i % 251) as u8)
         .collect();
