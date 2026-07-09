@@ -897,10 +897,9 @@ dependencies = [
  "bytes",
  "cloud-core",
  "futures",
- "httpdate",
- "percent-encoding",
  "quick-xml",
  "reqwest",
+ "s3-sigv4",
  "serde",
  "thiserror",
  "tokio",
@@ -1145,6 +1144,16 @@ name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+
+[[package]]
+name = "s3-sigv4"
+version = "1.2.0"
+dependencies = [
+ "bytes",
+ "cloud-core",
+ "percent-encoding",
+ "reqwest",
+]
 
 [[package]]
 name = "scopeguard"

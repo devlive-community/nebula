@@ -1,0 +1,16 @@
+[package]
+name = "s3-sigv4"
+version.workspace = true
+description = "Reusable AWS Signature V4 signer for S3-compatible object storage (Qiniu, AWS S3, R2, MinIO)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["aws", "sigv4", "s3", "signature", "object-storage"]
+categories = ["api-bindings", "authentication"]
+
+[dependencies]
+cloud-core = { path = "../cloud-core", version = "1" }
+reqwest = { workspace = true }
+bytes = { workspace = true }
+percent-encoding = "2"

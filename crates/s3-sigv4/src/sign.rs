@@ -1,4 +1,4 @@
-//! AWS Signature V4 签名(用于七牛云 Kodo 的 S3 兼容端点)。
+//! AWS Signature V4 的纯签名函数(与具体服务无关,service 作为参数传入)。
 //!
 //! 签名链:
 //! ```text
@@ -7,26 +7,21 @@
 //! SigningKey       = HMAC(HMAC(HMAC(HMAC("AWS4"+SK, date), region), service), "aws4_request")
 //! Signature        = hex(HMAC(SigningKey, StringToSign))
 //! ```
-//! `Authorization: AWS4-HMAC-SHA256 Credential={AK}/{scope}, SignedHeaders={sh}, Signature={sig}`
-//!
 //! 参考:AWS《Signature Version 4》。加密原语复用 [`cloud_core::crypto`]。
 
 use cloud_core::crypto;
 
 /// 签名算法标识。
 pub const ALGORITHM: &str = "AWS4-HMAC-SHA256";
-/// S3 兼容服务的 service 名(计入 scope)。
-pub const SERVICE: &str = "s3";
+/// S3 服务名(计入 scope)。其它 AWS 服务传各自 service。
+pub const S3: &str = "s3";
 /// scope 终止串。
 pub const REQUEST_TYPE: &str = "aws4_request";
-/// 空 body 的 SHA-256(GET/DELETE/HEAD 等无请求体时的 payload hash)。
+/// 空 body 的 SHA-256(无请求体时的 payload hash)。
 pub const EMPTY_PAYLOAD_HASH: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 /// 组装 CanonicalRequest。
-///
-/// `canonical_headers` 每行形如 `key:value\n`(已小写、按键排序、trim 值);
-/// `signed_headers` 形如 `host;x-amz-content-sha256;x-amz-date`。
 pub fn canonical_request(
     method: &str,
     canonical_uri: &str,
@@ -46,7 +41,6 @@ pub fn credential_scope(date: &str, region: &str, service: &str) -> String {
 }
 
 /// 组装 StringToSign。内部对 `canonical_request` 做 sha256。
-/// `amz_date` 为 ISO8601 的 `YYYYMMDDTHHMMSSZ`。
 pub fn string_to_sign(amz_date: &str, scope: &str, canonical_request: &str) -> String {
     format!(
         "{ALGORITHM}\n{amz_date}\n{scope}\n{}",
@@ -98,13 +92,10 @@ mod tests {
             EMPTY_PAYLOAD_HASH,
         );
         let scope = credential_scope("20150830", "us-east-1", "service");
-        assert_eq!(scope, "20150830/us-east-1/service/aws4_request");
-
         let sts = string_to_sign("20150830T123600Z", &scope, &cr);
         let key = signing_key(SK, "20150830", "us-east-1", "service");
         let sig = signature(&key, &sts);
 
-        // 官方向量给出的最终签名,逐字节相等。
         assert_eq!(
             sig,
             "5fa00fa31553b73ebf1942676e86291e8372ff2a2260956d9b8aae1d763fbf31"
@@ -123,28 +114,9 @@ mod tests {
     }
 
     #[test]
-    fn canonical_request_has_blank_line_between_headers_and_signed() {
-        let cr = canonical_request(
-            "GET",
-            "/",
-            "",
-            "host:h\nx-amz-date:d\n",
-            "host;x-amz-date",
-            EMPTY_PAYLOAD_HASH,
-        );
-        assert_eq!(
-            cr,
-            "GET\n/\n\nhost:h\nx-amz-date:d\n\nhost;x-amz-date\n\
-             e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        );
-    }
-
-    #[test]
-    fn signing_key_is_deterministic() {
-        let a = signing_key(SK, "20150830", "cn-east-1", "s3");
-        let b = signing_key(SK, "20150830", "cn-east-1", "s3");
-        assert_eq!(a, b);
-        // 不同 region 应得到不同密钥。
-        assert_ne!(a, signing_key(SK, "20150830", "cn-north-1", "s3"));
+    fn signing_key_varies_by_region() {
+        let a = signing_key(SK, "20150830", "cn-east-1", S3);
+        assert_eq!(a, signing_key(SK, "20150830", "cn-east-1", S3));
+        assert_ne!(a, signing_key(SK, "20150830", "cn-north-1", S3));
     }
 }

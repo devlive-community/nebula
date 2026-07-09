@@ -12,7 +12,9 @@ use reqwest::header::ETAG;
 use reqwest::Method;
 use serde::Deserialize;
 
-use crate::client::{KodoClient, RequestSpec};
+use s3_sigv4::RequestSpec;
+
+use crate::client::KodoClient;
 use crate::error::{KodoError, Result};
 use crate::object::{check_status, object_uri};
 

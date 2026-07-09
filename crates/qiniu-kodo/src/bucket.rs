@@ -8,8 +8,9 @@ use futures::Stream;
 use reqwest::Method;
 use serde::Deserialize;
 
+use s3_sigv4::RequestSpec;
+
 use crate::client::KodoClient;
-use crate::client::RequestSpec;
 use crate::error::{KodoError, Result};
 use crate::object::check_status;
 

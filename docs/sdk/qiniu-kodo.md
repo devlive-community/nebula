@@ -65,4 +65,4 @@ ListObjects **V2**(`list-type=2`):`continuation-token` 翻页;或 V1 marker。�
 ## 待办 / 后续
 
 - [x] provider-qiniu 适配层 + app-core 注册 + GUI 选项(`App::add_qiniu_account`)
-- [ ] 把 SigV4 抽成可被 aws-s3 / R2 / MinIO 复用的共享实现
+- [x] SigV4 已抽成共享 crate `s3-sigv4`(供 aws-s3 / R2 / MinIO 复用)

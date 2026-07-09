@@ -12,6 +12,7 @@ exclude = ["app"]
 members = [
     # 公共底座(可发布)
     "crates/cloud-core",
+    "crates/s3-sigv4",
 
     # 厂商原生 SDK(独立可发布,保持厂商原名)
     "crates/aliyun-oss",

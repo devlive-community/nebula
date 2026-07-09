@@ -9,13 +9,11 @@ use bytes::Bytes;
 use futures::StreamExt;
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use reqwest::{Method, Response, StatusCode};
+use s3_sigv4::{encode_path, RequestSpec};
 use serde::Deserialize;
 
-use crate::client::{
-    amz_datetime, canonical_query_string, encode_key, uri_encode, KodoClient, RequestSpec,
-};
+use crate::client::KodoClient;
 use crate::error::{KodoError, Result};
-use crate::sign;
 
 /// 对象元信息(HEAD 返回)。
 #[derive(Debug, Clone)]
@@ -142,7 +140,7 @@ impl KodoClient {
         dst_key: &str,
     ) -> Result<()> {
         // x-amz-copy-source 是被签名的 x-amz-* 头,值为 /{srcBucket}/{encodedSrcKey}。
-        let copy_source = format!("/{src_bucket}/{}", encode_key(src_key));
+        let copy_source = format!("/{src_bucket}/{}", encode_path(src_key));
         let request = self.build_signed(RequestSpec {
             method: Method::PUT,
             canonical_uri: &object_uri(dst_bucket, dst_key),
@@ -157,56 +155,24 @@ impl KodoClient {
 
     /// 生成一个 GET 预签名 URL(SigV4 query 方式),`expires_in` 秒后失效。纯本地签名。
     pub fn presign_get(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
-        self.build_presigned_url(bucket, key, expires_in, SystemTime::now())
+        Ok(self.build_presigned_url(bucket, key, expires_in, SystemTime::now()))
     }
 
-    /// 用固定时间构造预签名 URL,便于确定性测试。
+    /// 用固定时间构造预签名 URL,便于确定性测试。委托给共享 SigV4 实现。
     fn build_presigned_url(
         &self,
         bucket: &str,
         key: &str,
         expires_in: u64,
         now: SystemTime,
-    ) -> Result<String> {
-        let (amz_date, date) = amz_datetime(now);
-        let scope = sign::credential_scope(&date, self.region(), sign::SERVICE);
-        let credential = format!("{}/{scope}", self.access_key());
-
-        // 参与签名的查询参数(不含 X-Amz-Signature)。
-        let query = vec![
-            ("X-Amz-Algorithm".to_string(), sign::ALGORITHM.to_string()),
-            ("X-Amz-Credential".to_string(), credential),
-            ("X-Amz-Date".to_string(), amz_date.clone()),
-            ("X-Amz-Expires".to_string(), expires_in.to_string()),
-            ("X-Amz-SignedHeaders".to_string(), "host".to_string()),
-        ];
-        let canonical_query = canonical_query_string(&query);
-
-        let canonical_headers = format!("host:{}\n", self.endpoint());
-        let cr = sign::canonical_request(
-            "GET",
-            &object_uri(bucket, key),
-            &canonical_query,
-            &canonical_headers,
-            "host",
-            "UNSIGNED-PAYLOAD",
-        );
-        let sts = sign::string_to_sign(&amz_date, &scope, &cr);
-        let key_bytes = sign::signing_key(self.secret_key(), &date, self.region(), sign::SERVICE);
-        let signature = sign::signature(&key_bytes, &sts);
-
-        Ok(format!(
-            "https://{}{}?{canonical_query}&X-Amz-Signature={}",
-            self.endpoint(),
-            object_uri(bucket, key),
-            uri_encode(&signature),
-        ))
+    ) -> String {
+        s3_sigv4::presigned_get_url(&self.params(), &object_uri(bucket, key), expires_in, now)
     }
 }
 
 /// 路径风格的对象 canonical URI:`/{bucket}/{encoded_key}`。
 pub(crate) fn object_uri(bucket: &str, key: &str) -> String {
-    format!("/{bucket}/{}", encode_key(key))
+    format!("/{bucket}/{}", encode_path(key))
 }
 
 fn header_string(
@@ -280,9 +246,7 @@ mod tests {
     #[test]
     fn presign_url_has_sigv4_query_params() {
         let c = client();
-        let url = c
-            .build_presigned_url("mybucket", "hello.txt", 3600, at(1_440_938_160))
-            .unwrap();
+        let url = c.build_presigned_url("mybucket", "hello.txt", 3600, at(1_440_938_160));
 
         assert!(url.starts_with("https://s3.cn-east-1.qiniucs.com/mybucket/hello.txt?"));
         let parsed = reqwest::Url::parse(&url).unwrap();
