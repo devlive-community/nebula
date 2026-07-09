@@ -415,7 +415,7 @@ export default function App() {
   };
 
   const addAccount = async (
-    vendor: "aliyun" | "huawei" | "qiniu",
+    vendor: "aliyun" | "huawei" | "qiniu" | "aws",
     id: string,
     ak: string,
     sk: string,
@@ -425,13 +425,13 @@ export default function App() {
     setEditInfo(null);
     setError(null);
     try {
-      const add =
-        vendor === "huawei"
-          ? api.addHuaweiAccount
-          : vendor === "qiniu"
-            ? api.addQiniuAccount
-            : api.addAliyunAccount;
-      await add(id, ak, sk, endpoint);
+      const adders = {
+        aliyun: api.addAliyunAccount,
+        huawei: api.addHuaweiAccount,
+        qiniu: api.addQiniuAccount,
+        aws: api.addAwsAccount,
+      };
+      await adders[vendor](id, ak, sk, endpoint);
       await refreshAccounts();
       setCurrent(id);
       setPath("");

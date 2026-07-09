@@ -24,6 +24,14 @@ export const VENDORS = {
     endpoint: "s3.cn-east-1.qiniucs.com",
     idPlaceholder: "如 qiniu-main",
   },
+  aws: {
+    label: "AWS S3",
+    color: "#ff9900",
+    akLabel: "Access Key ID",
+    skLabel: "Secret Access Key",
+    endpoint: "s3.us-east-1.amazonaws.com",
+    idPlaceholder: "如 aws-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;

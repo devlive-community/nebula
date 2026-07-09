@@ -39,7 +39,7 @@ const nodes = [
   {name: '阿里云 OSS', active: true, x: 50, y: 7},
   {name: '腾讯云 COS', active: false, x: 90, y: 28},
   {name: '华为云 OBS', active: true, x: 84, y: 78},
-  {name: 'AWS S3', active: false, x: 50, y: 94},
+  {name: 'AWS S3', active: true, x: 50, y: 94},
   {name: '七牛云 Kodo', active: true, x: 16, y: 78},
   {name: 'Cloudflare R2', active: false, x: 10, y: 28}
 ]

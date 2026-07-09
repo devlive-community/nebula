@@ -83,6 +83,7 @@ dependencies = [
  "keyring",
  "nebula-provider",
  "provider-aliyun",
+ "provider-aws",
  "provider-huawei",
  "provider-qiniu",
  "rusqlite",
@@ -166,6 +167,13 @@ name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
+
+[[package]]
+name = "aws-s3"
+version = "1.2.0"
+dependencies = [
+ "s3-core",
+]
 
 [[package]]
 name = "base64"
@@ -2676,6 +2684,17 @@ version = "1.2.0"
 dependencies = [
  "aliyun-oss",
  "async-trait",
+ "bytes",
+ "futures",
+ "nebula-provider",
+]
+
+[[package]]
+name = "provider-aws"
+version = "1.2.0"
+dependencies = [
+ "async-trait",
+ "aws-s3",
  "bytes",
  "futures",
  "nebula-provider",

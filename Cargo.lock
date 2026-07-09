@@ -39,6 +39,7 @@ dependencies = [
  "keyring",
  "nebula-provider",
  "provider-aliyun",
+ "provider-aws",
  "provider-huawei",
  "provider-qiniu",
  "rusqlite",
@@ -85,6 +86,15 @@ name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
+
+[[package]]
+name = "aws-s3"
+version = "1.2.0"
+dependencies = [
+ "futures",
+ "s3-core",
+ "tokio",
+]
 
 [[package]]
 name = "base64"
@@ -860,6 +870,18 @@ version = "1.2.0"
 dependencies = [
  "aliyun-oss",
  "async-trait",
+ "bytes",
+ "futures",
+ "nebula-provider",
+ "tokio",
+]
+
+[[package]]
+name = "provider-aws"
+version = "1.2.0"
+dependencies = [
+ "async-trait",
+ "aws-s3",
  "bytes",
  "futures",
  "nebula-provider",

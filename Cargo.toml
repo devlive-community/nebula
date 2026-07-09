@@ -24,7 +24,7 @@ members = [
     "crates/huawei-obs",
     # "crates/huawei-openapi",
     "crates/qiniu-kodo",
-    # "crates/aws-s3",
+    "crates/aws-s3",
 
     # App 统一抽象 trait(可选发布)
     "crates/nebula-provider",
@@ -37,7 +37,7 @@ members = [
     # "crates/providers/provider-tencent",
     "crates/providers/provider-huawei",
     "crates/providers/provider-qiniu",
-    # "crates/providers/provider-aws",
+    "crates/providers/provider-aws",
 
     # 桌面 App 后端
     # "app/src-tauri",

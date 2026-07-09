@@ -1,0 +1,17 @@
+[package]
+name = "aws-s3"
+version.workspace = true
+description = "Hand-written async Rust SDK for AWS S3 (REST API + SigV4), a thin facade over s3-core"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["aws", "s3", "object-storage", "sigv4"]
+categories = ["api-bindings"]
+
+[dependencies]
+s3-core = { path = "../s3-core", version = "1" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+futures = { workspace = true }

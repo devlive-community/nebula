@@ -29,6 +29,13 @@ export const addQiniuAccount = (
   endpoint: string,
 ) => invoke<void>("add_qiniu_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addAwsAccount = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_aws_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 export const getAccount = (id: string) =>

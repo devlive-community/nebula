@@ -17,6 +17,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use nebula_provider::{Entry, ProviderRegistry, StorageProvider};
 use provider_aliyun::AliyunProvider;
+use provider_aws::AwsProvider;
 use provider_huawei::HuaweiProvider;
 use provider_qiniu::QiniuProvider;
 
@@ -29,6 +30,7 @@ pub use store::{AccountRecord, AccountStore};
 const VENDOR_ALIYUN: &str = "aliyun";
 const VENDOR_HUAWEI: &str = "huawei";
 const VENDOR_QINIU: &str = "qiniu";
+const VENDOR_AWS: &str = "aws";
 
 /// 账号的非敏感信息(不含密钥),供编辑回填用。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -121,6 +123,12 @@ impl App {
                 secret.to_string(),
                 rec.endpoint.clone(),
             ))),
+            VENDOR_AWS => self.registry.register(Arc::new(AwsProvider::new(
+                rec.id.clone(),
+                rec.access_key_id.clone(),
+                secret.to_string(),
+                rec.endpoint.clone(),
+            ))),
             _ => {}
         }
     }
@@ -199,6 +207,32 @@ impl App {
         let rec = AccountRecord {
             id,
             vendor: VENDOR_QINIU.to_string(),
+            access_key_id: access_key.into(),
+            access_key_secret: String::new(),
+            endpoint: endpoint.into(),
+        };
+        if let Some(store) = &self.store {
+            store.upsert(&rec)?;
+        }
+        self.register_record(&rec, &secret);
+        Ok(())
+    }
+
+    /// 便捷:新增一个 AWS S3 账号。密钥进钥匙串,元信息进 SQLite。
+    pub fn add_aws_account(
+        &self,
+        id: impl Into<String>,
+        access_key: impl Into<String>,
+        secret_key: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Result<()> {
+        let id = id.into();
+        let secret = secret_key.into();
+        self.secrets.set(&id, &secret)?;
+
+        let rec = AccountRecord {
+            id,
+            vendor: VENDOR_AWS.to_string(),
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
