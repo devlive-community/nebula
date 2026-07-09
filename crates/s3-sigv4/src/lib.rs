@@ -92,7 +92,9 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
 pub struct SigningParams<'a> {
     pub access_key: &'a str,
     pub secret_key: &'a str,
-    /// 主机名,如 `s3.cn-east-1.qiniucs.com`(不含协议)。
+    /// 协议,`https` 或 `http`(MinIO 等自建服务可能用 http)。
+    pub scheme: &'a str,
+    /// 主机名(不含协议),可带端口,如 `s3.cn-east-1.qiniucs.com`、`minio.local:9000`。
     pub endpoint: &'a str,
     pub region: &'a str,
     /// service 名,S3 用 [`sign::S3`]。
@@ -162,7 +164,10 @@ pub fn build_signed_request(
     let signature = sign::signature(&key, &sts);
     let authorization = sign::authorization(params.access_key, &scope, &signed_headers, &signature);
 
-    let mut url = format!("https://{}{}", params.endpoint, spec.canonical_uri);
+    let mut url = format!(
+        "{}://{}{}",
+        params.scheme, params.endpoint, spec.canonical_uri
+    );
     if !canonical_query.is_empty() {
         url.push('?');
         url.push_str(&canonical_query);
@@ -220,7 +225,8 @@ pub fn presigned_get_url(
     let signature = sign::signature(&key, &sts);
 
     format!(
-        "https://{}{canonical_uri}?{canonical_query}&X-Amz-Signature={}",
+        "{}://{}{canonical_uri}?{canonical_query}&X-Amz-Signature={}",
+        params.scheme,
         params.endpoint,
         uri_encode(&signature),
     )
@@ -234,6 +240,7 @@ mod tests {
         SigningParams {
             access_key: "AKIDEXAMPLE",
             secret_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+            scheme: "https",
             endpoint: "s3.cn-east-1.qiniucs.com",
             region: "cn-east-1",
             service: sign::S3,

@@ -16,7 +16,9 @@ use crate::error::{Result, S3Error};
 pub struct S3Client {
     access_key: String,
     secret_key: String,
-    /// 区域 endpoint,如 `s3.cn-east-1.qiniucs.com`(不含协议)。
+    /// 协议,`https`(默认)或 `http`(endpoint 以 `http://` 开头时,如自建 MinIO)。
+    scheme: String,
+    /// 主机名(不含协议),可带端口,如 `s3.cn-east-1.qiniucs.com`、`minio.local:9000`。
     endpoint: String,
     /// 从 endpoint 解析出的 region,如 `cn-east-1`。
     region: String,
@@ -24,17 +26,21 @@ pub struct S3Client {
 }
 
 impl S3Client {
-    /// 用凭证与区域 endpoint 创建客户端。region 从 `s3.{region}.qiniucs.com` 解析。
+    /// 用凭证与 endpoint 创建客户端。
+    ///
+    /// endpoint 可带协议前缀:`http://` 走明文(自建 MinIO 等),否则默认 `https`;可带端口。
+    /// region 从 `s3.{region}.*` 解析,解析不出为空(用 [`Self::with_region`] 显式设置)。
     pub fn new(
         access_key: impl Into<String>,
         secret_key: impl Into<String>,
         endpoint: impl Into<String>,
     ) -> Self {
-        let endpoint = normalize_endpoint(&endpoint.into());
+        let (scheme, endpoint) = parse_endpoint(&endpoint.into());
         let region = parse_region(&endpoint);
         Self {
             access_key: access_key.into(),
             secret_key: secret_key.into(),
+            scheme,
             endpoint,
             region,
             http: HttpClient::new(),
@@ -62,6 +68,9 @@ impl S3Client {
     pub fn endpoint(&self) -> &str {
         &self.endpoint
     }
+    pub fn scheme(&self) -> &str {
+        &self.scheme
+    }
     pub fn region(&self) -> &str {
         &self.region
     }
@@ -74,6 +83,7 @@ impl S3Client {
         SigningParams {
             access_key: &self.access_key,
             secret_key: &self.secret_key,
+            scheme: &self.scheme,
             endpoint: &self.endpoint,
             region: &self.region,
             service: s3_sigv4::sign::S3,
@@ -96,14 +106,18 @@ impl S3Client {
     }
 }
 
-/// 去掉协议前缀与尾部斜杠。
-fn normalize_endpoint(endpoint: &str) -> String {
-    endpoint
-        .trim()
-        .trim_start_matches("https://")
-        .trim_start_matches("http://")
-        .trim_end_matches('/')
-        .to_string()
+/// 解析 endpoint 为 `(scheme, host)`。`http://` 前缀 → 明文;否则默认 `https`。去尾部斜杠。
+fn parse_endpoint(raw: &str) -> (String, String) {
+    let raw = raw.trim();
+    if let Some(rest) = raw.strip_prefix("http://") {
+        ("http".to_string(), rest.trim_end_matches('/').to_string())
+    } else {
+        let host = raw
+            .strip_prefix("https://")
+            .unwrap_or(raw)
+            .trim_end_matches('/');
+        ("https".to_string(), host.to_string())
+    }
 }
 
 /// 从 `s3.{region}.qiniucs.com` 解析 region;解析不出返回空串。
@@ -166,5 +180,25 @@ mod tests {
             .to_str()
             .unwrap()
             .starts_with("AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/"));
+    }
+
+    #[test]
+    fn http_endpoint_with_port() {
+        // 自建 MinIO 场景:http 明文 + 自定义端口。
+        let c = S3Client::new("a", "b", "http://minio.local:9000").with_region("us-east-1");
+        assert_eq!(c.scheme(), "http");
+        assert_eq!(c.endpoint(), "minio.local:9000");
+        let req = c
+            .build_signed(RequestSpec {
+                method: Method::GET,
+                canonical_uri: "/bkt/k",
+                query: &[],
+                content_type: None,
+                amz_headers: &[],
+                body: None,
+            })
+            .unwrap();
+        // URL 走 http 且带端口;签名的 host 头亦为 minio.local:9000。
+        assert_eq!(req.url().as_str(), "http://minio.local:9000/bkt/k");
     }
 }
