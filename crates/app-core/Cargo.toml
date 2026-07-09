@@ -14,6 +14,7 @@ provider-aliyun = { path = "../providers/provider-aliyun" }
 provider-huawei = { path = "../providers/provider-huawei" }
 provider-qiniu = { path = "../providers/provider-qiniu" }
 provider-aws = { path = "../providers/provider-aws" }
+provider-r2 = { path = "../providers/provider-r2" }
 bytes = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

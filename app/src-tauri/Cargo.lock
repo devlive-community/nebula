@@ -86,6 +86,7 @@ dependencies = [
  "provider-aws",
  "provider-huawei",
  "provider-qiniu",
+ "provider-r2",
  "rusqlite",
  "serde",
  "thiserror 2.0.18",
@@ -435,6 +436,13 @@ dependencies = [
  "sha2",
  "thiserror 2.0.18",
  "tokio",
+]
+
+[[package]]
+name = "cloudflare-r2"
+version = "1.2.0"
+dependencies = [
+ "s3-core",
 ]
 
 [[package]]
@@ -2720,6 +2728,17 @@ dependencies = [
  "futures",
  "nebula-provider",
  "qiniu-kodo",
+]
+
+[[package]]
+name = "provider-r2"
+version = "1.2.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "cloudflare-r2",
+ "futures",
+ "nebula-provider",
 ]
 
 [[package]]

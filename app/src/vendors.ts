@@ -32,6 +32,14 @@ export const VENDORS = {
     endpoint: "s3.us-east-1.amazonaws.com",
     idPlaceholder: "如 aws-main",
   },
+  r2: {
+    label: "Cloudflare R2",
+    color: "#f6821f",
+    akLabel: "Access Key ID",
+    skLabel: "Secret Access Key",
+    endpoint: "<account_id>.r2.cloudflarestorage.com",
+    idPlaceholder: "如 r2-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;

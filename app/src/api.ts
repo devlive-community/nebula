@@ -36,6 +36,13 @@ export const addAwsAccount = (
   endpoint: string,
 ) => invoke<void>("add_aws_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addR2Account = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_r2_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 export const getAccount = (id: string) =>

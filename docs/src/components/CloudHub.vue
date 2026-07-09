@@ -41,6 +41,6 @@ const nodes = [
   {name: '华为云 OBS', active: true, x: 84, y: 78},
   {name: 'AWS S3', active: true, x: 50, y: 94},
   {name: '七牛云 Kodo', active: true, x: 16, y: 78},
-  {name: 'Cloudflare R2', active: false, x: 10, y: 28}
+  {name: 'Cloudflare R2', active: true, x: 10, y: 28}
 ]
 </script>

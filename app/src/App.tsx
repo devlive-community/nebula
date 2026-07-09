@@ -415,7 +415,7 @@ export default function App() {
   };
 
   const addAccount = async (
-    vendor: "aliyun" | "huawei" | "qiniu" | "aws",
+    vendor: "aliyun" | "huawei" | "qiniu" | "aws" | "r2",
     id: string,
     ak: string,
     sk: string,
@@ -430,6 +430,7 @@ export default function App() {
         huawei: api.addHuaweiAccount,
         qiniu: api.addQiniuAccount,
         aws: api.addAwsAccount,
+        r2: api.addR2Account,
       };
       await adders[vendor](id, ak, sk, endpoint);
       await refreshAccounts();

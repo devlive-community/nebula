@@ -1,0 +1,13 @@
+[package]
+name = "cloudflare-r2"
+version.workspace = true
+description = "Hand-written async Rust SDK for Cloudflare R2 (S3-compatible + SigV4), a thin facade over s3-core"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["cloudflare", "r2", "object-storage", "s3"]
+categories = ["api-bindings"]
+
+[dependencies]
+s3-core = { path = "../s3-core", version = "1" }
