@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faDatabase,
   faFile,
   faFolder,
   faSortDown,
   faSortUp,
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
-import { formatBytes, formatDate } from "../util";
+import { formatBytes, formatDate, isBucket } from "../util";
 import { useIncremental } from "../hooks";
 import { Checkbox } from "./Checkbox";
 
@@ -139,7 +140,9 @@ export function FileList({
               </span>
               <span className="col-name">
                 <span className="row__icon">
-                  <FontAwesomeIcon icon={isDir ? faFolder : faFile} />
+                  <FontAwesomeIcon
+                    icon={isBucket(entry) ? faDatabase : isDir ? faFolder : faFile}
+                  />
                 </span>
                 <button
                   className="row__name-link"

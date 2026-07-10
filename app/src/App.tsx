@@ -18,6 +18,7 @@ import * as api from "./api";
 import {
   baseName,
   formatBytes,
+  isBucket,
   joinRemote,
   parentPath,
   previewKind,
@@ -1222,6 +1223,10 @@ export default function App() {
   );
 
   function contextItems(entry: Entry): MenuItem[] {
+    // Bucket 不是普通文件夹:只提供"打开",不做整桶递归下载 / 迁移 / 删除(语义不对且危险)。
+    if (isBucket(entry)) {
+      return [{ label: "打开", onClick: () => openDir(entry) }];
+    }
     if (entry.kind === "directory") {
       const dirItems: MenuItem[] = [
         { label: "打开", onClick: () => openDir(entry) },

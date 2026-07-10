@@ -1,3 +1,18 @@
+import type { Entry } from "./types";
+
+/**
+ * 是否为 bucket(而非普通文件夹)。
+ *
+ * bucket 是根层级的顶级目录,路径无内部斜杠(如 `my-bucket`);
+ * 桶内文件夹路径含斜杠(如 `my-bucket/sub/`)。UI 据此区分图标与右键菜单。
+ */
+export function isBucket(entry: Entry): boolean {
+  return (
+    entry.kind === "directory" &&
+    !entry.path.replace(/\/+$/, "").includes("/")
+  );
+}
+
 /** 人类可读的字节数。 */
 export function formatBytes(size: number): string {
   if (size <= 0) return "—";

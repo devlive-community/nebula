@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFile, faFolder } from "@fortawesome/free-solid-svg-icons";
+import { faDatabase, faFile, faFolder } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { useIncremental } from "../hooks";
+import { isBucket } from "../util";
 import { Checkbox } from "./Checkbox";
 
 interface Props {
@@ -92,7 +93,10 @@ export function FileGrid({
             )}
             <div className="card__thumb">
               {isDir ? (
-                <FontAwesomeIcon icon={faFolder} className="card__icon card__icon--dir" />
+                <FontAwesomeIcon
+                  icon={isBucket(entry) ? faDatabase : faFolder}
+                  className="card__icon card__icon--dir"
+                />
               ) : thumb ? (
                 <img className="card__img" src={thumb} alt={entry.name} loading="lazy" />
               ) : (
