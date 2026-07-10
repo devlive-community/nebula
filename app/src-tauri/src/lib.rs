@@ -174,6 +174,21 @@ async fn stat(state: State<'_, App>, account: String, path: String) -> Result<En
     app.stat(&account, &path).await.map_err(|e| e.to_string())
 }
 
+/// 在某账号的 `root`(桶 / 前缀)下递归搜索名字包含 `query` 的文件,最多 `max_results` 条。
+#[tauri::command]
+async fn search(
+    state: State<'_, App>,
+    account: String,
+    root: String,
+    query: String,
+    max_results: usize,
+) -> Result<Vec<Entry>, String> {
+    let app = state.inner().clone();
+    app.search(&account, &root, &query, max_results)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 把本地文件上传到远端路径。
 #[tauri::command]
 async fn upload_file(
@@ -548,6 +563,7 @@ pub fn run() {
             get_account,
             browse,
             stat,
+            search,
             upload_file,
             download_file,
             delete,

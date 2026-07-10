@@ -28,3 +28,5 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.swp
+ROADMAP.md
+.claude/

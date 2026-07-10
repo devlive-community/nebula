@@ -397,6 +397,42 @@ impl App {
         Ok(self.provider(account)?.stat(path).await?)
     }
 
+    /// 在 `root`(桶 / 前缀)下**递归**搜索名字包含 `query`(大小写不敏感)的文件,
+    /// 最多返回 `max_results` 条。
+    ///
+    /// 逐层 `list` 下降:遇目录入队继续展开,遇文件按名字匹配。用现有的分层 `list`
+    /// 实现,不依赖厂商的扁平列举;大桶下可能产生较多请求,故用结果数封顶提前结束。
+    pub async fn search(
+        &self,
+        account: &str,
+        root: &str,
+        query: &str,
+        max_results: usize,
+    ) -> Result<Vec<Entry>> {
+        let provider = self.provider(account)?;
+        let needle = query.trim().to_lowercase();
+        let mut results = Vec::new();
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(root.to_string());
+
+        while let Some(dir) = queue.pop_front() {
+            if results.len() >= max_results {
+                break;
+            }
+            for entry in provider.list(&dir).await? {
+                if entry.is_dir() {
+                    queue.push_back(entry.path.clone());
+                } else if needle.is_empty() || entry.name.to_lowercase().contains(&needle) {
+                    results.push(entry);
+                    if results.len() >= max_results {
+                        break;
+                    }
+                }
+            }
+        }
+        Ok(results)
+    }
+
     /// 下载对象内容。
     pub async fn download(&self, account: &str, path: &str) -> Result<Bytes> {
         Ok(self.provider(account)?.read(path).await?)
@@ -635,6 +671,79 @@ mod tests {
         let app = App::new();
         app.add_account(Arc::new(MemoryProvider::new("mem")));
         app
+    }
+
+    /// 固定层级的只读 provider,用于测试递归搜索的逐层下降。
+    struct TreeProvider;
+
+    #[async_trait]
+    impl StorageProvider for TreeProvider {
+        fn id(&self) -> &str {
+            "tree"
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+        async fn list(&self, path: &str) -> nebula_provider::Result<Vec<Entry>> {
+            let entries = match path {
+                "b" => vec![
+                    Entry::directory("b/photos"),
+                    Entry::directory("b/docs"),
+                    Entry::file("b/readme.txt", 1),
+                ],
+                "b/photos" => vec![
+                    Entry::file("b/photos/cat.jpg", 1),
+                    Entry::file("b/photos/dog.png", 1),
+                ],
+                "b/docs" => vec![Entry::file("b/docs/cat-notes.md", 1)],
+                _ => vec![],
+            };
+            Ok(entries)
+        }
+        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+            Ok(Entry::file(path.to_string(), 1))
+        }
+        async fn read(&self, _path: &str) -> nebula_provider::Result<Bytes> {
+            Ok(Bytes::new())
+        }
+        async fn write(
+            &self,
+            _path: &str,
+            _data: Bytes,
+            _ct: Option<&str>,
+        ) -> nebula_provider::Result<()> {
+            Ok(())
+        }
+        async fn delete(&self, _path: &str) -> nebula_provider::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn search_descends_recursively_and_matches_by_name() {
+        let app = App::new();
+        app.add_account(Arc::new(TreeProvider));
+
+        // "cat" 命中两层深处的两个文件(photos/cat.jpg 与 docs/cat-notes.md)。
+        let hits = app.search("tree", "b", "cat", 100).await.unwrap();
+        let mut names: Vec<_> = hits.iter().map(|e| e.name.clone()).collect();
+        names.sort();
+        assert_eq!(names, ["cat-notes.md", "cat.jpg"]);
+        // 只返回文件,不含目录。
+        assert!(hits.iter().all(|e| !e.is_dir()));
+    }
+
+    #[tokio::test]
+    async fn search_empty_query_returns_all_files_capped() {
+        let app = App::new();
+        app.add_account(Arc::new(TreeProvider));
+
+        // 空查询返回全部文件(readme + cat.jpg + dog.png + cat-notes.md = 4)。
+        let all = app.search("tree", "b", "", 100).await.unwrap();
+        assert_eq!(all.len(), 4);
+        // 结果数封顶生效。
+        let capped = app.search("tree", "b", "", 2).await.unwrap();
+        assert_eq!(capped.len(), 2);
     }
 
     #[tokio::test]

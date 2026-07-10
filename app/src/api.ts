@@ -68,6 +68,13 @@ export const browse = (account: string, path: string) =>
 export const statPath = (account: string, path: string) =>
   invoke<Entry>("stat", { account, path });
 
+export const search = (
+  account: string,
+  root: string,
+  query: string,
+  maxResults: number,
+) => invoke<Entry[]>("search", { account, root, query, maxResults });
+
 export const uploadFile = (
   account: string,
   remotePath: string,
