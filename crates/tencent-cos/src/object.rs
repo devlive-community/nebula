@@ -76,6 +76,41 @@ impl CosClient {
         Ok((len, stream))
     }
 
+    /// 从 `offset` 字节开始流式下载(HTTP Range),返回 `(对象总大小, 剩余字节流)`。
+    /// 用于断点续传;`offset == 0` 等价于 [`Self::get_object_stream`]。
+    pub async fn get_object_range(
+        &self,
+        bucket: &str,
+        key: &str,
+        offset: u64,
+    ) -> Result<(Option<u64>, impl futures::Stream<Item = Result<Bytes>>)> {
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let mut request = self.build_signed(SignSpec {
+            method: Method::GET,
+            host: &host,
+            uri_path: &uri,
+            query: &[],
+            content_type: None,
+            content_md5: None,
+            cos_headers: &[],
+            body: None,
+        })?;
+        // Range 不参与 COS 签名,建完请求后附加即可。
+        request.headers_mut().insert(
+            reqwest::header::RANGE,
+            reqwest::header::HeaderValue::from_str(&format!("bytes={offset}-")).map_err(|e| {
+                CosError::Core(cloud_core::CoreError::InvalidRequest(e.to_string()))
+            })?,
+        );
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let total = total_size(&resp);
+        let stream = resp
+            .bytes_stream()
+            .map(|r| r.map_err(|e| CosError::Core(cloud_core::CoreError::from(e))));
+        Ok((total, stream))
+    }
+
     async fn get_object_response(&self, bucket: &str, key: &str) -> Result<Response> {
         let host = self.bucket_host(bucket);
         let uri = object_uri(key);
@@ -189,6 +224,20 @@ impl CosClient {
 /// 对象的 URI path:`/{encoded_key}`。
 pub(crate) fn object_uri(key: &str) -> String {
     format!("/{}", encode_key(key))
+}
+
+/// 从响应推断对象总大小:优先 `Content-Range` 的 `/{total}`,否则退回 `Content-Length`。
+pub(crate) fn total_size(resp: &Response) -> Option<u64> {
+    if let Some(total) = resp
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.rsplit('/').next())
+        .and_then(|t| t.trim().parse::<u64>().ok())
+    {
+        return Some(total);
+    }
+    resp.content_length()
 }
 
 fn header_string(

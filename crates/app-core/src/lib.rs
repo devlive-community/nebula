@@ -411,6 +411,16 @@ impl App {
         Ok(self.provider(account)?.read_stream(path).await?)
     }
 
+    /// 从 `offset` 字节开始流式下载(HTTP Range),返回 `(对象总大小, 剩余流)`,用于断点续传。
+    pub async fn download_range(
+        &self,
+        account: &str,
+        path: &str,
+        offset: u64,
+    ) -> Result<(Option<u64>, ByteStream)> {
+        Ok(self.provider(account)?.read_range(path, offset).await?)
+    }
+
     /// 上传 / 覆盖对象。
     pub async fn upload(
         &self,

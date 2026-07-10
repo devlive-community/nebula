@@ -204,6 +204,9 @@ async fn upload_file(
 }
 
 /// 流式下载远端对象到本地路径,边写边发 `download-progress` 事件。
+///
+/// **断点续传**:先下到 `{local_path}.part`;若该临时文件已存在,则从其大小处用 HTTP Range
+/// 续传(服务端拒绝续传时清掉重下)。全部写完再把 `.part` 改名为最终文件。中断后重新下载即续传。
 #[tauri::command]
 async fn download_file(
     app: AppHandle,
@@ -216,16 +219,40 @@ async fn download_file(
     use tokio::io::AsyncWriteExt;
 
     let core = state.inner().clone();
-    let (total, mut stream) = core
-        .download_stream(&account, &remote_path)
+    let part_path = format!("{local_path}.part");
+
+    // 已有 .part → 从其大小续传;offset>0 且服务端拒绝(如 416 过期/越界)则清掉从头下。
+    let mut offset = tokio::fs::metadata(&part_path)
         .await
-        .map_err(|e| e.to_string())?;
+        .map(|m| m.len())
+        .unwrap_or(0);
+    let (total, mut stream) = match core.download_range(&account, &remote_path, offset).await {
+        Ok(v) => v,
+        Err(e) if offset > 0 => {
+            let _ = tokio::fs::remove_file(&part_path).await;
+            offset = 0;
+            let _ = e;
+            core.download_range(&account, &remote_path, 0)
+                .await
+                .map_err(|e| e.to_string())?
+        }
+        Err(e) => return Err(e.to_string()),
+    };
     let total = total.unwrap_or(0);
 
-    let mut file = tokio::fs::File::create(&local_path)
-        .await
-        .map_err(|e| format!("创建本地文件失败: {e}"))?;
-    let mut downloaded = 0u64;
+    let mut file = if offset > 0 {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&part_path)
+            .await
+            .map_err(|e| format!("打开续传文件失败: {e}"))?
+    } else {
+        tokio::fs::File::create(&part_path)
+            .await
+            .map_err(|e| format!("创建本地文件失败: {e}"))?
+    };
+
+    let mut downloaded = offset;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| e.to_string())?;
         file.write_all(&chunk)
@@ -243,7 +270,11 @@ async fn download_file(
     }
     file.flush()
         .await
-        .map_err(|e| format!("写入本地文件失败: {e}"))
+        .map_err(|e| format!("写入本地文件失败: {e}"))?;
+    // 完成:.part → 最终文件名。
+    tokio::fs::rename(&part_path, &local_path)
+        .await
+        .map_err(|e| format!("重命名文件失败: {e}"))
 }
 
 /// 删除远端对象。

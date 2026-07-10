@@ -56,6 +56,14 @@ pub trait StorageProvider: Send + Sync {
         Ok((Some(len), Box::pin(stream)))
     }
 
+    /// 从 `offset` 字节开始流式下载(HTTP Range),返回 `(对象总大小, 剩余字节流)`,用于
+    /// **断点续传**。默认实现忽略 `offset` 回退到 [`read_stream`](Self::read_stream)(不支持续传);
+    /// 支持 Range 的适配层应覆盖此方法以真正从 `offset` 续传。
+    async fn read_range(&self, path: &str, offset: u64) -> Result<(Option<u64>, ByteStream)> {
+        let _ = offset;
+        self.read_stream(path).await
+    }
+
     /// 上传 / 覆盖单个对象。
     async fn write(&self, path: &str, data: Bytes, content_type: Option<&str>) -> Result<()>;
 

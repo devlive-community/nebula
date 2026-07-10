@@ -159,6 +159,16 @@ impl StorageProvider for AwsProvider {
         Ok((len, Box::pin(stream.map(|r| r.map_err(map_err)))))
     }
 
+    async fn read_range(&self, path: &str, offset: u64) -> Result<(Option<u64>, ByteStream)> {
+        let (bucket, key) = require_object(path)?;
+        let (total, stream) = self
+            .client
+            .get_object_range(bucket, key, offset)
+            .await
+            .map_err(map_err)?;
+        Ok((total, Box::pin(stream.map(|r| r.map_err(map_err)))))
+    }
+
     async fn write(&self, path: &str, data: Bytes, content_type: Option<&str>) -> Result<()> {
         let (bucket, key) = require_object(path)?;
         if should_multipart(data.len()) {

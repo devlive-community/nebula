@@ -99,6 +99,32 @@ impl OssClient {
         Ok((len, stream))
     }
 
+    /// 从 `offset` 字节开始流式下载(HTTP Range),返回 `(对象总大小, 剩余字节流)`。
+    /// 用于断点续传;`offset == 0` 等价于 [`Self::get_object_stream`]。
+    pub async fn get_object_range(
+        &self,
+        bucket: &str,
+        key: &str,
+        offset: u64,
+    ) -> Result<(Option<u64>, impl futures::Stream<Item = Result<Bytes>>)> {
+        let date = now_gmt();
+        let mut request =
+            self.build_signed_request(Method::GET, bucket, key, Payload::default(), &date)?;
+        // Range 不参与 OSS 签名,建完请求后附加即可。
+        request.headers_mut().insert(
+            reqwest::header::RANGE,
+            reqwest::header::HeaderValue::from_str(&format!("bytes={offset}-")).map_err(|e| {
+                OssError::Core(cloud_core::CoreError::InvalidRequest(e.to_string()))
+            })?,
+        );
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let total = total_size(&resp);
+        let stream = resp
+            .bytes_stream()
+            .map(|r| r.map_err(|e| OssError::Core(cloud_core::CoreError::from(e))));
+        Ok((total, stream))
+    }
+
     /// 删除一个对象。对象不存在时 OSS 也返回 204,视为成功。
     pub async fn delete_object(&self, bucket: &str, key: &str) -> Result<()> {
         let date = now_gmt();
@@ -251,6 +277,20 @@ impl OssClient {
             .map_err(cloud_core::CoreError::from)
             .map_err(OssError::from)
     }
+}
+
+/// 从响应推断对象总大小:优先 `Content-Range` 的 `/{total}`,否则退回 `Content-Length`。
+pub(crate) fn total_size(resp: &Response) -> Option<u64> {
+    if let Some(total) = resp
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.rsplit('/').next())
+        .and_then(|t| t.trim().parse::<u64>().ok())
+    {
+        return Some(total);
+    }
+    resp.content_length()
 }
 
 /// 当前时间的 HTTP GMT 格式,如 `Thu, 17 Nov 2005 18:49:58 GMT`。
