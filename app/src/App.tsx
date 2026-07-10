@@ -35,6 +35,7 @@ import { MigrateDialog } from "./components/MigrateDialog";
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TransferPanel } from "./components/TransferPanel";
+import { SearchResults } from "./components/SearchResults";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { PreviewModal } from "./components/PreviewModal";
@@ -55,6 +56,12 @@ export default function App() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState<{
+    query: string;
+    results: Entry[];
+    loading: boolean;
+    truncated: boolean;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -187,11 +194,12 @@ export default function App() {
   const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  // 切换账号 / 目录时清空过滤词、选择与详情。
+  // 切换账号 / 目录时清空过滤词、选择、详情与搜索结果。
   useEffect(() => {
     setFilter("");
     setSelected(new Set());
     setDetailsEntry(null);
+    setSearch(null);
   }, [current, path]);
 
   const visibleEntries = useMemo(() => {
@@ -358,6 +366,33 @@ export default function App() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // 从当前目录递归搜索(全桶或子树,取决于所在层级)。
+  const runSearch = useCallback(
+    async (query: string) => {
+      if (!current || path === "") return;
+      setSearch({ query, results: [], loading: true, truncated: false });
+      try {
+        const results = await api.search(current, path, query, 500);
+        setSearch({
+          query,
+          results,
+          loading: false,
+          truncated: results.length >= 500,
+        });
+      } catch (e) {
+        setError(String(e));
+        setSearch(null);
+      }
+    },
+    [current, path],
+  );
+
+  // 打开搜索结果:跳到其所在目录并退出搜索。
+  const openSearchResult = (entry: Entry) => {
+    setSearch(null);
+    setPath(parentPath(entry.path));
+  };
 
   // 原生菜单点击 → 前端动作。用 ref 持最新逻辑,事件监听只注册一次。
   const onMenuRef = useRef<(action: string) => void>(() => {});
@@ -819,7 +854,9 @@ export default function App() {
                 busy={busy}
                 filter={filter}
                 view={view}
+                canSearch={path !== "" && !!current}
                 onFilter={setFilter}
+                onSearch={runSearch}
                 onUp={() => setPath(parentPath(path))}
                 onRefresh={load}
                 onToggleView={() =>
@@ -852,7 +889,17 @@ export default function App() {
               </div>
             )}
 
-            {view === "list" ? (
+            {search ? (
+              <SearchResults
+                query={search.query}
+                root={path}
+                results={search.results}
+                loading={search.loading}
+                truncated={search.truncated}
+                onOpen={openSearchResult}
+                onClear={() => setSearch(null)}
+              />
+            ) : view === "list" ? (
               <FileList
                 entries={visibleEntries}
                 loading={loading}

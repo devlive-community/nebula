@@ -16,7 +16,9 @@ interface Props {
   busy: boolean;
   filter: string;
   view: "list" | "grid";
+  canSearch: boolean;
   onFilter: (value: string) => void;
+  onSearch: (query: string) => void;
   onUp: () => void;
   onRefresh: () => void;
   onToggleView: () => void;
@@ -31,7 +33,9 @@ export function Toolbar({
   busy,
   filter,
   view,
+  canSearch,
   onFilter,
+  onSearch,
   onUp,
   onRefresh,
   onToggleView,
@@ -51,9 +55,13 @@ export function Toolbar({
         <FontAwesomeIcon icon={faMagnifyingGlass} className="toolbar__search-icon" />
         <input
           className="toolbar__search-input"
-          placeholder="过滤当前目录…"
+          placeholder={canSearch ? "过滤当前目录 / 回车递归搜索…" : "过滤当前目录…"}
           value={filter}
           onChange={(e) => onFilter(e.target.value)}
+          onKeyDown={(e) => {
+            const q = filter.trim();
+            if (e.key === "Enter" && canSearch && q) onSearch(q);
+          }}
         />
       </div>
       <div className="toolbar__spacer" />
