@@ -16,6 +16,18 @@ pub type ProgressFn<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
 /// 分块字节流,用于流式下载(边下边写、可报进度)。
 pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>;
 
+/// 把一个 [`ByteStream`] 收集成完整 [`Bytes`],任一分块出错即向上传播。
+///
+/// 供适配层在"小文件退化为简单 PUT"或兜底路径复用;流式上传不应走这里(会缓冲整个对象)。
+pub async fn collect_stream(mut stream: ByteStream) -> Result<Bytes> {
+    use futures::StreamExt;
+    let mut buf = bytes::BytesMut::new();
+    while let Some(chunk) = stream.next().await {
+        buf.extend_from_slice(&chunk?);
+    }
+    Ok(buf.freeze())
+}
+
 /// 一个存储 provider 实例(通常 = 一个云账号)。
 ///
 /// # 路径约定
@@ -82,6 +94,26 @@ pub trait StorageProvider: Send + Sync {
             progress(total, total);
         }
         result
+    }
+
+    /// 流式上传:从 `stream` 边收边写,不把整个对象缓冲进内存。`len` 为已知的对象总大小
+    /// (用于进度分母与"小文件走简单 PUT"的判断),未知时传 `None`。
+    ///
+    /// 默认实现把整个流收集成 [`Bytes`] 再调 [`write_with_progress`](Self::write_with_progress)
+    /// (**不省内存**,仅作兜底);支持分片的适配层应覆盖此方法,用流式分片上传把内存占用
+    /// 压到常数级。
+    async fn write_stream(
+        &self,
+        path: &str,
+        len: Option<u64>,
+        stream: ByteStream,
+        content_type: Option<&str>,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let _ = len;
+        let data = collect_stream(stream).await?;
+        self.write_with_progress(path, data, content_type, progress)
+            .await
     }
 
     /// 删除单个对象。

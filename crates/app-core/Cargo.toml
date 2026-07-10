@@ -33,3 +33,4 @@ keyring = { version = "3", default-features = false, features = [
 [dev-dependencies]
 tokio = { workspace = true }
 async-trait = "0.1"
+futures = { workspace = true }

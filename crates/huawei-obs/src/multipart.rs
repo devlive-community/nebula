@@ -5,7 +5,8 @@
 //! [`ObsClient::abort_multipart_upload`]。高层 [`ObsClient::upload_multipart`] 把整块
 //! 数据按 `part_size` 切分并自动编排(失败自动 abort)。
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
+use futures::{Stream, StreamExt};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, DATE, ETAG};
 use reqwest::{Method, Request};
 use serde::Deserialize;
@@ -202,6 +203,113 @@ impl ObsClient {
                 Err(err)
             }
         }
+    }
+
+    /// 流式分片上传:从 `stream` 边收边传,内存只保留"未满一片"的缓冲(≈ `part_size`),
+    /// 与对象总大小无关。`total_hint` 仅用于进度分母(未知传 0)。任一步失败自动 abort。
+    #[allow(clippy::too_many_arguments)]
+    pub async fn upload_multipart_stream<S, E>(
+        &self,
+        bucket: &str,
+        key: &str,
+        stream: S,
+        part_size: usize,
+        content_type: Option<&str>,
+        total_hint: u64,
+        mut on_progress: impl FnMut(u64, u64),
+    ) -> Result<()>
+    where
+        S: Stream<Item = std::result::Result<Bytes, E>> + Unpin,
+        E: std::fmt::Display,
+    {
+        let part_size = part_size.max(MIN_PART_SIZE);
+        on_progress(0, total_hint);
+
+        let upload_id = self
+            .initiate_multipart_upload(bucket, key, content_type)
+            .await?;
+
+        let outcome = self
+            .stream_parts(
+                bucket,
+                key,
+                &upload_id,
+                stream,
+                part_size,
+                total_hint,
+                &mut on_progress,
+            )
+            .await;
+        match outcome {
+            Ok(parts) => {
+                let completed = self
+                    .complete_multipart_upload(bucket, key, &upload_id, &parts)
+                    .await;
+                if completed.is_err() {
+                    let _ = self.abort_multipart_upload(bucket, key, &upload_id).await;
+                }
+                completed
+            }
+            Err(err) => {
+                let _ = self.abort_multipart_upload(bucket, key, &upload_id).await;
+                Err(err)
+            }
+        }
+    }
+
+    /// 拉流 → 攒够 `part_size` 就顺序上传一片(内存受控)。收尾把剩余字节作为末片;
+    /// 若整个流为空则仍传一个空片,满足"至少一片"。
+    #[allow(clippy::too_many_arguments)]
+    async fn stream_parts<S, E>(
+        &self,
+        bucket: &str,
+        key: &str,
+        upload_id: &str,
+        mut stream: S,
+        part_size: usize,
+        total: u64,
+        on_progress: &mut impl FnMut(u64, u64),
+    ) -> Result<Vec<(u32, String)>>
+    where
+        S: Stream<Item = std::result::Result<Bytes, E>> + Unpin,
+        E: std::fmt::Display,
+    {
+        let mut parts = Vec::new();
+        let mut buf = BytesMut::new();
+        let mut part_number = 1u32;
+        let mut uploaded = 0u64;
+
+        while let Some(item) = stream.next().await {
+            let chunk = item.map_err(|e| {
+                ObsError::Core(cloud_core::CoreError::InvalidRequest(format!(
+                    "source stream error: {e}"
+                )))
+            })?;
+            buf.extend_from_slice(&chunk);
+            while buf.len() >= part_size {
+                let part = buf.split_to(part_size).freeze();
+                let len = part.len() as u64;
+                let etag = self
+                    .upload_part(bucket, key, upload_id, part_number, part)
+                    .await?;
+                parts.push((part_number, etag));
+                part_number += 1;
+                uploaded += len;
+                on_progress(uploaded, total);
+            }
+        }
+
+        if !buf.is_empty() || parts.is_empty() {
+            let part = buf.freeze();
+            let len = part.len() as u64;
+            let etag = self
+                .upload_part(bucket, key, upload_id, part_number, part)
+                .await?;
+            parts.push((part_number, etag));
+            uploaded += len;
+            on_progress(uploaded, total);
+        }
+        Ok(parts)
     }
 
     /// 顺序上传所有分片,每片完成后回调累计进度;返回 `(part_number, etag)` 列表。

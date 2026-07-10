@@ -481,8 +481,8 @@ impl App {
     /// 同 [`Self::copy_across`],但在上传过程中回调 `(已传字节, 总字节)`。
     ///
     /// - **同账号**:直接走 provider 的服务端复制,不下载数据。
-    /// - **跨账号 / 跨云**:服务端复制无法跨账号,退化为"下载源 → 上传目标"(数据整块
-    ///   在内存中转,与现有上传路径一致)。
+    /// - **跨账号 / 跨云**:服务端复制无法跨账号,改为**流式中转**——源的分块下载流直接
+    ///   喂给目标的流式分片上传,内存只保留一个滑动窗口,与对象大小无关。
     pub async fn copy_across_with_progress(
         &self,
         src_account: &str,
@@ -498,10 +498,12 @@ impl App {
             progress(total, total);
             return Ok(());
         }
+        // 跨账号:服务端复制无能为力,边下边传中转——源的分块流直接喂给目标的流式分片
+        // 上传,内存只保留一个滑动窗口,与对象大小无关。
         let src = self.provider(src_account)?;
         let dst = self.provider(dst_account)?;
-        let data = src.read(src_path).await?;
-        dst.write_with_progress(dst_path, data, None, progress)
+        let (len, stream) = src.read_stream(src_path).await?;
+        dst.write_stream(dst_path, len, stream, None, progress)
             .await?;
         Ok(())
     }
@@ -691,6 +693,123 @@ mod tests {
             seen.into_inner().unwrap(),
             Some((data.len() as u64, data.len() as u64))
         );
+    }
+
+    /// 分块 provider:`read_stream` 把对象切成 4 字节小块逐个吐出,`write_stream` 覆盖为
+    /// 逐块消费并记录拉到的块数——用于证明跨账号迁移走的是流式路径(而非整块读+写)。
+    struct ChunkedProvider {
+        id: String,
+        store: Mutex<HashMap<String, Bytes>>,
+        last_write_chunks: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl ChunkedProvider {
+        fn new(id: &str) -> Self {
+            Self {
+                id: id.to_string(),
+                store: Mutex::new(HashMap::new()),
+                last_write_chunks: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl StorageProvider for ChunkedProvider {
+        fn id(&self) -> &str {
+            &self.id
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+        async fn list(&self, _path: &str) -> nebula_provider::Result<Vec<Entry>> {
+            Ok(vec![])
+        }
+        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+            let store = self.store.lock().unwrap();
+            store
+                .get(path)
+                .map(|v| Entry::file(path.to_string(), v.len() as u64))
+                .ok_or_else(|| ProviderError::NotFound(path.to_string()))
+        }
+        async fn read(&self, path: &str) -> nebula_provider::Result<Bytes> {
+            let store = self.store.lock().unwrap();
+            store
+                .get(path)
+                .cloned()
+                .ok_or_else(|| ProviderError::NotFound(path.to_string()))
+        }
+        async fn read_stream(
+            &self,
+            path: &str,
+        ) -> nebula_provider::Result<(Option<u64>, nebula_provider::ByteStream)> {
+            let data = self.read(path).await?;
+            let len = data.len() as u64;
+            let chunks: Vec<nebula_provider::Result<Bytes>> = (0..data.len())
+                .step_by(4)
+                .map(|i| Ok(data.slice(i..(i + 4).min(data.len()))))
+                .collect();
+            Ok((Some(len), Box::pin(futures::stream::iter(chunks))))
+        }
+        async fn write(
+            &self,
+            path: &str,
+            data: Bytes,
+            _ct: Option<&str>,
+        ) -> nebula_provider::Result<()> {
+            self.store.lock().unwrap().insert(path.to_string(), data);
+            Ok(())
+        }
+        async fn write_stream(
+            &self,
+            path: &str,
+            _len: Option<u64>,
+            mut stream: nebula_provider::ByteStream,
+            _ct: Option<&str>,
+            progress: ProgressFn<'_>,
+        ) -> nebula_provider::Result<()> {
+            use futures::StreamExt;
+            let mut buf = bytes::BytesMut::new();
+            let mut n = 0usize;
+            while let Some(chunk) = stream.next().await {
+                buf.extend_from_slice(&chunk?);
+                n += 1;
+            }
+            self.last_write_chunks
+                .store(n, std::sync::atomic::Ordering::SeqCst);
+            let total = buf.len() as u64;
+            self.store
+                .lock()
+                .unwrap()
+                .insert(path.to_string(), buf.freeze());
+            progress(total, total);
+            Ok(())
+        }
+        async fn delete(&self, path: &str) -> nebula_provider::Result<()> {
+            self.store.lock().unwrap().remove(path);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn copy_across_streams_in_chunks() {
+        let app = App::new();
+        let dst = Arc::new(ChunkedProvider::new("dst"));
+        let dst_chunks = dst.last_write_chunks.clone();
+        app.add_account(Arc::new(ChunkedProvider::new("src")));
+        app.add_account(dst);
+
+        let data = Bytes::from(vec![7u8; 20]); // 20 字节 → read_stream 切成 5 块
+        app.upload("src", "b/f.bin", data.clone(), None)
+            .await
+            .unwrap();
+
+        app.copy_across("src", "b/f.bin", "dst", "b/g.bin")
+            .await
+            .unwrap();
+
+        // 目标拿到完整数据,且是分多块流式喂进来的(证明没走整块缓冲)。
+        assert_eq!(app.download("dst", "b/g.bin").await.unwrap(), data);
+        assert_eq!(dst_chunks.load(std::sync::atomic::Ordering::SeqCst), 5);
     }
 
     #[tokio::test]

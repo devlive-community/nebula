@@ -214,6 +214,43 @@ impl StorageProvider for TencentProvider {
         }
     }
 
+    async fn write_stream(
+        &self,
+        path: &str,
+        len: Option<u64>,
+        stream: ByteStream,
+        content_type: Option<&str>,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        // 已知且不大的对象:收集后简单 PUT,省去分片握手。
+        if let Some(l) = len {
+            if !should_multipart(l as usize) {
+                let data = nebula_provider::collect_stream(stream).await?;
+                progress(0, l);
+                self.client
+                    .put_object(bucket, key, data, content_type)
+                    .await
+                    .map_err(map_err)?;
+                progress(l, l);
+                return Ok(());
+            }
+        }
+        // 大文件 / 未知大小:流式分片,内存受控。
+        self.client
+            .upload_multipart_stream(
+                bucket,
+                key,
+                stream,
+                MULTIPART_PART_SIZE,
+                content_type,
+                len.unwrap_or(0),
+                progress,
+            )
+            .await
+            .map_err(map_err)
+    }
+
     async fn delete(&self, path: &str) -> Result<()> {
         let (bucket, key) = require_object(path)?;
         self.client
