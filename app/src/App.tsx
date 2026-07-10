@@ -87,6 +87,7 @@ export default function App() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [showNewBucket, setShowNewBucket] = useState(false);
   const [settings, setSettings] = useState<Settings>({
     share_expiry_secs: 3600,
     concurrency: 3,
@@ -813,7 +814,9 @@ export default function App() {
     setBusy(true);
     setError(null);
     try {
-      if (entry.kind === "directory") await api.deleteFolder(current, entry.path);
+      if (isBucket(entry)) await api.deleteBucket(current, entry.path);
+      else if (entry.kind === "directory")
+        await api.deleteFolder(current, entry.path);
       else await api.deletePath(current, entry.path);
       await load();
     } catch (e) {
@@ -1094,6 +1097,22 @@ export default function App() {
     }
   };
 
+  const createBucket = async (name: string) => {
+    setShowNewBucket(false);
+    if (!current || !name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createBucket(current, name.trim());
+      await load();
+      setNotice({ tone: "ok", text: `✓ 已新建 Bucket ${name.trim()}` });
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const createFolder = async (name: string) => {
     setShowNewFolder(false);
     if (!current || !path) return;
@@ -1122,6 +1141,7 @@ export default function App() {
     batchRestore ||
     !!shareUrl ||
     showNewFolder ||
+    showNewBucket ||
     pendingBatchDelete ||
     showSettings;
 
@@ -1141,6 +1161,7 @@ export default function App() {
       else if (batchRestore) setBatchRestore(false);
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
+      else if (showNewBucket) setShowNewBucket(false);
       else if (showForm) setShowForm(false);
       else if (pendingBatchDelete) setPendingBatchDelete(false);
       else if (pendingDelete) setPendingDelete(null);
@@ -1202,6 +1223,8 @@ export default function App() {
                 filter={filter}
                 view={view}
                 canSearch={path !== "" && !!current}
+                atRoot={path === "" && !!current}
+                onNewBucket={() => setShowNewBucket(true)}
                 onFilter={setFilter}
                 onSearch={runSearch}
                 onUp={() => setPath(parentPath(path))}
@@ -1356,9 +1379,11 @@ export default function App() {
         <ConfirmDialog
           title="删除确认"
           message={
-            pendingDelete.kind === "directory"
-              ? `确定删除整个文件夹 ${pendingDelete.name}?其下所有对象都会被递归删除,此操作不可恢复。`
-              : `确定删除 ${pendingDelete.name}?此操作不可恢复。`
+            isBucket(pendingDelete)
+              ? `确定删除 Bucket ${pendingDelete.name}?Bucket 需为空,此操作不可恢复。`
+              : pendingDelete.kind === "directory"
+                ? `确定删除整个文件夹 ${pendingDelete.name}?其下所有对象都会被递归删除,此操作不可恢复。`
+                : `确定删除 ${pendingDelete.name}?此操作不可恢复。`
           }
           danger
           confirmLabel="删除"
@@ -1374,6 +1399,16 @@ export default function App() {
           submitLabel="创建"
           onSubmit={createFolder}
           onCancel={() => setShowNewFolder(false)}
+        />
+      )}
+
+      {showNewBucket && (
+        <PromptDialog
+          title="新建 Bucket"
+          placeholder="Bucket 名称(全局唯一,小写字母 / 数字 / 连字符)"
+          submitLabel="创建"
+          onSubmit={createBucket}
+          onCancel={() => setShowNewBucket(false)}
         />
       )}
 
@@ -1501,9 +1536,16 @@ export default function App() {
   );
 
   function contextItems(entry: Entry): MenuItem[] {
-    // Bucket 不是普通文件夹:只提供"打开",不做整桶递归下载 / 迁移 / 删除(语义不对且危险)。
+    // Bucket 不是普通文件夹:打开,或删除 Bucket(需为空);不做整桶递归操作(危险)。
     if (isBucket(entry)) {
-      return [{ label: "打开", onClick: () => openDir(entry) }];
+      return [
+        { label: "打开", onClick: () => openDir(entry) },
+        {
+          label: "删除 Bucket",
+          danger: true,
+          onClick: () => setPendingDelete(entry),
+        },
+      ];
     }
     if (entry.kind === "directory") {
       const dirItems: MenuItem[] = [

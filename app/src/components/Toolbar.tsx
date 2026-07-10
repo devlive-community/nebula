@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowUp,
+  faDatabase,
   faFolderOpen,
   faFolderPlus,
   faList,
@@ -17,6 +18,9 @@ interface Props {
   filter: string;
   view: "list" | "grid";
   canSearch: boolean;
+  /** 是否在根层级(全部 Bucket)。true 时显示"新建 Bucket"。 */
+  atRoot: boolean;
+  onNewBucket: () => void;
   onFilter: (value: string) => void;
   onSearch: (query: string) => void;
   onUp: () => void;
@@ -34,6 +38,8 @@ export function Toolbar({
   filter,
   view,
   canSearch,
+  atRoot,
+  onNewBucket,
   onFilter,
   onSearch,
   onUp,
@@ -73,30 +79,42 @@ export function Toolbar({
       >
         <FontAwesomeIcon icon={view === "list" ? faTableCells : faList} />
       </button>
-      <button
-        className="btn"
-        disabled={!canUpload}
-        onClick={onNewFolder}
-        title="在当前目录新建文件夹"
-      >
-        <FontAwesomeIcon icon={faFolderPlus} /> 新建文件夹
-      </button>
-      <button
-        className="btn"
-        disabled={!canUpload}
-        onClick={onUploadFolder}
-        title="上传文件夹到当前目录"
-      >
-        <FontAwesomeIcon icon={faFolderOpen} /> 上传文件夹
-      </button>
-      <button
-        className="btn btn--primary"
-        disabled={!canUpload}
-        onClick={onUpload}
-        title="上传文件到当前目录"
-      >
-        <FontAwesomeIcon icon={faUpload} /> 上传
-      </button>
+      {atRoot ? (
+        <button
+          className="btn btn--primary"
+          onClick={onNewBucket}
+          title="新建一个 Bucket"
+        >
+          <FontAwesomeIcon icon={faDatabase} /> 新建 Bucket
+        </button>
+      ) : (
+        <>
+          <button
+            className="btn"
+            disabled={!canUpload}
+            onClick={onNewFolder}
+            title="在当前目录新建文件夹"
+          >
+            <FontAwesomeIcon icon={faFolderPlus} /> 新建文件夹
+          </button>
+          <button
+            className="btn"
+            disabled={!canUpload}
+            onClick={onUploadFolder}
+            title="上传文件夹到当前目录"
+          >
+            <FontAwesomeIcon icon={faFolderOpen} /> 上传文件夹
+          </button>
+          <button
+            className="btn btn--primary"
+            disabled={!canUpload}
+            onClick={onUpload}
+            title="上传文件到当前目录"
+          >
+            <FontAwesomeIcon icon={faUpload} /> 上传
+          </button>
+        </>
+      )}
     </div>
   );
 }

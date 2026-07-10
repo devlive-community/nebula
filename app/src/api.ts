@@ -174,6 +174,12 @@ export const downloadFile = (
   transferId: string,
 ) => invoke<void>("download_file", { account, remotePath, localPath, transferId });
 
+export const createBucket = (account: string, bucket: string) =>
+  invoke<void>("create_bucket", { account, bucket });
+
+export const deleteBucket = (account: string, bucket: string) =>
+  invoke<void>("delete_bucket", { account, bucket });
+
 export const deletePath = (account: string, path: string) =>
   invoke<void>("delete", { account, path });
 
