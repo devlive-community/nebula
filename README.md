@@ -27,14 +27,15 @@ nebula/
 │  ├─ qiniu-kodo/               七牛云对象存储 SDK(S3 兼容,s3-core 门面)
 │  ├─ aws-s3/                   AWS S3 SDK(S3 REST + SigV4,s3-core 门面)
 │  ├─ cloudflare-r2/            Cloudflare R2 SDK(S3 兼容,s3-core 门面)
+│  ├─ minio-s3/                 MinIO SDK(S3 兼容,支持 http/自定义端口)
 │  ├─ nebula-provider/          App 统一抽象 trait(StorageProvider)
 │  ├─ providers/provider-*      适配层(各 SDK → StorageProvider)
 │  └─ app-core/                 App 业务逻辑(账号/传输/设置,框架无关,可 cargo test)
 └─ app/                         Tauri 桌面应用(src-tauri 后端 + src 前端)
 ```
 
-> 已实现阿里云 OSS、华为云 OBS(均真账号验证过)、七牛云 Kodo、AWS S3、Cloudflare R2(后三家
-> S3 兼容,共用 `s3-core`,离线单测全绿、真账号冒烟待验证)。新增厂商 = 按
+> 已实现阿里云 OSS、华为云 OBS(均真账号验证过)、七牛云 Kodo、AWS S3、Cloudflare R2、MinIO
+> (后四家 S3 兼容,共用 `s3-core`,离线单测全绿、真账号冒烟待验证)。新增厂商 = 按
 > [SDK 开发手册](./docs/sdk-playbook.md) 写一个 `<vendor>` SDK(S3 兼容的可直接复用 `s3-core`)
 > + 一个 provider 适配层,在 `app-core` 注册即可,App 界面无需改动。完整规划见 [PLAN.md](./PLAN.md)。
 

@@ -1,0 +1,19 @@
+[package]
+name = "provider-minio"
+version.workspace = true
+description = "Adapter wrapping minio-s3 as a nebula StorageProvider (app-internal, not published)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+nebula-provider = { path = "../../nebula-provider" }
+minio-s3 = { path = "../../minio-s3" }
+async-trait = "0.1"
+bytes = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

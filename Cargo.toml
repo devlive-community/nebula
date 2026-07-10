@@ -26,6 +26,7 @@ members = [
     "crates/qiniu-kodo",
     "crates/aws-s3",
     "crates/cloudflare-r2",
+    "crates/minio-s3",
 
     # App 统一抽象 trait(可选发布)
     "crates/nebula-provider",
@@ -40,6 +41,7 @@ members = [
     "crates/providers/provider-qiniu",
     "crates/providers/provider-aws",
     "crates/providers/provider-r2",
+    "crates/providers/provider-minio",
 
     # 桌面 App 后端
     # "app/src-tauri",

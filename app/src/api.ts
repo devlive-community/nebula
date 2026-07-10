@@ -43,6 +43,13 @@ export const addR2Account = (
   endpoint: string,
 ) => invoke<void>("add_r2_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addMinioAccount = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_minio_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 export const getAccount = (id: string) =>

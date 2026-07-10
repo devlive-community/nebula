@@ -85,6 +85,7 @@ dependencies = [
  "provider-aliyun",
  "provider-aws",
  "provider-huawei",
+ "provider-minio",
  "provider-qiniu",
  "provider-r2",
  "rusqlite",
@@ -2053,6 +2054,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 
 [[package]]
+name = "minio-s3"
+version = "1.3.0"
+dependencies = [
+ "s3-core",
+]
+
+[[package]]
 name = "minisign-verify"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2716,6 +2724,17 @@ dependencies = [
  "bytes",
  "futures",
  "huawei-obs",
+ "nebula-provider",
+]
+
+[[package]]
+name = "provider-minio"
+version = "1.3.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "minio-s3",
  "nebula-provider",
 ]
 

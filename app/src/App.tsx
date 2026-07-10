@@ -415,7 +415,7 @@ export default function App() {
   };
 
   const addAccount = async (
-    vendor: "aliyun" | "huawei" | "qiniu" | "aws" | "r2",
+    vendor: "aliyun" | "huawei" | "qiniu" | "aws" | "r2" | "minio",
     id: string,
     ak: string,
     sk: string,
@@ -431,6 +431,7 @@ export default function App() {
         qiniu: api.addQiniuAccount,
         aws: api.addAwsAccount,
         r2: api.addR2Account,
+        minio: api.addMinioAccount,
       };
       await adders[vendor](id, ak, sk, endpoint);
       await refreshAccounts();

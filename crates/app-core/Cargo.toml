@@ -15,6 +15,7 @@ provider-huawei = { path = "../providers/provider-huawei" }
 provider-qiniu = { path = "../providers/provider-qiniu" }
 provider-aws = { path = "../providers/provider-aws" }
 provider-r2 = { path = "../providers/provider-r2" }
+provider-minio = { path = "../providers/provider-minio" }
 bytes = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

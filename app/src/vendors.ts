@@ -40,6 +40,14 @@ export const VENDORS = {
     endpoint: "<account_id>.r2.cloudflarestorage.com",
     idPlaceholder: "如 r2-main",
   },
+  minio: {
+    label: "MinIO",
+    color: "#c72e49",
+    akLabel: "Access Key",
+    skLabel: "Secret Key",
+    endpoint: "http://minio.example.com:9000",
+    idPlaceholder: "如 minio-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;
