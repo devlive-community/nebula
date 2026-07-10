@@ -41,9 +41,11 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
               ? "失败"
               : i.status === "cancelled"
                 ? "已取消"
-                : i.status === "done"
-                  ? "完成"
-                  : `${pct}%`;
+                : i.status === "interrupted"
+                  ? "已中断"
+                  : i.status === "done"
+                    ? "完成"
+                    : `${pct}%`;
           return (
             <div className="transfers__item" key={i.id}>
               <div className="transfers__row">
@@ -65,12 +67,14 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                     <FontAwesomeIcon icon={faXmark} />
                   </button>
                 )}
-                {(i.status === "error" || i.status === "cancelled") &&
+                {(i.status === "error" ||
+                  i.status === "cancelled" ||
+                  i.status === "interrupted") &&
                   i.kind !== "迁移" &&
                   i.kind !== "迁移文件夹" && (
                     <button
                       className="transfers__retry"
-                      title={i.status === "cancelled" ? "继续" : "重试"}
+                      title={i.status === "error" ? "重试" : "继续"}
                       onClick={() => onRetry(i.id)}
                     >
                       <FontAwesomeIcon icon={faRotateRight} />

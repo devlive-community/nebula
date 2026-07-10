@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Entry, Integrity, Page, SearchResult, Settings, UploadEntry } from "./types";
+import type { AccountInfo, Entry, Integrity, Page, SearchResult, Settings, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -88,6 +88,17 @@ export const downloadFolder = (
 /** 请求取消一个进行中的传输(以传输面板的 id 为键)。 */
 export const cancelTransfer = (id: string) =>
   invoke<void>("cancel_transfer", { id });
+
+/** 列出持久化的传输任务(重启后恢复面板)。 */
+export const listTransfers = () => invoke<TransferItem[]>("list_transfers");
+
+/** 写入(或覆盖)一条传输任务。 */
+export const saveTransfer = (record: TransferItem) =>
+  invoke<void>("save_transfer", { record });
+
+/** 删除一条持久化传输任务。 */
+export const deleteTransfer = (id: string) =>
+  invoke<void>("delete_transfer", { id });
 
 export const migrateFolder = (
   srcAccount: string,

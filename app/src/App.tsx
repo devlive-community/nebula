@@ -155,6 +155,43 @@ export default function App() {
       prev[id] ? { ...prev, [id]: { ...prev[id], done, total } } : prev,
     );
 
+  // 传输列表持久化:只在**状态**变化时写库(进度 tick 不写),完成即删。
+  const persistedRef = useRef<Record<string, TransferItem["status"]>>({});
+  useEffect(() => {
+    const prev = persistedRef.current;
+    const next: Record<string, TransferItem["status"]> = {};
+    for (const [id, item] of Object.entries(transfers)) {
+      next[id] = item.status;
+      if (prev[id] === item.status) continue; // 状态没变(含进度 tick)→ 不写库
+      if (item.status === "done") void api.deleteTransfer(id);
+      else void api.saveTransfer(item);
+    }
+    // 面板里被移除(清除已完成)→ 从库删
+    for (const id of Object.keys(prev)) {
+      if (!(id in transfers)) void api.deleteTransfer(id);
+    }
+    persistedRef.current = next;
+  }, [transfers]);
+
+  // 启动时恢复未完成的传输;关 App 时还在传的(active)标为「已中断」,可手动续传。
+  useEffect(() => {
+    void (async () => {
+      const rows = await api.listTransfers();
+      if (rows.length === 0) return;
+      const restored: Record<string, TransferItem> = {};
+      const persisted: Record<string, TransferItem["status"]> = {};
+      for (const r of rows) {
+        persisted[r.id] = r.status;
+        restored[r.id] = {
+          ...r,
+          status: r.status === "active" ? "interrupted" : r.status,
+        };
+      }
+      persistedRef.current = persisted;
+      setTransfers(restored);
+    })();
+  }, []);
+
   type TransferSpec = {
     id: string;
     kind: "上传" | "下载";
