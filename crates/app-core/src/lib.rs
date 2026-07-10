@@ -9,6 +9,7 @@
 
 mod error;
 mod integrity;
+mod limits;
 mod secret;
 mod settings;
 mod store;
@@ -27,6 +28,7 @@ use provider_tencent::TencentProvider;
 
 pub use error::{AppError, Result};
 pub use integrity::{verify_bytes, Integrity};
+pub use limits::TransferLimits;
 pub use nebula_provider::{ByteStream, Capabilities, EntryKind, Page, ProgressFn};
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
@@ -70,6 +72,8 @@ pub struct App {
     store: Option<Arc<AccountStore>>,
     /// 敏感密钥存储(钥匙串或内存)。
     secrets: Arc<dyn SecretStore>,
+    /// 全局传输带宽限速(所有克隆共享同一令牌桶)。
+    limits: TransferLimits,
 }
 
 impl Default for App {
@@ -78,6 +82,7 @@ impl Default for App {
             registry: ProviderRegistry::new(),
             store: None,
             secrets: Arc::new(MemorySecrets::default()),
+            limits: TransferLimits::default(),
         }
     }
 }
@@ -103,8 +108,12 @@ impl App {
             registry: ProviderRegistry::new(),
             store: Some(Arc::new(store)),
             secrets,
+            limits: TransferLimits::default(),
         };
         app.load_persisted()?;
+        // 应用持久化的限速设置。
+        app.limits
+            .set_kib_per_sec(app.settings().rate_limit_kib_per_sec);
         Ok(app)
     }
 
@@ -586,10 +595,11 @@ impl App {
             return Ok(());
         }
         // 跨账号:服务端复制无能为力,边下边传中转——源的分块流直接喂给目标的流式分片
-        // 上传,内存只保留一个滑动窗口,与对象大小无关。
+        // 上传,内存只保留一个滑动窗口,与对象大小无关。读取流经全局限速节流。
         let src = self.provider(src_account)?;
         let dst = self.provider(dst_account)?;
         let (len, stream) = src.read_stream(src_path).await?;
+        let stream = self.limits.throttled(stream);
         dst.write_stream(dst_path, len, stream, None, progress)
             .await?;
         Ok(())
@@ -699,16 +709,31 @@ impl App {
                 s.concurrency = n;
             }
         }
+        if let Ok(Some(v)) = store.get_setting("rate_limit_kib_per_sec") {
+            if let Ok(n) = v.parse() {
+                s.rate_limit_kib_per_sec = n;
+            }
+        }
         s
     }
 
-    /// 保存应用设置到 SQLite。
+    /// 保存应用设置到 SQLite,并把限速立即应用到进行中的传输。
     pub fn save_settings(&self, settings: &Settings) -> Result<()> {
         if let Some(store) = &self.store {
             store.set_setting("share_expiry_secs", &settings.share_expiry_secs.to_string())?;
             store.set_setting("concurrency", &settings.concurrency.to_string())?;
+            store.set_setting(
+                "rate_limit_kib_per_sec",
+                &settings.rate_limit_kib_per_sec.to_string(),
+            )?;
         }
+        self.limits.set_kib_per_sec(settings.rate_limit_kib_per_sec);
         Ok(())
+    }
+
+    /// 全局传输限速句柄(与 App 各克隆共享)。Tauri 下载循环用它对每块限速。
+    pub fn transfer_limits(&self) -> TransferLimits {
+        self.limits.clone()
     }
 
     /// 按 id 解析 provider,未注册则报 [`AppError::NoSuchProvider`]。
@@ -1412,13 +1437,19 @@ mod tests {
             let mut s = app.settings();
             s.share_expiry_secs = 1800;
             s.concurrency = 5;
+            s.rate_limit_kib_per_sec = 2048;
             app.save_settings(&s).unwrap();
+            // 保存后限速立即生效在共享令牌桶上。
+            assert_eq!(app.transfer_limits().kib_per_sec(), 2048);
         }
         {
             let app = App::with_store_and_secrets(&path, secrets.clone()).unwrap();
             let s = app.settings();
             assert_eq!(s.share_expiry_secs, 1800);
             assert_eq!(s.concurrency, 5);
+            assert_eq!(s.rate_limit_kib_per_sec, 2048);
+            // 启动时从持久化设置恢复限速。
+            assert_eq!(app.transfer_limits().kib_per_sec(), 2048);
         }
         let _ = std::fs::remove_file(&path);
     }

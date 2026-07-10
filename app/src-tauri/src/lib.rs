@@ -281,6 +281,7 @@ async fn download_file(
     use tokio::io::AsyncWriteExt;
 
     let core = state.inner().clone();
+    let limits = core.transfer_limits();
     let part_path = format!("{local_path}.part");
 
     // 已有 .part → 从其大小续传;offset>0 且服务端拒绝(如 416 过期/越界)则清掉从头下。
@@ -317,6 +318,7 @@ async fn download_file(
     let mut downloaded = offset;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| e.to_string())?;
+        limits.throttle(chunk.len() as u64).await; // 全局带宽限速
         file.write_all(&chunk)
             .await
             .map_err(|e| format!("写入本地文件失败: {e}"))?;
@@ -427,6 +429,7 @@ async fn download_folder(
     use tokio::io::AsyncWriteExt;
 
     let core = state.inner().clone();
+    let limits = core.transfer_limits();
     let files = core
         .list_all_files(&account, &remote_root)
         .await
@@ -466,6 +469,7 @@ async fn download_folder(
             .map_err(|e| format!("创建本地文件失败: {e}"))?;
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|e| e.to_string())?;
+            limits.throttle(chunk.len() as u64).await; // 全局带宽限速
             f.write_all(&chunk)
                 .await
                 .map_err(|e| format!("写入本地文件失败: {e}"))?;

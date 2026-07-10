@@ -19,6 +19,7 @@ provider-aws = { path = "../providers/provider-aws" }
 provider-r2 = { path = "../providers/provider-r2" }
 provider-minio = { path = "../providers/provider-minio" }
 bytes = { workspace = true }
+futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -32,6 +33,6 @@ keyring = { version = "3", default-features = false, features = [
 ] }
 
 [dev-dependencies]
-tokio = { workspace = true }
+# test-util 提供虚拟时钟(start_paused),用于确定性地测限速。
+tokio = { workspace = true, features = ["test-util"] }
 async-trait = "0.1"
-futures = { workspace = true }

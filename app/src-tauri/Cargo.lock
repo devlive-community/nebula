@@ -81,6 +81,7 @@ version = "1.4.0"
 dependencies = [
  "bytes",
  "cloud-core",
+ "futures",
  "keyring",
  "nebula-provider",
  "provider-aliyun",

@@ -9,6 +9,9 @@ pub struct Settings {
     pub share_expiry_secs: u64,
     /// 批量传输的最大并发数。
     pub concurrency: u32,
+    /// 全局传输带宽上限,单位 KiB/秒;`0` 表示不限速。
+    #[serde(default)]
+    pub rate_limit_kib_per_sec: u64,
 }
 
 impl Default for Settings {
@@ -16,6 +19,7 @@ impl Default for Settings {
         Self {
             share_expiry_secs: 3600,
             concurrency: 3,
+            rate_limit_kib_per_sec: 0,
         }
     }
 }
