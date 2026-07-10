@@ -54,6 +54,13 @@ export interface TransferItem {
   status: "active" | "done" | "error";
 }
 
+/** 分页列举的一页(与 Rust 端 nebula_provider::Page 对应)。 */
+export interface Page {
+  entries: Entry[];
+  /** 下一页游标;null 表示已到末页。 */
+  cursor: string | null;
+}
+
 /** 与 Rust 端 nebula_provider::Entry 对应。 */
 export interface Entry {
   name: string;

@@ -179,7 +179,7 @@ impl OssClient {
     }
 
     /// 拉取一层目录的一页(子目录前缀在前,文件在后)。
-    async fn list_dir_page(
+    pub async fn list_dir_page(
         &self,
         bucket: &str,
         prefix: Option<&str>,

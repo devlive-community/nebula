@@ -119,6 +119,40 @@ impl StorageProvider for MinioProvider {
         }
     }
 
+    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+        match path::split(path) {
+            // 根:桶数量少,一次列全,无分页。
+            (None, _) => Ok(nebula_provider::Page {
+                entries: self.list(path).await?,
+                cursor: None,
+            }),
+            (Some(bucket), prefix) => {
+                let prefix_opt = (!prefix.is_empty()).then_some(prefix);
+                let page = self
+                    .client
+                    .list_dir_page(bucket, prefix_opt, cursor.unwrap_or_default())
+                    .await
+                    .map_err(map_err)?;
+                let entries = page
+                    .items
+                    .into_iter()
+                    .map(|item| match item {
+                        ListEntry::Prefix(prefix) => Entry::directory(format!("{bucket}/{prefix}")),
+                        ListEntry::Object(obj) => {
+                            Entry::file(format!("{bucket}/{}", obj.key), obj.size)
+                                .with_etag(obj.etag)
+                                .with_last_modified(obj.last_modified)
+                        }
+                    })
+                    .collect();
+                Ok(nebula_provider::Page {
+                    entries,
+                    cursor: page.next,
+                })
+            }
+        }
+    }
+
     async fn stat(&self, path: &str) -> Result<Entry> {
         match path::split(path) {
             (Some(bucket), "") => Ok(Entry::directory(bucket.to_string())),

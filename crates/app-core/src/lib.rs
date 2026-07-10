@@ -25,7 +25,7 @@ use provider_r2::R2Provider;
 use provider_tencent::TencentProvider;
 
 pub use error::{AppError, Result};
-pub use nebula_provider::{ByteStream, Capabilities, EntryKind, ProgressFn};
+pub use nebula_provider::{ByteStream, Capabilities, EntryKind, Page, ProgressFn};
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
 pub use store::{AccountRecord, AccountStore};
@@ -390,6 +390,16 @@ impl App {
     /// 浏览某账号下某路径(桶 / 前缀)的条目。
     pub async fn browse(&self, account: &str, path: &str) -> Result<Vec<Entry>> {
         Ok(self.provider(account)?.list(path).await?)
+    }
+
+    /// 分页浏览:返回某路径下的**一页**条目 + 下一页游标(`cursor` 为 `None` 取第一页)。
+    pub async fn browse_page(
+        &self,
+        account: &str,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<Page> {
+        Ok(self.provider(account)?.list_page(path, cursor).await?)
     }
 
     /// 读取某路径的元信息。
@@ -919,6 +929,84 @@ mod tests {
         // 目标拿到完整数据,且是分多块流式喂进来的(证明没走整块缓冲)。
         assert_eq!(app.download("dst", "b/g.bin").await.unwrap(), data);
         assert_eq!(dst_chunks.load(std::sync::atomic::Ordering::SeqCst), 5);
+    }
+
+    /// 分页 provider:3 页、每页 2 个,游标为页索引字符串。
+    struct PagedProvider;
+
+    #[async_trait]
+    impl StorageProvider for PagedProvider {
+        fn id(&self) -> &str {
+            "paged"
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+        async fn list(&self, _path: &str) -> nebula_provider::Result<Vec<Entry>> {
+            Ok(vec![])
+        }
+        async fn list_page(
+            &self,
+            _path: &str,
+            cursor: Option<String>,
+        ) -> nebula_provider::Result<Page> {
+            let pages = [["a", "b"], ["c", "d"], ["e", "f"]];
+            let idx: usize = cursor.as_deref().and_then(|c| c.parse().ok()).unwrap_or(0);
+            let entries = pages[idx]
+                .iter()
+                .map(|n| Entry::file(format!("b/{n}"), 1))
+                .collect();
+            let next = (idx + 1 < pages.len()).then(|| (idx + 1).to_string());
+            Ok(Page {
+                entries,
+                cursor: next,
+            })
+        }
+        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+            Ok(Entry::file(path.to_string(), 1))
+        }
+        async fn read(&self, _path: &str) -> nebula_provider::Result<Bytes> {
+            Ok(Bytes::new())
+        }
+        async fn write(
+            &self,
+            _path: &str,
+            _data: Bytes,
+            _ct: Option<&str>,
+        ) -> nebula_provider::Result<()> {
+            Ok(())
+        }
+        async fn delete(&self, _path: &str) -> nebula_provider::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn browse_page_threads_cursor_across_pages() {
+        let app = App::new();
+        app.add_account(Arc::new(PagedProvider));
+
+        let p0 = app.browse_page("paged", "b", None).await.unwrap();
+        assert_eq!(p0.entries.len(), 2);
+        assert_eq!(p0.cursor.as_deref(), Some("1"));
+        let p1 = app.browse_page("paged", "b", p0.cursor).await.unwrap();
+        assert_eq!(p1.cursor.as_deref(), Some("2"));
+        let p2 = app.browse_page("paged", "b", p1.cursor).await.unwrap();
+        // 末页无下一页游标。
+        assert_eq!(p2.entries.len(), 2);
+        assert!(p2.cursor.is_none());
+    }
+
+    #[tokio::test]
+    async fn browse_page_default_returns_single_page() {
+        let app = app_with_memory();
+        app.upload("mem", "x", Bytes::from_static(b"1"), None)
+            .await
+            .unwrap();
+        // 未覆盖 list_page 的 provider:一次列全,无下一页游标。
+        let page = app.browse_page("mem", "", None).await.unwrap();
+        assert!(page.cursor.is_none());
+        assert_eq!(page.entries.len(), 1);
     }
 
     #[tokio::test]

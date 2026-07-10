@@ -9,7 +9,11 @@ import { useEffect, useState, type UIEvent } from "react";
  *
  * 列表引用变化(切目录 / 过滤 / 排序)时自动重置回第一批。
  */
-export function useIncremental<T>(items: T[], batch = 120) {
+export function useIncremental<T>(
+  items: T[],
+  batch = 120,
+  onReachEnd?: () => void,
+) {
   const [count, setCount] = useState(batch);
 
   useEffect(() => {
@@ -18,9 +22,15 @@ export function useIncremental<T>(items: T[], batch = 120) {
 
   const onScroll = (e: UIEvent<HTMLElement>) => {
     const el = e.currentTarget;
-    // 距底部 320px 内就预取下一批,避免滚到最底才加载的顿挫。
+    // 距底部 320px 内触发。
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 320) {
-      setCount((c) => (c < items.length ? Math.min(c + batch, items.length) : c));
+      if (count < items.length) {
+        // 还有已加载但未渲染的,先放行下一批进 DOM。
+        setCount((c) => Math.min(c + batch, items.length));
+      } else {
+        // 已加载的全部渲染完 → 请求上层拉取下一页(若还有)。
+        onReachEnd?.();
+      }
     }
   };
 

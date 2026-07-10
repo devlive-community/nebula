@@ -28,6 +28,13 @@ pub async fn collect_stream(mut stream: ByteStream) -> Result<Bytes> {
     Ok(buf.freeze())
 }
 
+/// 分页列举的一页:本页条目 + 下一页游标(`None` 表示已到末页)。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Page {
+    pub entries: Vec<Entry>,
+    pub cursor: Option<String>,
+}
+
 /// 一个存储 provider 实例(通常 = 一个云账号)。
 ///
 /// # 路径约定
@@ -50,6 +57,18 @@ pub trait StorageProvider: Send + Sync {
 
     /// 列出某路径下的条目(桶或前缀)。
     async fn list(&self, path: &str) -> Result<Vec<Entry>>;
+
+    /// 分页列出某路径下的**一页**条目 + 下一页游标;`cursor` 为 `None` 取第一页。
+    ///
+    /// 默认实现回退到 [`list`](Self::list):一次性列全作为单页(无下一页游标),保证任何
+    /// provider 都可用。支持游标分页的适配层应覆盖此方法,避免大目录一次性拉全导致的延迟。
+    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<Page> {
+        let _ = cursor;
+        Ok(Page {
+            entries: self.list(path).await?,
+            cursor: None,
+        })
+    }
 
     /// 读取单个对象的元信息。
     async fn stat(&self, path: &str) -> Result<Entry>;

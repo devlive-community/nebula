@@ -2,7 +2,7 @@
 //!
 //! 业务逻辑都在 `app-core`(可 `cargo test`),这里只做 JS ↔ Rust 的桥接与本地文件读写。
 
-use app_core::{AccountInfo, App, Settings};
+use app_core::{AccountInfo, App, Page, Settings};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
@@ -165,6 +165,20 @@ async fn browse(
 ) -> Result<Vec<Entry>, String> {
     let app = state.inner().clone();
     app.browse(&account, &path).await.map_err(|e| e.to_string())
+}
+
+/// 分页浏览:返回某路径下的一页条目 + 下一页游标(`cursor` 为空取第一页)。
+#[tauri::command]
+async fn browse_page(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    cursor: Option<String>,
+) -> Result<Page, String> {
+    let app = state.inner().clone();
+    app.browse_page(&account, &path, cursor)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// 读取对象元信息。
@@ -562,6 +576,7 @@ pub fn run() {
             remove_account,
             get_account,
             browse,
+            browse_page,
             stat,
             search,
             upload_file,

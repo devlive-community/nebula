@@ -52,6 +52,8 @@ export default function App() {
   });
   const [path, setPath] = useState("");
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -320,19 +322,38 @@ export default function App() {
   const load = useCallback(async () => {
     if (!current) {
       setEntries([]);
+      setCursor(null);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      setEntries(await api.browse(current, path));
+      const page = await api.browsePage(current, path, null);
+      setEntries(page.entries);
+      setCursor(page.cursor);
     } catch (e) {
       setError(String(e));
       setEntries([]);
+      setCursor(null);
     } finally {
       setLoading(false);
     }
   }, [current, path]);
+
+  // 滚到底部且本页已渲染完时,拉取下一页并追加。
+  const loadMore = useCallback(async () => {
+    if (!current || !cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.browsePage(current, path, cursor);
+      setEntries((prev) => [...prev, ...page.entries]);
+      setCursor(page.cursor);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [current, path, cursor, loadingMore]);
 
   useEffect(() => {
     load();
@@ -848,6 +869,7 @@ export default function App() {
                 onContext={(entry, x, y) => setMenu({ x, y, entry })}
                 onDragStartFile={onDragStartFile}
                 onDropDir={onDropDir}
+                onReachEnd={loadMore}
               />
             ) : (
               <FileGrid
@@ -861,6 +883,7 @@ export default function App() {
                 onContext={(entry, x, y) => setMenu({ x, y, entry })}
                 onDragStartFile={onDragStartFile}
                 onDropDir={onDropDir}
+                onReachEnd={loadMore}
               />
             )}
 

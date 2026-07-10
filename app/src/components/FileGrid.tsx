@@ -16,6 +16,7 @@ interface Props {
   onContext: (entry: Entry, x: number, y: number) => void;
   onDragStartFile: (entry: Entry) => void;
   onDropDir: (dir: Entry) => void;
+  onReachEnd?: () => void;
 }
 
 export function FileGrid({
@@ -29,9 +30,14 @@ export function FileGrid({
   onContext,
   onDragStartFile,
   onDropDir,
+  onReachEnd,
 }: Props) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const { shown, shownCount, total, hasMore, onScroll } = useIncremental(entries);
+  const { shown, shownCount, total, hasMore, onScroll } = useIncremental(
+    entries,
+    120,
+    onReachEnd,
+  );
   if (loading) {
     return <div className="filelist__state">加载中…</div>;
   }

@@ -145,7 +145,7 @@ impl CosClient {
         })
     }
 
-    async fn list_dir_page(
+    pub async fn list_dir_page(
         &self,
         bucket: &str,
         prefix: Option<&str>,
