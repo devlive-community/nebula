@@ -81,7 +81,13 @@ export const downloadFolder = (
   account: string,
   remoteRoot: string,
   localDir: string,
-) => invoke<void>("download_folder", { account, remoteRoot, localDir });
+  transferId: string,
+) =>
+  invoke<void>("download_folder", { account, remoteRoot, localDir, transferId });
+
+/** 请求取消一个进行中的传输(以传输面板的 id 为键)。 */
+export const cancelTransfer = (id: string) =>
+  invoke<void>("cancel_transfer", { id });
 
 export const migrateFolder = (
   srcAccount: string,
@@ -104,17 +110,23 @@ export const uploadFile = (
   account: string,
   remotePath: string,
   localPath: string,
+  transferId: string,
   contentType?: string,
 ) =>
   invoke<void>("upload_file", {
     account,
     remotePath,
     localPath,
+    transferId,
     contentType: contentType ?? null,
   });
 
-export const downloadFile = (account: string, remotePath: string, localPath: string) =>
-  invoke<void>("download_file", { account, remotePath, localPath });
+export const downloadFile = (
+  account: string,
+  remotePath: string,
+  localPath: string,
+  transferId: string,
+) => invoke<void>("download_file", { account, remotePath, localPath, transferId });
 
 export const deletePath = (account: string, path: string) =>
   invoke<void>("delete", { account, path });

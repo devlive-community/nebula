@@ -170,18 +170,24 @@ export default function App() {
       [t.id]: { ...t, done: 0, total: 0, status: "active" },
     }));
     try {
-      if (t.kind === "上传") await api.uploadFile(t.account, t.remote, t.local);
-      else await api.downloadFile(t.account, t.remote, t.local);
+      if (t.kind === "上传")
+        await api.uploadFile(t.account, t.remote, t.local, t.id);
+      else await api.downloadFile(t.account, t.remote, t.local, t.id);
       setTransfers((prev) =>
         prev[t.id]
           ? { ...prev, [t.id]: { ...prev[t.id], status: "done", done: prev[t.id].total } }
           : prev,
       );
     } catch (e) {
-      setError(String(e));
+      // 后端以 "已取消" 作为取消信号:标记为已取消,不弹错误横幅。
+      const msg = String(e);
+      const cancelled = msg === "已取消";
       setTransfers((prev) =>
-        prev[t.id] ? { ...prev, [t.id]: { ...prev[t.id], status: "error" } } : prev,
+        prev[t.id]
+          ? { ...prev, [t.id]: { ...prev[t.id], status: cancelled ? "cancelled" : "error" } }
+          : prev,
       );
+      if (!cancelled) setError(msg);
     }
   };
 
@@ -190,6 +196,16 @@ export default function App() {
     // 只有单文件上传 / 下载能直接重发;迁移与文件夹任务请从右键菜单重来。
     if (t && (t.kind === "上传" || t.kind === "下载"))
       void startTransfer({ ...t, kind: t.kind });
+  };
+
+  const cancelTransfer = (id: string) => {
+    // 乐观标记为已取消(即时反馈),再通知后端在下个分片 / 数据块中止。
+    setTransfers((prev) =>
+      prev[id] && prev[id].status === "active"
+        ? { ...prev, [id]: { ...prev[id], status: "cancelled" } }
+        : prev,
+    );
+    void api.cancelTransfer(id);
   };
 
   const clearTransfers = () =>
@@ -662,17 +678,21 @@ export default function App() {
       },
     }));
     try {
-      await api.downloadFolder(current, entry.path, dir);
+      await api.downloadFolder(current, entry.path, dir, id);
       setTransfers((prev) =>
         prev[id]
           ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
           : prev,
       );
     } catch (e) {
-      setError(String(e));
+      const msg = String(e);
+      const cancelled = msg === "已取消";
       setTransfers((prev) =>
-        prev[id] ? { ...prev, [id]: { ...prev[id], status: "error" } } : prev,
+        prev[id]
+          ? { ...prev, [id]: { ...prev[id], status: cancelled ? "cancelled" : "error" } }
+          : prev,
       );
+      if (!cancelled) setError(msg);
     }
   };
 
@@ -1075,6 +1095,7 @@ export default function App() {
                 items={Object.values(transfers)}
                 onClear={clearTransfers}
                 onRetry={retryTransfer}
+                onCancel={cancelTransfer}
               />
             )}
           </>

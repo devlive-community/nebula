@@ -63,7 +63,7 @@ export interface TransferItem {
   local: string;
   done: number;
   total: number;
-  status: "active" | "done" | "error";
+  status: "active" | "done" | "error" | "cancelled";
 }
 
 /** 分页列举的一页(与 Rust 端 nebula_provider::Page 对应)。 */

@@ -1,15 +1,16 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRotateRight } from "@fortawesome/free-solid-svg-icons";
+import { faRotateRight, faXmark } from "@fortawesome/free-solid-svg-icons";
 import type { TransferItem } from "../types";
 
 interface Props {
   items: TransferItem[];
   onClear: () => void;
   onRetry: (id: string) => void;
+  onCancel: (id: string) => void;
 }
 
 /** 底部传输任务面板:每个上传 / 下载独立显示进度与状态。 */
-export function TransferPanel({ items, onClear, onRetry }: Props) {
+export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
   const active = items.filter((i) => i.status === "active").length;
   const hasFinished = items.some((i) => i.status !== "active");
 
@@ -38,9 +39,11 @@ export function TransferPanel({ items, onClear, onRetry }: Props) {
           const label =
             i.status === "error"
               ? "失败"
-              : i.status === "done"
-                ? "完成"
-                : `${pct}%`;
+              : i.status === "cancelled"
+                ? "已取消"
+                : i.status === "done"
+                  ? "完成"
+                  : `${pct}%`;
           return (
             <div className="transfers__item" key={i.id}>
               <div className="transfers__row">
@@ -53,10 +56,19 @@ export function TransferPanel({ items, onClear, onRetry }: Props) {
                 >
                   {label}
                 </span>
-                {i.status === "error" && (
+                {i.status === "active" && (
                   <button
                     className="transfers__retry"
-                    title="重试"
+                    title="取消"
+                    onClick={() => onCancel(i.id)}
+                  >
+                    <FontAwesomeIcon icon={faXmark} />
+                  </button>
+                )}
+                {(i.status === "error" || i.status === "cancelled") && (
+                  <button
+                    className="transfers__retry"
+                    title={i.status === "cancelled" ? "继续" : "重试"}
                     onClick={() => onRetry(i.id)}
                   >
                     <FontAwesomeIcon icon={faRotateRight} />
