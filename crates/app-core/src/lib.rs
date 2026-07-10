@@ -619,7 +619,11 @@ impl App {
         let files = self.list_all_files(src_account, src_root).await?;
         let total = files.len() as u64;
         let base = ensure_trailing_slash(src_root);
-        let dst_base = format!("{}{}/", ensure_trailing_slash(dst_dir), folder_name(src_root));
+        let dst_base = format!(
+            "{}{}/",
+            ensure_trailing_slash(dst_dir),
+            folder_name(src_root)
+        );
         for (i, file) in files.iter().enumerate() {
             let rel = file.path.strip_prefix(&base).unwrap_or(file.path.as_str());
             let dst_path = format!("{dst_base}{rel}");
@@ -914,10 +918,7 @@ mod tests {
         }
         async fn list(&self, path: &str) -> nebula_provider::Result<Vec<Entry>> {
             let entries = match path {
-                "b" => vec![
-                    Entry::directory("b/photos"),
-                    Entry::file("b/readme.txt", 1),
-                ],
+                "b" => vec![Entry::directory("b/photos"), Entry::file("b/readme.txt", 1)],
                 "b/photos" => vec![
                     Entry::file("b/photos/cat.jpg", 1),
                     Entry::file("b/photos/dog.png", 1),
@@ -967,7 +968,12 @@ mod tests {
         names.sort();
         assert_eq!(
             names,
-            ["b/docs/cat-notes.md", "b/photos/cat.jpg", "b/photos/dog.png", "b/readme.txt"]
+            [
+                "b/docs/cat-notes.md",
+                "b/photos/cat.jpg",
+                "b/photos/dog.png",
+                "b/readme.txt"
+            ]
         );
     }
 
@@ -1065,11 +1071,19 @@ mod tests {
     #[tokio::test]
     async fn verify_passes_for_intact_object() {
         let app = app_with_memory();
-        app.upload("mem", "b/k.txt", Bytes::from_static(b"hello app-core"), None)
-            .await
-            .unwrap();
+        app.upload(
+            "mem",
+            "b/k.txt",
+            Bytes::from_static(b"hello app-core"),
+            None,
+        )
+        .await
+        .unwrap();
         // MemoryProvider 的 stat 返回内容 MD5 作为 ETag → 校验应通过。
-        assert_eq!(app.verify("mem", "b/k.txt").await.unwrap(), Integrity::Verified);
+        assert_eq!(
+            app.verify("mem", "b/k.txt").await.unwrap(),
+            Integrity::Verified
+        );
     }
 
     #[tokio::test]

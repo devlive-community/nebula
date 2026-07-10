@@ -668,7 +668,9 @@ fn setup_menu(app: &AppHandle) -> tauri::Result<()> {
         .separator()
         .quit()
         .build()?;
-    let account_menu = SubmenuBuilder::new(app, "账号").item(&add_account).build()?;
+    let account_menu = SubmenuBuilder::new(app, "账号")
+        .item(&add_account)
+        .build()?;
     let edit_menu = SubmenuBuilder::new(app, "编辑")
         .undo()
         .redo()
