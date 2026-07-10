@@ -77,6 +77,17 @@ export const statPath = (account: string, path: string) =>
 export const verifyObject = (account: string, path: string) =>
   invoke<Integrity>("verify_object", { account, path });
 
+/** 转换对象存储类型 / 归档层。 */
+export const setStorageClass = (
+  account: string,
+  path: string,
+  storageClass: string,
+) => invoke<void>("set_storage_class", { account, path, class: storageClass });
+
+/** 取回(解冻)归档对象,days 为保持天数。 */
+export const restoreObject = (account: string, path: string, days: number) =>
+  invoke<void>("restore_object", { account, path, days });
+
 export const downloadFolder = (
   account: string,
   remoteRoot: string,

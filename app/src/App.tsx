@@ -34,6 +34,10 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { MoveCopyDialog } from "./components/MoveCopyDialog";
 import { MigrateDialog } from "./components/MigrateDialog";
+import {
+  RestoreDialog,
+  StorageClassDialog,
+} from "./components/StorageClassDialog";
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TransferPanel } from "./components/TransferPanel";
@@ -76,6 +80,10 @@ export default function App() {
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [moveCopyTarget, setMoveCopyTarget] = useState<Entry | null>(null);
   const [migrateTarget, setMigrateTarget] = useState<Entry | null>(null);
+  const [storageClassTarget, setStorageClassTarget] = useState<Entry | null>(
+    null,
+  );
+  const [restoreTarget, setRestoreTarget] = useState<Entry | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -948,6 +956,40 @@ export default function App() {
     }
   };
 
+  const doSetStorageClass = async (storageClass: string) => {
+    const entry = storageClassTarget;
+    setStorageClassTarget(null);
+    if (!current || !entry) return;
+    setError(null);
+    setNotice({ tone: "info", text: `正在转换 ${entry.name} 的存储类型…` });
+    try {
+      await api.setStorageClass(current, entry.path, storageClass);
+      setNotice({ tone: "ok", text: `✓ ${entry.name} 已转为 ${storageClass}` });
+      await load();
+    } catch (e) {
+      setNotice(null);
+      setError(String(e));
+    }
+  };
+
+  const doRestore = async (days: number) => {
+    const entry = restoreTarget;
+    setRestoreTarget(null);
+    if (!current || !entry) return;
+    setError(null);
+    setNotice({ tone: "info", text: `正在发起取回 ${entry.name}…` });
+    try {
+      await api.restoreObject(current, entry.path, days);
+      setNotice({
+        tone: "ok",
+        text: `已发起取回 ${entry.name},解冻完成后即可下载`,
+      });
+    } catch (e) {
+      setNotice(null);
+      setError(String(e));
+    }
+  };
+
   const createFolder = async (name: string) => {
     setShowNewFolder(false);
     if (!current || !path) return;
@@ -970,6 +1012,8 @@ export default function App() {
     !!renameTarget ||
     !!moveCopyTarget ||
     !!migrateTarget ||
+    !!storageClassTarget ||
+    !!restoreTarget ||
     !!shareUrl ||
     showNewFolder ||
     pendingBatchDelete ||
@@ -985,6 +1029,8 @@ export default function App() {
       else if (shareUrl) setShareUrl(null);
       else if (moveCopyTarget) setMoveCopyTarget(null);
       else if (migrateTarget) setMigrateTarget(null);
+      else if (storageClassTarget) setStorageClassTarget(null);
+      else if (restoreTarget) setRestoreTarget(null);
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
       else if (showForm) setShowForm(false);
@@ -1260,6 +1306,24 @@ export default function App() {
         />
       )}
 
+      {storageClassTarget && current && (
+        <StorageClassDialog
+          vendor={accounts.find((a) => a.id === current)?.vendor ?? ""}
+          name={storageClassTarget.name}
+          current={storageClassTarget.storage_class}
+          onConfirm={doSetStorageClass}
+          onCancel={() => setStorageClassTarget(null)}
+        />
+      )}
+
+      {restoreTarget && (
+        <RestoreDialog
+          name={restoreTarget.name}
+          onConfirm={doRestore}
+          onCancel={() => setRestoreTarget(null)}
+        />
+      )}
+
       {shareUrl && (
         <ShareDialog
           url={shareUrl}
@@ -1335,6 +1399,8 @@ export default function App() {
       { label: "详情", onClick: () => setDetailsEntry(entry) },
       { label: "下载", onClick: () => download(entry) },
       { label: "校验完整性", onClick: () => verifyEntry(entry) },
+      { label: "转换存储类型", onClick: () => setStorageClassTarget(entry) },
+      { label: "取回归档", onClick: () => setRestoreTarget(entry) },
       { label: "重命名", onClick: () => setRenameTarget(entry) },
       { label: "复制 / 移动到", onClick: () => setMoveCopyTarget(entry) },
     );

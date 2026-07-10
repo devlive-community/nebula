@@ -1325,6 +1325,27 @@ body.resizing {
   cursor: not-allowed;
 }
 
+.field select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 11px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
+.field select:focus {
+  border-color: var(--primary);
+}
+
+.field__hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  margin: 2px 0 0;
+}
+
 /* ---------- Custom select ---------- */
 .select {
   position: relative;
