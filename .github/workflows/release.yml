@@ -93,7 +93,7 @@ jobs:
         with:
           projectPath: app
           tagName: ${{ github.ref_name }}
-          releaseName: "Nebula ${{ github.ref_name }}"
+          releaseName: "${{ github.ref_name }}"
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
