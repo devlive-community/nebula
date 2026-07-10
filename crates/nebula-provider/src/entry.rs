@@ -25,6 +25,8 @@ pub struct Entry {
     pub last_modified: Option<String>,
     /// ETag,目录为 `None`。
     pub etag: Option<String>,
+    /// 存储类型 / 归档层(如 `STANDARD` / `IA` / `ARCHIVE`);未知或目录为 `None`。
+    pub storage_class: Option<String>,
 }
 
 impl Entry {
@@ -38,6 +40,7 @@ impl Entry {
             size: 0,
             last_modified: None,
             etag: None,
+            storage_class: None,
         }
     }
 
@@ -51,6 +54,7 @@ impl Entry {
             size,
             last_modified: None,
             etag: None,
+            storage_class: None,
         }
     }
 
@@ -63,6 +67,13 @@ impl Entry {
     /// 链式设置 ETag。
     pub fn with_etag(mut self, value: impl Into<String>) -> Self {
         self.etag = Some(value.into());
+        self
+    }
+
+    /// 链式设置存储类型。空字符串视为未知(`None`),便于各适配层无脑透传。
+    pub fn with_storage_class(mut self, value: impl Into<String>) -> Self {
+        let value = value.into();
+        self.storage_class = (!value.is_empty()).then_some(value);
         self
     }
 
@@ -108,5 +119,14 @@ mod tests {
         assert_eq!(e.kind, EntryKind::File);
         assert_eq!(e.etag.as_deref(), Some("\"abc\""));
         assert_eq!(e.last_modified.as_deref(), Some("2024-01-01T00:00:00Z"));
+    }
+
+    #[test]
+    fn storage_class_empty_is_none() {
+        let archived = Entry::file("b/k", 1).with_storage_class("ARCHIVE");
+        assert_eq!(archived.storage_class.as_deref(), Some("ARCHIVE"));
+        // 空字符串(适配层无脑透传时的"未知")视为 None。
+        let unknown = Entry::file("b/k", 1).with_storage_class("");
+        assert_eq!(unknown.storage_class, None);
     }
 }

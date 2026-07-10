@@ -120,7 +120,8 @@ impl StorageProvider for HuaweiProvider {
                             entries.push(
                                 Entry::file(format!("{bucket}/{}", obj.key), obj.size)
                                     .with_etag(obj.etag)
-                                    .with_last_modified(obj.last_modified),
+                                    .with_last_modified(obj.last_modified)
+                                    .with_storage_class(obj.storage_class),
                             );
                         }
                     }
@@ -153,6 +154,7 @@ impl StorageProvider for HuaweiProvider {
                             Entry::file(format!("{bucket}/{}", obj.key), obj.size)
                                 .with_etag(obj.etag)
                                 .with_last_modified(obj.last_modified)
+                                .with_storage_class(obj.storage_class)
                         }
                     })
                     .collect();
