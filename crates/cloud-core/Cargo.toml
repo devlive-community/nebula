@@ -21,4 +21,5 @@ hex = "0.4"
 base64 = "0.22"
 
 [dev-dependencies]
-tokio = { workspace = true }
+# test-util 提供 tokio::test(start_paused) 的虚拟时钟,用于确定性地测限速。
+tokio = { workspace = true, features = ["test-util"] }
