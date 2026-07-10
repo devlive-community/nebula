@@ -448,6 +448,20 @@ async fn create_folder(state: State<'_, App>, account: String, path: String) -> 
         .map_err(|e| e.to_string())
 }
 
+/// 修改对象的内容类型(Content-Type)。
+#[tauri::command]
+async fn set_content_type(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    content_type: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_content_type(&account, &path, &content_type)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 统计文件夹 / Bucket 下的文件数与总字节数。
 #[tauri::command]
 async fn folder_stats(
@@ -1008,6 +1022,7 @@ pub fn run() {
             create_folder,
             create_bucket,
             delete_bucket,
+            set_content_type,
             folder_stats,
             rename,
             copy,

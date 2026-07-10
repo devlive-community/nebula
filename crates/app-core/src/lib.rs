@@ -601,6 +601,19 @@ impl App {
         Ok(self.provider(account)?.restore(path, days).await?)
     }
 
+    /// 修改对象的内容类型(`Content-Type`)。
+    pub async fn set_content_type(
+        &self,
+        account: &str,
+        path: &str,
+        content_type: &str,
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .set_content_type(path, content_type)
+            .await?)
+    }
+
     /// 在某账号下新建一个 bucket。
     pub async fn create_bucket(&self, account: &str, bucket: &str) -> Result<()> {
         Ok(self.provider(account)?.create_bucket(bucket).await?)
@@ -1370,9 +1383,13 @@ mod tests {
             .await
             .is_err());
         assert!(app.restore("mem", "b/k", 1).await.is_err());
-        // bucket 操作同样默认 Unsupported。
+        // bucket 与元数据操作同样默认 Unsupported。
         assert!(app.create_bucket("mem", "newb").await.is_err());
         assert!(app.delete_bucket("mem", "newb").await.is_err());
+        assert!(app
+            .set_content_type("mem", "b/k", "image/png")
+            .await
+            .is_err());
     }
 
     #[tokio::test]
