@@ -65,15 +65,17 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                     <FontAwesomeIcon icon={faXmark} />
                   </button>
                 )}
-                {(i.status === "error" || i.status === "cancelled") && (
-                  <button
-                    className="transfers__retry"
-                    title={i.status === "cancelled" ? "继续" : "重试"}
-                    onClick={() => onRetry(i.id)}
-                  >
-                    <FontAwesomeIcon icon={faRotateRight} />
-                  </button>
-                )}
+                {(i.status === "error" || i.status === "cancelled") &&
+                  i.kind !== "迁移" &&
+                  i.kind !== "迁移文件夹" && (
+                    <button
+                      className="transfers__retry"
+                      title={i.status === "cancelled" ? "继续" : "重试"}
+                      onClick={() => onRetry(i.id)}
+                    >
+                      <FontAwesomeIcon icon={faRotateRight} />
+                    </button>
+                  )}
               </div>
               <div className="transfers__track">
                 <div

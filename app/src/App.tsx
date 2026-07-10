@@ -193,9 +193,15 @@ export default function App() {
 
   const retryTransfer = (id: string) => {
     const t = transfers[id];
-    // 只有单文件上传 / 下载能直接重发;迁移与文件夹任务请从右键菜单重来。
-    if (t && (t.kind === "上传" || t.kind === "下载"))
+    if (!t) return;
+    // 单文件上传 / 下载:直接重发(会从断点续传)。
+    if (t.kind === "上传" || t.kind === "下载") {
       void startTransfer({ ...t, kind: t.kind });
+    } else if (t.kind === "下载文件夹") {
+      // 文件夹下载:用记下的账号 / 路径 / 本地目录重跑,无需再次选目录。
+      void runFolderDownload(t.account, t.remote, t.local, t.name);
+    }
+    // 迁移 / 迁移文件夹缺少源端信息,无法从面板重发(面板不显示其重试按钮)。
   };
 
   const cancelTransfer = (id: string) => {
@@ -658,19 +664,22 @@ export default function App() {
     setBusy(false);
   };
 
-  const downloadFolderEntry = async (entry: Entry) => {
-    if (!current) return;
-    const dir = await open({ directory: true, title: "选择下载到的目录" });
-    if (typeof dir !== "string") return;
-    const id = `folder:download:${entry.path}`;
+  // 跑一次文件夹下载(供首次发起与"继续/重试"复用,复用同一个传输 id)。
+  const runFolderDownload = async (
+    account: string,
+    remote: string,
+    dir: string,
+    name: string,
+  ) => {
+    const id = `folder:download:${remote}`;
     setTransfers((prev) => ({
       ...prev,
       [id]: {
         id,
         kind: "下载文件夹",
-        name: entry.name,
-        account: current,
-        remote: entry.path,
+        name,
+        account,
+        remote,
         local: dir,
         done: 0,
         total: 0,
@@ -678,7 +687,7 @@ export default function App() {
       },
     }));
     try {
-      await api.downloadFolder(current, entry.path, dir, id);
+      await api.downloadFolder(account, remote, dir, id);
       setTransfers((prev) =>
         prev[id]
           ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
@@ -694,6 +703,13 @@ export default function App() {
       );
       if (!cancelled) setError(msg);
     }
+  };
+
+  const downloadFolderEntry = async (entry: Entry) => {
+    if (!current) return;
+    const dir = await open({ directory: true, title: "选择下载到的目录" });
+    if (typeof dir !== "string") return;
+    await runFolderDownload(current, entry.path, dir, entry.name);
   };
 
   const doDelete = async () => {
