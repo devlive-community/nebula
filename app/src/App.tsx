@@ -64,6 +64,10 @@ export default function App() {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{
+    tone: "ok" | "warn" | "err" | "info";
+    text: string;
+  } | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editInfo, setEditInfo] = useState<AccountInfo | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
@@ -296,6 +300,13 @@ export default function App() {
       unTransfer.then((off) => off());
     };
   }, []);
+
+  // 完成类提示(通过 / 警告 / 失败)几秒后自动消失;"info"(进行中)保留到被替换。
+  useEffect(() => {
+    if (!notice || notice.tone === "info") return;
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   const refreshAccounts = useCallback(async () => {
     const list = await api.listAccountInfos();
@@ -755,6 +766,28 @@ export default function App() {
     }
   };
 
+  const verifyEntry = async (entry: Entry) => {
+    if (!current) return;
+    setError(null);
+    setNotice({ tone: "info", text: `正在校验 ${entry.name}…` });
+    try {
+      const r = await api.verifyObject(current, entry.path);
+      if (r.status === "verified") {
+        setNotice({ tone: "ok", text: `✓ ${entry.name} 完整性校验通过` });
+      } else if (r.status === "mismatch") {
+        setNotice({
+          tone: "err",
+          text: `✗ ${entry.name} 校验失败:内容与远端 ETag 不一致,文件可能已损坏`,
+        });
+      } else {
+        setNotice({ tone: "warn", text: `${entry.name} 无法校验:${r.reason}` });
+      }
+    } catch (e) {
+      setNotice(null);
+      setError(String(e));
+    }
+  };
+
   const createFolder = async (name: string) => {
     setShowNewFolder(false);
     if (!current || !path) return;
@@ -869,6 +902,12 @@ export default function App() {
             </div>
 
             {error && <div className="error-banner">{error}</div>}
+
+            {notice && (
+              <div className={`notice-banner notice-banner--${notice.tone}`}>
+                {notice.text}
+              </div>
+            )}
 
             {selected.size > 0 && (
               <div className="batch-bar">
@@ -1110,6 +1149,7 @@ export default function App() {
     items.push(
       { label: "详情", onClick: () => setDetailsEntry(entry) },
       { label: "下载", onClick: () => download(entry) },
+      { label: "校验完整性", onClick: () => verifyEntry(entry) },
       { label: "重命名", onClick: () => setRenameTarget(entry) },
       { label: "复制 / 移动到", onClick: () => setMoveCopyTarget(entry) },
     );

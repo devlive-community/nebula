@@ -61,6 +61,12 @@ export interface Page {
   cursor: string | null;
 }
 
+/** 内容完整性校验结果(与 Rust 端 app_core::Integrity 对应)。 */
+export type Integrity =
+  | { status: "verified" }
+  | { status: "mismatch"; expected: string; actual: string }
+  | { status: "unverifiable"; reason: string };
+
 /** 递归搜索结果(与 Rust 端 app_core::SearchResult 对应)。 */
 export interface SearchResult {
   entries: Entry[];

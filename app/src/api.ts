@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Entry, Page, SearchResult, Settings, UploadEntry } from "./types";
+import type { AccountInfo, Entry, Integrity, Page, SearchResult, Settings, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -73,6 +73,9 @@ export const browsePage = (
 
 export const statPath = (account: string, path: string) =>
   invoke<Entry>("stat", { account, path });
+
+export const verifyObject = (account: string, path: string) =>
+  invoke<Integrity>("verify_object", { account, path });
 
 export const search = (
   account: string,
