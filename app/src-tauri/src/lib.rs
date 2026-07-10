@@ -34,6 +34,19 @@ struct TransferProgress {
     total: u64,
 }
 
+/// 文件夹级操作进度事件负载,发往前端 `folder-progress`。以**文件数**计量(非字节)。
+#[derive(Clone, Serialize)]
+struct FolderProgress {
+    /// 操作类型:`download` / `migrate` / `delete`。
+    op: String,
+    /// 被操作的文件夹路径,前端以此定位进度条。
+    path: String,
+    /// 已完成文件数。
+    done: u64,
+    /// 总文件数。
+    total: u64,
+}
+
 /// 列出已注册账号(仅 id)。
 #[tauri::command]
 fn list_accounts(state: State<'_, App>) -> Vec<String> {
@@ -400,6 +413,134 @@ async fn copy_across(
         .map_err(|e| e.to_string())
 }
 
+/// 递归下载整个远端文件夹到本地目录,保留相对结构(落到 `{local_dir}/{文件夹名}/…`)。
+/// 逐个文件流式写入,每完成一个发一次 `folder-progress`(按文件数计)。
+#[tauri::command]
+async fn download_folder(
+    app: AppHandle,
+    state: State<'_, App>,
+    account: String,
+    remote_root: String,
+    local_dir: String,
+) -> Result<(), String> {
+    use futures::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
+    let core = state.inner().clone();
+    let files = core
+        .list_all_files(&account, &remote_root)
+        .await
+        .map_err(|e| e.to_string())?;
+    let total = files.len() as u64;
+
+    let base = if remote_root.ends_with('/') {
+        remote_root.clone()
+    } else {
+        format!("{remote_root}/")
+    };
+    let folder = remote_root
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or("download");
+    let root_dir = std::path::Path::new(&local_dir).join(folder);
+
+    for (i, file) in files.iter().enumerate() {
+        let rel = file.path.strip_prefix(&base).unwrap_or(&file.path);
+        // 按 `/` 分段拼本地路径,跨平台安全。
+        let mut local = root_dir.clone();
+        for seg in rel.split('/') {
+            local.push(seg);
+        }
+        if let Some(parent) = local.parent() {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| format!("创建目录失败: {e}"))?;
+        }
+        let (_len, mut stream) = core
+            .download_stream(&account, &file.path)
+            .await
+            .map_err(|e| e.to_string())?;
+        let mut f = tokio::fs::File::create(&local)
+            .await
+            .map_err(|e| format!("创建本地文件失败: {e}"))?;
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| e.to_string())?;
+            f.write_all(&chunk)
+                .await
+                .map_err(|e| format!("写入本地文件失败: {e}"))?;
+        }
+        f.flush()
+            .await
+            .map_err(|e| format!("写入本地文件失败: {e}"))?;
+        let _ = app.emit(
+            "folder-progress",
+            FolderProgress {
+                op: "download".into(),
+                path: remote_root.clone(),
+                done: (i + 1) as u64,
+                total,
+            },
+        );
+    }
+    Ok(())
+}
+
+/// 把整个远端文件夹迁移到另一账号的目标目录下(作为子目录),保留相对结构;源保留。
+/// 每完成一个文件发一次 `folder-progress`。
+#[tauri::command]
+async fn migrate_folder(
+    app: AppHandle,
+    state: State<'_, App>,
+    src_account: String,
+    src_root: String,
+    dst_account: String,
+    dst_dir: String,
+) -> Result<(), String> {
+    let core = state.inner().clone();
+    let event_path = src_root.clone();
+    let progress = move |done: u64, total: u64| {
+        let _ = app.emit(
+            "folder-progress",
+            FolderProgress {
+                op: "migrate".into(),
+                path: event_path.clone(),
+                done,
+                total,
+            },
+        );
+    };
+    core.migrate_folder(&src_account, &src_root, &dst_account, &dst_dir, &progress)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 递归删除整个远端文件夹(文件 + 目录占位)。每删一个发一次 `folder-progress`。
+#[tauri::command]
+async fn delete_folder(
+    app: AppHandle,
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<(), String> {
+    let core = state.inner().clone();
+    let event_path = path.clone();
+    let progress = move |done: u64, total: u64| {
+        let _ = app.emit(
+            "folder-progress",
+            FolderProgress {
+                op: "delete".into(),
+                path: event_path.clone(),
+                done,
+                total,
+            },
+        );
+    };
+    core.delete_folder(&account, &path, &progress)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 生成对象的预签名下载链接。
 #[tauri::command]
 async fn presign(
@@ -598,6 +739,9 @@ pub fn run() {
             rename,
             copy,
             copy_across,
+            download_folder,
+            migrate_folder,
+            delete_folder,
             presign,
             presign_batch,
             expand_upload_paths,

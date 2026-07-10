@@ -595,6 +595,70 @@ impl App {
         Ok(())
     }
 
+    /// 递归列出 `root`(桶 / 前缀)下的所有文件(不含目录占位)。
+    ///
+    /// 分页遍历,`SEARCH_SCAN_LIMIT` 兜底防止在超大目录上失控。文件夹级下载 / 迁移 / 删除的基础件。
+    pub async fn list_all_files(&self, account: &str, root: &str) -> Result<Vec<Entry>> {
+        let provider = self.provider(account)?;
+        Ok(walk_dir(&provider, root).await?.0)
+    }
+
+    /// 把 `src_account` 下的整个目录 `src_root` 迁移到 `dst_account` 的 `dst_dir` 下——
+    /// 作为其子目录(按 `src_root` 最后一段命名),保留内部相对结构;源对象保留。
+    ///
+    /// 逐个文件复用 [`Self::copy_across`](同账号服务端复制、跨账号流式中转);
+    /// `progress(已完成文件数, 总文件数)`。
+    pub async fn migrate_folder(
+        &self,
+        src_account: &str,
+        src_root: &str,
+        dst_account: &str,
+        dst_dir: &str,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let files = self.list_all_files(src_account, src_root).await?;
+        let total = files.len() as u64;
+        let base = ensure_trailing_slash(src_root);
+        let dst_base = format!("{}{}/", ensure_trailing_slash(dst_dir), folder_name(src_root));
+        for (i, file) in files.iter().enumerate() {
+            let rel = file.path.strip_prefix(&base).unwrap_or(file.path.as_str());
+            let dst_path = format!("{dst_base}{rel}");
+            self.copy_across(src_account, &file.path, dst_account, &dst_path)
+                .await?;
+            progress((i + 1) as u64, total);
+        }
+        Ok(())
+    }
+
+    /// 递归删除 `root` 下所有对象(文件 + 目录占位对象)。`progress(已删数, 总数)`。
+    ///
+    /// 对象存储的 DELETE 是幂等的,合成前缀(无实体占位对象)删除也安全,故一并清理目录占位,
+    /// 避免"新建文件夹"留下的零字节 `/` 对象残留。
+    pub async fn delete_folder(
+        &self,
+        account: &str,
+        root: &str,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let provider = self.provider(account)?;
+        let (files, mut dirs) = walk_dir(&provider, root).await?;
+        dirs.push(ensure_trailing_slash(root));
+        dirs.sort_by_key(|b| std::cmp::Reverse(b.len())); // 深的先删
+        let total = (files.len() + dirs.len()) as u64;
+        let mut done = 0u64;
+        for file in &files {
+            provider.delete(&file.path).await?;
+            done += 1;
+            progress(done, total);
+        }
+        for dir in &dirs {
+            provider.delete(dir).await?;
+            done += 1;
+            progress(done, total);
+        }
+        Ok(())
+    }
+
     /// 生成预签名下载链接,`expires_secs` 秒后失效。
     pub async fn presign(&self, account: &str, path: &str, expires_secs: u64) -> Result<String> {
         Ok(self.provider(account)?.presign(path, expires_secs).await?)
@@ -649,6 +713,56 @@ impl App {
             .get(account)
             .ok_or_else(|| AppError::NoSuchProvider(account.to_string()))
     }
+}
+
+/// 递归遍历 `root` 下所有条目,分页进行,`SEARCH_SCAN_LIMIT` 兜底防失控。
+/// 返回 `(文件条目, 目录路径)`;触及扫描上限时尽力而为地提前返回已收集部分。
+async fn walk_dir(
+    provider: &Arc<dyn StorageProvider>,
+    root: &str,
+) -> Result<(Vec<Entry>, Vec<String>)> {
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    let mut scanned = 0usize;
+    let mut queue = std::collections::VecDeque::new();
+    queue.push_back(root.to_string());
+    while let Some(dir) = queue.pop_front() {
+        let mut cursor = None;
+        loop {
+            let page = provider.list_page(&dir, cursor).await?;
+            for entry in page.entries {
+                scanned += 1;
+                if entry.is_dir() {
+                    dirs.push(entry.path.clone());
+                    queue.push_back(entry.path);
+                } else {
+                    files.push(entry);
+                }
+            }
+            if scanned >= SEARCH_SCAN_LIMIT {
+                return Ok((files, dirs));
+            }
+            match page.cursor {
+                Some(next) => cursor = Some(next),
+                None => break,
+            }
+        }
+    }
+    Ok((files, dirs))
+}
+
+/// 保证路径以 `/` 结尾(桶 / 前缀作为目录前缀使用)。
+fn ensure_trailing_slash(p: &str) -> String {
+    if p.ends_with('/') {
+        p.to_string()
+    } else {
+        format!("{p}/")
+    }
+}
+
+/// 取目录路径最后一段作为文件夹名(忽略结尾斜杠)。
+fn folder_name(p: &str) -> &str {
+    p.trim_end_matches('/').rsplit('/').next().unwrap_or(p)
 }
 
 #[cfg(test)]
@@ -772,6 +886,134 @@ mod tests {
         async fn delete(&self, _path: &str) -> nebula_provider::Result<()> {
             Ok(())
         }
+    }
+
+    /// 与 [`TreeProvider`] 同构的层级 provider,但记录 copy / delete 调用,
+    /// 用于验证文件夹级迁移 / 删除的路径映射与遍历。
+    struct RecordingTree {
+        copied: Mutex<Vec<(String, String)>>,
+        deleted: Mutex<Vec<String>>,
+    }
+
+    impl RecordingTree {
+        fn new() -> Self {
+            Self {
+                copied: Mutex::new(Vec::new()),
+                deleted: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl StorageProvider for RecordingTree {
+        fn id(&self) -> &str {
+            "rec"
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+        async fn list(&self, path: &str) -> nebula_provider::Result<Vec<Entry>> {
+            let entries = match path {
+                "b" => vec![
+                    Entry::directory("b/photos"),
+                    Entry::file("b/readme.txt", 1),
+                ],
+                "b/photos" => vec![
+                    Entry::file("b/photos/cat.jpg", 1),
+                    Entry::file("b/photos/dog.png", 1),
+                ],
+                _ => vec![],
+            };
+            Ok(entries)
+        }
+        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+            Ok(Entry::file(path.to_string(), 1))
+        }
+        async fn read(&self, _path: &str) -> nebula_provider::Result<Bytes> {
+            Ok(Bytes::new())
+        }
+        async fn write(
+            &self,
+            _path: &str,
+            _data: Bytes,
+            _ct: Option<&str>,
+        ) -> nebula_provider::Result<()> {
+            Ok(())
+        }
+        async fn copy(&self, from: &str, to: &str) -> nebula_provider::Result<()> {
+            self.copied
+                .lock()
+                .unwrap()
+                .push((from.to_string(), to.to_string()));
+            Ok(())
+        }
+        async fn delete(&self, path: &str) -> nebula_provider::Result<()> {
+            self.deleted.lock().unwrap().push(path.to_string());
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn list_all_files_collects_every_file_under_prefix() {
+        let app = App::new();
+        app.add_account(Arc::new(TreeProvider));
+        let mut names: Vec<_> = app
+            .list_all_files("tree", "b")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|e| e.path)
+            .collect();
+        names.sort();
+        assert_eq!(
+            names,
+            ["b/docs/cat-notes.md", "b/photos/cat.jpg", "b/photos/dog.png", "b/readme.txt"]
+        );
+    }
+
+    #[tokio::test]
+    async fn migrate_folder_maps_paths_under_named_subdir() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+
+        // 把 b/photos 迁移到 arch/ 下 → 落到 arch/photos/... 保留相对结构。
+        app.migrate_folder("rec", "b/photos", "rec", "arch", &|_, _| {})
+            .await
+            .unwrap();
+        let mut copied = rec.copied.lock().unwrap().clone();
+        copied.sort();
+        assert_eq!(
+            copied,
+            [
+                ("b/photos/cat.jpg".into(), "arch/photos/cat.jpg".into()),
+                ("b/photos/dog.png".into(), "arch/photos/dog.png".into()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_folder_removes_files_and_the_dir_marker() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+
+        app.delete_folder("rec", "b/photos", &|_, _| {})
+            .await
+            .unwrap();
+        let deleted = rec.deleted.lock().unwrap().clone();
+        assert!(deleted.contains(&"b/photos/cat.jpg".to_string()));
+        assert!(deleted.contains(&"b/photos/dog.png".to_string()));
+        // 目录占位对象也被清掉。
+        assert!(deleted.contains(&"b/photos/".to_string()));
+    }
+
+    #[test]
+    fn folder_path_helpers() {
+        assert_eq!(ensure_trailing_slash("a/b"), "a/b/");
+        assert_eq!(ensure_trailing_slash("a/b/"), "a/b/");
+        assert_eq!(folder_name("bucket/photos/"), "photos");
+        assert_eq!(folder_name("bucket/photos"), "photos");
     }
 
     #[tokio::test]
