@@ -49,6 +49,9 @@ pub struct AccountInfo {
 /// 钥匙串里存储密钥用的服务名。
 const KEYRING_SERVICE: &str = "org.devlive.nebula";
 
+/// 递归搜索最多扫描的条目数(跨所有层级),防止超大桶把搜索拖死。
+const SEARCH_SCAN_LIMIT: usize = 20_000;
+
 /// App 的核心状态与操作入口。可低成本 clone(共享注册表 / 存储 / 密钥库)。
 #[derive(Clone)]
 pub struct App {
@@ -410,8 +413,9 @@ impl App {
     /// 在 `root`(桶 / 前缀)下**递归**搜索名字包含 `query`(大小写不敏感)的文件,
     /// 最多返回 `max_results` 条。
     ///
-    /// 逐层 `list` 下降:遇目录入队继续展开,遇文件按名字匹配。用现有的分层 `list`
-    /// 实现,不依赖厂商的扁平列举;大桶下可能产生较多请求,故用结果数封顶提前结束。
+    /// **逐页**下降(用 [`list_page`](StorageProvider::list_page)):每取一页就判断,凑够
+    /// `max_results` 立即返回,不会把整层拉完;并用总扫描量上限 [`SEARCH_SCAN_LIMIT`] 兜底,
+    /// 避免超大桶把搜索拖到"卡死"。命中稀疏的超大桶会扫到上限后返回已找到的部分。
     pub async fn search(
         &self,
         account: &str,
@@ -422,21 +426,31 @@ impl App {
         let provider = self.provider(account)?;
         let needle = query.trim().to_lowercase();
         let mut results = Vec::new();
+        let mut scanned = 0usize;
         let mut queue = std::collections::VecDeque::new();
         queue.push_back(root.to_string());
 
-        while let Some(dir) = queue.pop_front() {
-            if results.len() >= max_results {
-                break;
-            }
-            for entry in provider.list(&dir).await? {
-                if entry.is_dir() {
-                    queue.push_back(entry.path.clone());
-                } else if needle.is_empty() || entry.name.to_lowercase().contains(&needle) {
-                    results.push(entry);
-                    if results.len() >= max_results {
-                        break;
+        'walk: while let Some(dir) = queue.pop_front() {
+            let mut cursor = None;
+            loop {
+                let page = provider.list_page(&dir, cursor).await?;
+                for entry in page.entries {
+                    scanned += 1;
+                    if entry.is_dir() {
+                        queue.push_back(entry.path);
+                    } else if needle.is_empty() || entry.name.to_lowercase().contains(&needle) {
+                        results.push(entry);
+                        if results.len() >= max_results {
+                            break 'walk;
+                        }
                     }
+                }
+                if scanned >= SEARCH_SCAN_LIMIT {
+                    break 'walk;
+                }
+                match page.cursor {
+                    Some(next) => cursor = Some(next),
+                    None => break,
                 }
             }
         }
