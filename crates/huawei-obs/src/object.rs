@@ -149,6 +149,35 @@ impl ObsClient {
         Ok(())
     }
 
+    /// 转换存储类型:带 `x-obs-storage-class` + `x-obs-metadata-directive: COPY` 的自我复制。
+    pub async fn set_storage_class(&self, bucket: &str, key: &str, class: &str) -> Result<()> {
+        let date = now_gmt();
+        let copy_source = format!("/{bucket}/{}", encode_key(key));
+        let obs_headers = sign::canonicalized_obs_headers([
+            ("x-obs-copy-source", copy_source.as_str()),
+            ("x-obs-metadata-directive", "COPY"),
+            ("x-obs-storage-class", class),
+        ]);
+        let canonical = format!("/{bucket}/{key}");
+        let sts = sign::string_to_sign("PUT", "", "", &date, &obs_headers, &canonical);
+        let authorization = sign::authorization(self.access_key(), self.secret_key(), &sts);
+        let url = format!("{}/{}", self.bucket_base_url(bucket), encode_key(key));
+        let request = self
+            .http()
+            .inner()
+            .request(Method::PUT, &url)
+            .header(DATE, &date)
+            .header(AUTHORIZATION, authorization)
+            .header("x-obs-copy-source", &copy_source)
+            .header("x-obs-metadata-directive", "COPY")
+            .header("x-obs-storage-class", class)
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(ObsError::from)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 组装并签名一次 CopyObject 请求。抽出 `date` 便于确定性测试。
     fn build_copy_request(
         &self,

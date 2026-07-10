@@ -153,6 +153,28 @@ impl OssClient {
         Ok(())
     }
 
+    /// 取回归档对象:`POST /{key}?restore`,复用子资源签名(`restore` 为受签名子资源)。
+    pub async fn restore_object(&self, bucket: &str, key: &str, days: u32) -> Result<()> {
+        let date = now_gmt();
+        let body = Bytes::from(format!(
+            "<RestoreRequest><Days>{days}</Days></RestoreRequest>"
+        ));
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::POST,
+                key,
+                subresources: &[("restore", None)],
+                content_type: Some("application/xml"),
+                content_md5: None,
+                body: Some(body),
+            },
+            &date,
+        )?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 高层封装:把整块数据按 `part_size` 切分并完成分片上传;任一步失败自动 abort。
     ///
     /// `part_size` 会被抬到不小于 [`MIN_PART_SIZE`]。至少上传一个分片(空数据也会

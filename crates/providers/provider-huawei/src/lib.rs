@@ -86,6 +86,7 @@ impl StorageProvider for HuaweiProvider {
         Capabilities {
             multipart_upload: true,
             resumable_upload: true,
+            storage_class_ops: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -337,6 +338,22 @@ impl StorageProvider for HuaweiProvider {
         let (bucket, key) = require_object(path)?;
         self.client
             .abort_multipart_upload(bucket, key, upload_id)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn set_storage_class(&self, path: &str, class: &str) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .set_storage_class(bucket, key, class)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn restore(&self, path: &str, days: u32) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .restore_object(bucket, key, days)
             .await
             .map_err(map_err)
     }

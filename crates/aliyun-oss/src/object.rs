@@ -149,6 +149,37 @@ impl OssClient {
         Ok(())
     }
 
+    /// 转换存储类型:带 `x-oss-storage-class` + `x-oss-metadata-directive: COPY` 的自我复制。
+    pub async fn set_storage_class(&self, bucket: &str, key: &str, class: &str) -> Result<()> {
+        let date = now_gmt();
+        let copy_source = format!("/{bucket}/{}", encode_key(key));
+        // 三个 x-oss- 头都需计入 CanonicalizedOSSHeaders(会自动排序)。
+        let oss_headers = sign::canonicalized_oss_headers([
+            ("x-oss-copy-source", copy_source.as_str()),
+            ("x-oss-metadata-directive", "COPY"),
+            ("x-oss-storage-class", class),
+        ]);
+        let canonical = format!("/{bucket}/{key}");
+        let sts = sign::string_to_sign("PUT", "", "", &date, &oss_headers, &canonical);
+        let authorization =
+            sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
+        let url = format!("{}/{}", self.bucket_base_url(bucket), encode_key(key));
+        let request = self
+            .http()
+            .inner()
+            .request(Method::PUT, &url)
+            .header(DATE, &date)
+            .header(AUTHORIZATION, authorization)
+            .header("x-oss-copy-source", &copy_source)
+            .header("x-oss-metadata-directive", "COPY")
+            .header("x-oss-storage-class", class)
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(OssError::from)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 组装并签名一次 CopyObject 请求。抽出 `date` 便于确定性测试。
     fn build_copy_request(
         &self,

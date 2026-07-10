@@ -176,6 +176,20 @@ pub trait StorageProvider: Send + Sync {
         Ok(())
     }
 
+    /// 转换对象的存储类型 / 归档层(如标准 → 低频 / 归档)。`class` 为厂商的存储类型字符串。
+    ///
+    /// 通常通过"带新存储类型头的服务端自我复制"实现。默认 [`ProviderError::Unsupported`],
+    /// 支持的适配层覆盖并在 [`capabilities`](Self::capabilities) 置 `storage_class_ops = true`。
+    async fn set_storage_class(&self, _path: &str, _class: &str) -> Result<()> {
+        Err(ProviderError::Unsupported("set storage class".into()))
+    }
+
+    /// 取回(解冻)归档 / 冷归档对象,`days` 为取回后可读的保持天数。归档对象在取回完成前
+    /// 无法直接下载。默认 [`ProviderError::Unsupported`]。
+    async fn restore(&self, _path: &str, _days: u32) -> Result<()> {
+        Err(ProviderError::Unsupported("restore archived object".into()))
+    }
+
     /// 删除单个对象。
     async fn delete(&self, path: &str) -> Result<()>;
 

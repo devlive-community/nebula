@@ -9,6 +9,8 @@ pub struct Capabilities {
     pub multipart_upload: bool,
     /// 支持可断点续传的分片上传(begin/upload_part/complete/abort 已实现)。
     pub resumable_upload: bool,
+    /// 支持存储类型转换与归档取回(set_storage_class / restore 已实现)。
+    pub storage_class_ops: bool,
     /// 支持生成预签名临时链接。
     pub presign: bool,
     /// 支持服务端复制(跨对象 / 跨桶免中转)。

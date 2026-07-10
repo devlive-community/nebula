@@ -200,6 +200,51 @@ impl CosClient {
         Ok(())
     }
 
+    /// 转换对象存储类型:带 `x-cos-storage-class` + `x-cos-metadata-directive: Copy` 自我复制。
+    pub async fn set_storage_class(&self, bucket: &str, key: &str, class: &str) -> Result<()> {
+        let copy_source = format!("{}/{}", self.bucket_host(bucket), encode_key(key));
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let request = self.build_signed(SignSpec {
+            method: Method::PUT,
+            host: &host,
+            uri_path: &uri,
+            query: &[],
+            content_type: None,
+            content_md5: None,
+            cos_headers: &[
+                ("x-cos-copy-source", copy_source),
+                ("x-cos-storage-class", class.to_string()),
+                ("x-cos-metadata-directive", "Copy".to_string()),
+            ],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 取回归档对象:`POST /{key}?restore`,请求体指定保持天数与取回层级。
+    pub async fn restore_object(&self, bucket: &str, key: &str, days: u32) -> Result<()> {
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let body = format!(
+            "<RestoreRequest><Days>{days}</Days>\
+             <CASJobParameters><Tier>Standard</Tier></CASJobParameters></RestoreRequest>"
+        );
+        let request = self.build_signed(SignSpec {
+            method: Method::POST,
+            host: &host,
+            uri_path: &uri,
+            query: &[("restore", None)],
+            content_type: Some("application/xml"),
+            content_md5: None,
+            cos_headers: &[],
+            body: Some(Bytes::from(body)),
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 生成一个 GET 预签名 URL,`expires_in` 秒后失效。纯本地签名,不发请求。
     pub fn presign_get(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
         Ok(self.build_presigned_url(bucket, key, expires_in, now_unix()))
