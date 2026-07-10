@@ -67,10 +67,51 @@ dst.write_with_progress(...).await?;        // 目标怎么上传,是目标那�
 
 这就是三层架构(`cloud-core → SDK → provider 适配层 → app`)+ 统一 trait 的回报:**把"每家云不一样"的复杂度,死死摁在适配层里**,让上面的业务逻辑活在一个干净的、只有 `read`/`write`/`list` 的世界里。
 
-## 还没做完的:内存中转
+## 补完:从"整块中转"到"流式中转"
 
-老实说,v1 的跨账号迁移是把整个对象**整块读进内存**再上传的(`src.read()` 返回完整 `Bytes`)——这和 Nebula 现有的上传路径一致(上传也是先把本地文件读进内存)。搬几百 MB 没问题,搬几个 GB 就会吃内存。
+第一版的跨账号迁移是把整个对象**整块读进内存**再上传的(`src.read()` 返回完整 `Bytes`)。搬几百 MB 没问题,搬几个 GB 就会吃内存。所以紧接着我们把它补成了**边下边传的流式中转**——源的分块下载流直接喂给目标的分片上传,内存里只留一个滑动窗口,占用与对象大小无关。
 
-真正的解法是**边下边传的流式中转**:源的分块流直接喂给目标的分片上传,内存里只留一个滑动窗口。但那需要把 provider 的 `write` 从"吃 `Bytes`"改成"吃一个 `Stream`",是一次更大的手术。留给下一篇。
+关键是给统一抽象加一个流式写入方法 `write_stream`,让它"吃一个 `Stream`"而不是"吃 `Bytes`":
 
-先让"多云"这两个字,从一个下拉框里的摆设,变成真能把数据在云之间搬来搬去的东西。
+```rust
+// StorageProvider trait 新增(带兜底默认实现)
+async fn write_stream(
+    &self,
+    path: &str,
+    len: Option<u64>,           // 已知总大小(用于进度分母 / 小文件判断)
+    stream: ByteStream,          // 源的分块下载流
+    content_type: Option<&str>,
+    progress: ProgressFn<'_>,
+) -> Result<()> {
+    // 默认:收集整个流再走普通上传——不省内存,仅作兜底
+    let data = collect_stream(stream).await?;
+    self.write_with_progress(path, data, content_type, progress).await
+}
+```
+
+于是 `copy_across` 的跨账号分支变成一句话——源的流直接进目标的流:
+
+```rust
+let (len, stream) = src.read_stream(src_path).await?;
+dst.write_stream(dst_path, len, stream, None, progress).await?;
+```
+
+真正省内存的活在每家 SDK 的 `upload_multipart_stream` 里:拉流 → 攒够一片(part_size)就上传一片 → 循环,内存峰值约等于**一个分片**,和对象总大小脱钩:
+
+```rust
+while let Some(chunk) = stream.next().await {
+    buf.extend_from_slice(&chunk?);
+    while buf.len() >= part_size {
+        let part = buf.split_to(part_size).freeze();
+        let etag = self.upload_part(bucket, key, upload_id, n, part).await?;
+        parts.push((n, etag)); n += 1;
+    }
+}
+// 收尾:剩余字节作为末片,再 complete
+```
+
+### 一个刻意的设计:兜底默认实现
+
+注意上面 `write_stream` 有个**默认实现**(收集整个流再普通上传)。这是故意的:哪怕将来新接一家云、一时没写流式分片,迁移功能也**永远正确可用**,只是那一家暂时不省内存。真正的流式实现被列进了 [SDK 开发手册](/blog/build-a-provider-sdk) 的验收清单——每家新厂商都得补上。**正确性靠默认实现兜底,性能靠验收清单保证**,两者分开。
+
+这一版之后,"多云"这两个字才算落地:从一个下拉框里的摆设,变成真能把几个 GB 的数据在云之间流式搬来搬去、内存却纹丝不动的东西。
