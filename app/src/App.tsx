@@ -1045,6 +1045,25 @@ export default function App() {
     }
   };
 
+  const showFolderStats = async (entry: Entry) => {
+    if (!current) return;
+    setError(null);
+    const label = isBucket(entry) ? "Bucket" : "文件夹";
+    setNotice({ tone: "info", text: `正在统计${label} ${entry.name}…` });
+    try {
+      const s = await api.folderStats(current, entry.path);
+      setNotice({
+        tone: s.truncated ? "warn" : "ok",
+        text: `${entry.name}:${s.files} 个文件,共 ${formatBytes(s.bytes)}${
+          s.truncated ? "(超大目录,统计可能偏小)" : ""
+        }`,
+      });
+    } catch (e) {
+      setNotice(null);
+      setError(String(e));
+    }
+  };
+
   const doSetStorageClass = async (storageClass: string) => {
     const entry = storageClassTarget;
     setStorageClassTarget(null);
@@ -1540,6 +1559,7 @@ export default function App() {
     if (isBucket(entry)) {
       return [
         { label: "打开", onClick: () => openDir(entry) },
+        { label: "统计信息", onClick: () => showFolderStats(entry) },
         {
           label: "删除 Bucket",
           danger: true,
@@ -1550,6 +1570,7 @@ export default function App() {
     if (entry.kind === "directory") {
       const dirItems: MenuItem[] = [
         { label: "打开", onClick: () => openDir(entry) },
+        { label: "统计信息", onClick: () => showFolderStats(entry) },
         { label: "下载文件夹", onClick: () => downloadFolderEntry(entry) },
       ];
       if (accounts.length > 1) {

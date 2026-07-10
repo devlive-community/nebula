@@ -86,6 +86,14 @@ export type Integrity =
   | { status: "mismatch"; expected: string; actual: string }
   | { status: "unverifiable"; reason: string };
 
+/** 前缀统计(与 Rust 端 app_core::FolderStats 对应)。 */
+export interface FolderStats {
+  files: number;
+  bytes: number;
+  /** 因扫描量触顶而偏小。 */
+  truncated: boolean;
+}
+
 /** 递归搜索结果(与 Rust 端 app_core::SearchResult 对应)。 */
 export interface SearchResult {
   entries: Entry[];

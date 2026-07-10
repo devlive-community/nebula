@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Entry, Integrity, Page, SearchResult, Settings, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Entry, FolderStats, Integrity, Page, SearchResult, Settings, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -173,6 +173,10 @@ export const downloadFile = (
   localPath: string,
   transferId: string,
 ) => invoke<void>("download_file", { account, remotePath, localPath, transferId });
+
+/** 统计文件夹 / Bucket 的文件数与总大小。 */
+export const folderStats = (account: string, path: string) =>
+  invoke<FolderStats>("folder_stats", { account, path });
 
 export const createBucket = (account: string, bucket: string) =>
   invoke<void>("create_bucket", { account, bucket });
