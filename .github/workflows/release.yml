@@ -63,6 +63,26 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: app
 
+      # 从发布日志 docs/src/content/release/<版本>.md 提取正文(去掉开头的 frontmatter)
+      # 作为 Release body;没有对应文件时回退到一句通用说明。
+      - name: Extract release notes
+        id: notes
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          file="docs/src/content/release/${version}.md"
+          if [ -f "$file" ]; then
+            # 删除第一行到第二个 `---`(即整段 YAML frontmatter)
+            body="$(sed '1,/^---[[:space:]]*$/d' "$file")"
+          else
+            body="桌面多云存储管理器。各平台安装包见下方 Assets。"
+          fi
+          {
+            echo "body<<NEBULA_NOTES_EOF"
+            echo "$body"
+            echo "NEBULA_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -74,7 +94,7 @@ jobs:
           projectPath: app
           tagName: ${{ github.ref_name }}
           releaseName: "Nebula ${{ github.ref_name }}"
-          releaseBody: "桌面多云存储管理器。各平台安装包见下方 Assets。"
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
