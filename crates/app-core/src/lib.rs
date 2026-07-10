@@ -465,6 +465,47 @@ impl App {
         Ok(self.provider(account)?.copy(from, to).await?)
     }
 
+    /// 跨账号 / 跨云复制:把 `src_account` 的 `src_path` 搬到 `dst_account` 的 `dst_path`,
+    /// 保留源对象。两端可以是不同的云。
+    pub async fn copy_across(
+        &self,
+        src_account: &str,
+        src_path: &str,
+        dst_account: &str,
+        dst_path: &str,
+    ) -> Result<()> {
+        self.copy_across_with_progress(src_account, src_path, dst_account, dst_path, &|_, _| {})
+            .await
+    }
+
+    /// 同 [`Self::copy_across`],但在上传过程中回调 `(已传字节, 总字节)`。
+    ///
+    /// - **同账号**:直接走 provider 的服务端复制,不下载数据。
+    /// - **跨账号 / 跨云**:服务端复制无法跨账号,退化为"下载源 → 上传目标"(数据整块
+    ///   在内存中转,与现有上传路径一致)。
+    pub async fn copy_across_with_progress(
+        &self,
+        src_account: &str,
+        src_path: &str,
+        dst_account: &str,
+        dst_path: &str,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        if src_account == dst_account {
+            let provider = self.provider(src_account)?;
+            provider.copy(src_path, dst_path).await?;
+            let total = provider.stat(dst_path).await.map(|e| e.size).unwrap_or(0);
+            progress(total, total);
+            return Ok(());
+        }
+        let src = self.provider(src_account)?;
+        let dst = self.provider(dst_account)?;
+        let data = src.read(src_path).await?;
+        dst.write_with_progress(dst_path, data, None, progress)
+            .await?;
+        Ok(())
+    }
+
     /// 生成预签名下载链接,`expires_secs` 秒后失效。
     pub async fn presign(&self, account: &str, path: &str, expires_secs: u64) -> Result<String> {
         Ok(self.provider(account)?.presign(path, expires_secs).await?)
@@ -608,6 +649,48 @@ mod tests {
         let meta = app.stat("mem", "b/k.txt").await.unwrap();
         assert_eq!(meta.kind, EntryKind::File);
         assert_eq!(meta.size, data.len() as u64);
+    }
+
+    #[tokio::test]
+    async fn copy_across_moves_object_between_accounts() {
+        let app = App::new();
+        app.add_account(Arc::new(MemoryProvider::new("src")));
+        app.add_account(Arc::new(MemoryProvider::new("dst")));
+        let data = Bytes::from_static(b"cross-cloud payload");
+        app.upload("src", "b/from.bin", data.clone(), None)
+            .await
+            .unwrap();
+
+        app.copy_across("src", "b/from.bin", "dst", "b/to.bin")
+            .await
+            .unwrap();
+
+        // 目标账号拿到了副本,源对象仍在。
+        assert_eq!(app.download("dst", "b/to.bin").await.unwrap(), data);
+        assert_eq!(app.download("src", "b/from.bin").await.unwrap(), data);
+    }
+
+    #[tokio::test]
+    async fn copy_across_same_account_uses_server_side_copy() {
+        let app = app_with_memory();
+        let data = Bytes::from_static(b"same-account");
+        app.upload("mem", "b/a.txt", data.clone(), None)
+            .await
+            .unwrap();
+
+        let seen = std::sync::Mutex::new(None);
+        app.copy_across_with_progress("mem", "b/a.txt", "mem", "b/b.txt", &|done, total| {
+            *seen.lock().unwrap() = Some((done, total));
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(app.download("mem", "b/b.txt").await.unwrap(), data);
+        // 进度回调以总大小收尾。
+        assert_eq!(
+            seen.into_inner().unwrap(),
+            Some((data.len() as u64, data.len() as u64))
+        );
     }
 
     #[tokio::test]

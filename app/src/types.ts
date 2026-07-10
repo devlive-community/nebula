@@ -14,6 +14,13 @@ export interface DownloadProgress {
   total: number;
 }
 
+/** 跨账号迁移进度事件负载(Rust 端 TransferProgress)。 */
+export interface TransferProgress {
+  to: string;
+  transferred: number;
+  total: number;
+}
+
 /** 账号非敏感信息(编辑回填用,与 Rust 端 AccountInfo 对应)。 */
 export interface AccountInfo {
   id: string;
@@ -37,7 +44,7 @@ export interface Settings {
 /** 传输任务列表中的一项(含重试所需的参数)。 */
 export interface TransferItem {
   id: string;
-  kind: "上传" | "下载";
+  kind: "上传" | "下载" | "迁移";
   name: string;
   account: string;
   remote: string;

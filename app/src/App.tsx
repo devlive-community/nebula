@@ -10,6 +10,7 @@ import type {
   Entry,
   Settings,
   TransferItem,
+  TransferProgress,
   UploadProgress,
 } from "./types";
 import * as api from "./api";
@@ -30,6 +31,7 @@ import { FileGrid } from "./components/FileGrid";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { PromptDialog } from "./components/PromptDialog";
 import { MoveCopyDialog } from "./components/MoveCopyDialog";
+import { MigrateDialog } from "./components/MigrateDialog";
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TransferPanel } from "./components/TransferPanel";
@@ -58,6 +60,7 @@ export default function App() {
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [moveCopyTarget, setMoveCopyTarget] = useState<Entry | null>(null);
+  const [migrateTarget, setMigrateTarget] = useState<Entry | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -168,7 +171,8 @@ export default function App() {
 
   const retryTransfer = (id: string) => {
     const t = transfers[id];
-    if (t) void startTransfer(t);
+    // 迁移任务不经 startTransfer(它只认上传 / 下载),失败请从右键菜单重发。
+    if (t && t.kind !== "迁移") void startTransfer({ ...t, kind: t.kind });
   };
 
   const clearTransfers = () =>
@@ -273,9 +277,13 @@ export default function App() {
     const unDownload = listen<DownloadProgress>("download-progress", (e) => {
       updateProgress(e.payload.path, e.payload.downloaded, e.payload.total);
     });
+    const unTransfer = listen<TransferProgress>("transfer-progress", (e) => {
+      updateProgress(`migrate:${e.payload.to}`, e.payload.transferred, e.payload.total);
+    });
     return () => {
       unUpload.then((off) => off());
       unDownload.then((off) => off());
+      unTransfer.then((off) => off());
     };
   }, []);
 
@@ -639,6 +647,43 @@ export default function App() {
     }
   };
 
+  const doMigrate = async (dstAccount: string, dstPath: string) => {
+    const entry = migrateTarget;
+    setMigrateTarget(null);
+    if (!current || !entry) return;
+    // 传输面板任务 id 与后端 transfer-progress 的 `to` 对齐,用于实时进度。
+    const id = `migrate:${dstPath}`;
+    setTransfers((prev) => ({
+      ...prev,
+      [id]: {
+        id,
+        kind: "迁移",
+        name: baseName(dstPath),
+        account: dstAccount,
+        remote: dstPath,
+        local: `${current} → ${dstAccount}`,
+        done: 0,
+        total: entry.size,
+        status: "active",
+      },
+    }));
+    try {
+      await api.copyAcross(current, entry.path, dstAccount, dstPath);
+      setTransfers((prev) =>
+        prev[id]
+          ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
+          : prev,
+      );
+      // 目标恰为当前视图时刷新以显示新对象。
+      if (dstAccount === current) await load();
+    } catch (e) {
+      setError(String(e));
+      setTransfers((prev) =>
+        prev[id] ? { ...prev, [id]: { ...prev[id], status: "error" } } : prev,
+      );
+    }
+  };
+
   const share = async (entry: Entry) => {
     if (!current) return;
     setError(null);
@@ -675,6 +720,7 @@ export default function App() {
     !!pendingDelete ||
     !!renameTarget ||
     !!moveCopyTarget ||
+    !!migrateTarget ||
     !!shareUrl ||
     showNewFolder ||
     pendingBatchDelete ||
@@ -689,6 +735,7 @@ export default function App() {
       if (showSettings) setShowSettings(false);
       else if (shareUrl) setShareUrl(null);
       else if (moveCopyTarget) setMoveCopyTarget(null);
+      else if (migrateTarget) setMigrateTarget(null);
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
       else if (showForm) setShowForm(false);
@@ -928,6 +975,16 @@ export default function App() {
         />
       )}
 
+      {migrateTarget && current && (
+        <MigrateDialog
+          accounts={accounts}
+          srcAccount={current}
+          from={migrateTarget.path}
+          onConfirm={doMigrate}
+          onCancel={() => setMigrateTarget(null)}
+        />
+      )}
+
       {shareUrl && (
         <ShareDialog
           url={shareUrl}
@@ -985,6 +1042,11 @@ export default function App() {
       { label: "下载", onClick: () => download(entry) },
       { label: "重命名", onClick: () => setRenameTarget(entry) },
       { label: "复制 / 移动到", onClick: () => setMoveCopyTarget(entry) },
+    );
+    if (accounts.length > 1) {
+      items.push({ label: "迁移到其他账号", onClick: () => setMigrateTarget(entry) });
+    }
+    items.push(
       { label: "分享链接", onClick: () => share(entry) },
       { label: "删除", danger: true, onClick: () => setPendingDelete(entry) },
     );

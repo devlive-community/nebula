@@ -96,6 +96,13 @@ export const rename = (account: string, from: string, to: string) =>
 export const copy = (account: string, from: string, to: string) =>
   invoke<void>("copy", { account, from, to });
 
+export const copyAcross = (
+  srcAccount: string,
+  srcPath: string,
+  dstAccount: string,
+  dstPath: string,
+) => invoke<void>("copy_across", { srcAccount, srcPath, dstAccount, dstPath });
+
 export const presign = (account: string, path: string, expiresSecs: number) =>
   invoke<string>("presign", { account, path, expiresSecs });
 

@@ -1029,6 +1029,23 @@ body.resizing {
   width: 480px;
 }
 
+.picker__account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.picker__account-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.picker__account .select {
+  flex: 1;
+}
+
 .picker__bar {
   display: flex;
   align-items: center;

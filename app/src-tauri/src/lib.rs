@@ -25,6 +25,15 @@ struct DownloadProgress {
     total: u64,
 }
 
+/// 跨账号迁移进度事件负载,发往前端 `transfer-progress`。
+#[derive(Clone, Serialize)]
+struct TransferProgress {
+    /// 目标端路径,前端以此定位进度条。
+    to: String,
+    transferred: u64,
+    total: u64,
+}
+
 /// 列出已注册账号(仅 id)。
 #[tauri::command]
 fn list_accounts(state: State<'_, App>) -> Vec<String> {
@@ -321,6 +330,36 @@ async fn copy(
         .map_err(|e| e.to_string())
 }
 
+/// 跨账号 / 跨云迁移复制:把 `src_account` 的 `src_path` 搬到 `dst_account` 的 `dst_path`,
+/// 保留源对象。跨账号时走"下载源 → 上传目标",过程中发 `transfer-progress` 事件。
+#[tauri::command]
+async fn copy_across(
+    app: AppHandle,
+    state: State<'_, App>,
+    src_account: String,
+    src_path: String,
+    dst_account: String,
+    dst_path: String,
+) -> Result<(), String> {
+    let core = state.inner().clone();
+
+    let event_to = dst_path.clone();
+    let progress = move |transferred: u64, total: u64| {
+        let _ = app.emit(
+            "transfer-progress",
+            TransferProgress {
+                to: event_to.clone(),
+                transferred,
+                total,
+            },
+        );
+    };
+
+    core.copy_across_with_progress(&src_account, &src_path, &dst_account, &dst_path, &progress)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 生成对象的预签名下载链接。
 #[tauri::command]
 async fn presign(
@@ -515,6 +554,7 @@ pub fn run() {
             create_folder,
             rename,
             copy,
+            copy_across,
             presign,
             presign_batch,
             expand_upload_paths,
