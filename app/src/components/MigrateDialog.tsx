@@ -14,6 +14,8 @@ interface Props {
   srcAccount: string;
   /** 源对象完整路径,如 bucket/a/b.txt。 */
   from: string;
+  /** 源是否为文件夹(整目录迁移)。true 时确认回传的是**目标目录**,而非目标对象路径。 */
+  isFolder?: boolean;
   onConfirm: (dstAccount: string, dstPath: string) => void;
   onCancel: () => void;
 }
@@ -27,7 +29,7 @@ const accountLabel = (a: AccountInfo): string => {
  * 跨账号 / 跨云迁移复制:选一个目标账号,级联浏览进目标账号的某个 bucket / 目录,
  * 再把源对象复制过去(保留源对象)。目标账号默认排除源账号本身。
  */
-export function MigrateDialog({ accounts, srcAccount, from, onConfirm, onCancel }: Props) {
+export function MigrateDialog({ accounts, srcAccount, from, isFolder, onConfirm, onCancel }: Props) {
   const options = useMemo(
     () => accounts.map((a) => ({ value: a.id, label: accountLabel(a) })),
     [accounts],
@@ -65,9 +67,17 @@ export function MigrateDialog({ accounts, srcAccount, from, onConfirm, onCancel 
     setPickPath("");
   };
 
-  const target = pickPath ? joinRemote(pickPath, baseName(from)) : "";
-  const sameObject = dstAccount === srcAccount && target === from;
-  const canConfirm = dstAccount !== "" && target !== "" && !sameObject;
+  // 文件夹迁移:落到「目标目录/源文件夹名/…」,确认回传目标目录(pickPath)。
+  const srcFolderName = from.replace(/\/+$/, "").split("/").pop() ?? "";
+  const target = isFolder
+    ? pickPath
+      ? joinRemote(pickPath, srcFolderName) + "/"
+      : ""
+    : pickPath
+      ? joinRemote(pickPath, baseName(from))
+      : "";
+  const sameObject = !isFolder && dstAccount === srcAccount && target === from;
+  const canConfirm = dstAccount !== "" && pickPath !== "" && target !== "" && !sameObject;
   const crumbs = breadcrumbs(pickPath);
 
   return (
@@ -144,7 +154,7 @@ export function MigrateDialog({ accounts, srcAccount, from, onConfirm, onCancel 
           <button
             className="btn btn--primary"
             disabled={!canConfirm}
-            onClick={() => onConfirm(dstAccount, target)}
+            onClick={() => onConfirm(dstAccount, isFolder ? pickPath : target)}
           >
             <FontAwesomeIcon icon={faRightLeft} /> 迁移到此
           </button>

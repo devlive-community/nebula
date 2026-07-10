@@ -8,6 +8,7 @@ import type {
   AccountInfo,
   DownloadProgress,
   Entry,
+  FolderProgress,
   Settings,
   TransferItem,
   TransferProgress,
@@ -184,8 +185,9 @@ export default function App() {
 
   const retryTransfer = (id: string) => {
     const t = transfers[id];
-    // 迁移任务不经 startTransfer(它只认上传 / 下载),失败请从右键菜单重发。
-    if (t && t.kind !== "迁移") void startTransfer({ ...t, kind: t.kind });
+    // 只有单文件上传 / 下载能直接重发;迁移与文件夹任务请从右键菜单重来。
+    if (t && (t.kind === "上传" || t.kind === "下载"))
+      void startTransfer({ ...t, kind: t.kind });
   };
 
   const clearTransfers = () =>
@@ -294,10 +296,15 @@ export default function App() {
     const unTransfer = listen<TransferProgress>("transfer-progress", (e) => {
       updateProgress(`migrate:${e.payload.to}`, e.payload.transferred, e.payload.total);
     });
+    const unFolder = listen<FolderProgress>("folder-progress", (e) => {
+      const { op, path, done, total } = e.payload;
+      updateProgress(`folder:${op}:${path}`, done, total);
+    });
     return () => {
       unUpload.then((off) => off());
       unDownload.then((off) => off());
       unTransfer.then((off) => off());
+      unFolder.then((off) => off());
     };
   }, []);
 
@@ -633,6 +640,40 @@ export default function App() {
     setBusy(false);
   };
 
+  const downloadFolderEntry = async (entry: Entry) => {
+    if (!current) return;
+    const dir = await open({ directory: true, title: "选择下载到的目录" });
+    if (typeof dir !== "string") return;
+    const id = `folder:download:${entry.path}`;
+    setTransfers((prev) => ({
+      ...prev,
+      [id]: {
+        id,
+        kind: "下载文件夹",
+        name: entry.name,
+        account: current,
+        remote: entry.path,
+        local: dir,
+        done: 0,
+        total: 0,
+        status: "active",
+      },
+    }));
+    try {
+      await api.downloadFolder(current, entry.path, dir);
+      setTransfers((prev) =>
+        prev[id]
+          ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
+          : prev,
+      );
+    } catch (e) {
+      setError(String(e));
+      setTransfers((prev) =>
+        prev[id] ? { ...prev, [id]: { ...prev[id], status: "error" } } : prev,
+      );
+    }
+  };
+
   const doDelete = async () => {
     const entry = pendingDelete;
     setPendingDelete(null);
@@ -640,7 +681,8 @@ export default function App() {
     setBusy(true);
     setError(null);
     try {
-      await api.deletePath(current, entry.path);
+      if (entry.kind === "directory") await api.deleteFolder(current, entry.path);
+      else await api.deletePath(current, entry.path);
       await load();
     } catch (e) {
       setError(String(e));
@@ -718,7 +760,42 @@ export default function App() {
     const entry = migrateTarget;
     setMigrateTarget(null);
     if (!current || !entry) return;
-    // 传输面板任务 id 与后端 transfer-progress 的 `to` 对齐,用于实时进度。
+
+    // 文件夹迁移:dstPath 是目标目录,逐文件流式中转,进度按文件数(folder-progress)。
+    if (entry.kind === "directory") {
+      const fid = `folder:migrate:${entry.path}`;
+      setTransfers((prev) => ({
+        ...prev,
+        [fid]: {
+          id: fid,
+          kind: "迁移文件夹",
+          name: entry.name,
+          account: dstAccount,
+          remote: dstPath,
+          local: `${current} → ${dstAccount}`,
+          done: 0,
+          total: 0,
+          status: "active",
+        },
+      }));
+      try {
+        await api.migrateFolder(current, entry.path, dstAccount, dstPath);
+        setTransfers((prev) =>
+          prev[fid]
+            ? { ...prev, [fid]: { ...prev[fid], status: "done", done: prev[fid].total } }
+            : prev,
+        );
+        if (dstAccount === current) await load();
+      } catch (e) {
+        setError(String(e));
+        setTransfers((prev) =>
+          prev[fid] ? { ...prev, [fid]: { ...prev[fid], status: "error" } } : prev,
+        );
+      }
+      return;
+    }
+
+    // 单对象迁移:任务 id 与后端 transfer-progress 的 `to` 对齐,用于实时进度。
     const id = `migrate:${dstPath}`;
     setTransfers((prev) => ({
       ...prev,
@@ -1034,7 +1111,11 @@ export default function App() {
       {pendingDelete && (
         <ConfirmDialog
           title="删除确认"
-          message={`确定删除 ${pendingDelete.name}?此操作不可恢复。`}
+          message={
+            pendingDelete.kind === "directory"
+              ? `确定删除整个文件夹 ${pendingDelete.name}?其下所有对象都会被递归删除,此操作不可恢复。`
+              : `确定删除 ${pendingDelete.name}?此操作不可恢复。`
+          }
           danger
           confirmLabel="删除"
           onConfirm={doDelete}
@@ -1089,6 +1170,7 @@ export default function App() {
           accounts={accounts}
           srcAccount={current}
           from={migrateTarget.path}
+          isFolder={migrateTarget.kind === "directory"}
           onConfirm={doMigrate}
           onCancel={() => setMigrateTarget(null)}
         />
@@ -1140,7 +1222,22 @@ export default function App() {
 
   function contextItems(entry: Entry): MenuItem[] {
     if (entry.kind === "directory") {
-      return [{ label: "打开", onClick: () => openDir(entry) }];
+      const dirItems: MenuItem[] = [
+        { label: "打开", onClick: () => openDir(entry) },
+        { label: "下载文件夹", onClick: () => downloadFolderEntry(entry) },
+      ];
+      if (accounts.length > 1) {
+        dirItems.push({
+          label: "迁移到其他账号",
+          onClick: () => setMigrateTarget(entry),
+        });
+      }
+      dirItems.push({
+        label: "删除文件夹",
+        danger: true,
+        onClick: () => setPendingDelete(entry),
+      });
+      return dirItems;
     }
     const items: MenuItem[] = [];
     if (previewKind(entry.name)) {

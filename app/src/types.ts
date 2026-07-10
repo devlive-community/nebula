@@ -21,6 +21,16 @@ export interface TransferProgress {
   total: number;
 }
 
+/** 文件夹级操作进度事件负载(Rust 端 FolderProgress)。以文件数计量。 */
+export interface FolderProgress {
+  /** "download" | "migrate" | "delete"。 */
+  op: string;
+  /** 被操作的文件夹路径。 */
+  path: string;
+  done: number;
+  total: number;
+}
+
 /** 账号非敏感信息(编辑回填用,与 Rust 端 AccountInfo 对应)。 */
 export interface AccountInfo {
   id: string;
@@ -44,7 +54,7 @@ export interface Settings {
 /** 传输任务列表中的一项(含重试所需的参数)。 */
 export interface TransferItem {
   id: string;
-  kind: "上传" | "下载" | "迁移";
+  kind: "上传" | "下载" | "迁移" | "下载文件夹" | "迁移文件夹";
   name: string;
   account: string;
   remote: string;

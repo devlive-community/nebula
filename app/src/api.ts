@@ -77,6 +77,22 @@ export const statPath = (account: string, path: string) =>
 export const verifyObject = (account: string, path: string) =>
   invoke<Integrity>("verify_object", { account, path });
 
+export const downloadFolder = (
+  account: string,
+  remoteRoot: string,
+  localDir: string,
+) => invoke<void>("download_folder", { account, remoteRoot, localDir });
+
+export const migrateFolder = (
+  srcAccount: string,
+  srcRoot: string,
+  dstAccount: string,
+  dstDir: string,
+) => invoke<void>("migrate_folder", { srcAccount, srcRoot, dstAccount, dstDir });
+
+export const deleteFolder = (account: string, path: string) =>
+  invoke<void>("delete_folder", { account, path });
+
 export const search = (
   account: string,
   root: string,
