@@ -86,6 +86,7 @@ export default function App() {
   const [restoreTarget, setRestoreTarget] = useState<Entry | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
+  const [editTypeTarget, setEditTypeTarget] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewBucket, setShowNewBucket] = useState(false);
   const [settings, setSettings] = useState<Settings>({
@@ -1045,6 +1046,42 @@ export default function App() {
     }
   };
 
+  // 打开详情:先用列表数据即时显示,再 stat 补上真实 Content-Type(列表不返回)。
+  const openDetails = async (entry: Entry) => {
+    setDetailsEntry(entry);
+    if (!current || entry.kind !== "file") return;
+    try {
+      const full = await api.statPath(current, entry.path);
+      setDetailsEntry((cur) =>
+        cur && cur.path === entry.path
+          ? { ...cur, content_type: full.content_type }
+          : cur,
+      );
+    } catch {
+      /* stat 失败就保留列表数据 */
+    }
+  };
+
+  const doSetContentType = async (contentType: string) => {
+    const entry = editTypeTarget;
+    setEditTypeTarget(null);
+    if (!current || !entry) return;
+    setError(null);
+    setNotice({ tone: "info", text: `正在修改 ${entry.name} 的类型…` });
+    try {
+      await api.setContentType(current, entry.path, contentType);
+      setDetailsEntry((cur) =>
+        cur && cur.path === entry.path
+          ? { ...cur, content_type: contentType }
+          : cur,
+      );
+      setNotice({ tone: "ok", text: `✓ ${entry.name} 类型已改为 ${contentType}` });
+    } catch (e) {
+      setNotice(null);
+      setError(String(e));
+    }
+  };
+
   const showFolderStats = async (entry: Entry) => {
     if (!current) return;
     setError(null);
@@ -1161,6 +1198,7 @@ export default function App() {
     !!shareUrl ||
     showNewFolder ||
     showNewBucket ||
+    !!editTypeTarget ||
     pendingBatchDelete ||
     showSettings;
 
@@ -1181,6 +1219,7 @@ export default function App() {
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
       else if (showNewBucket) setShowNewBucket(false);
+      else if (editTypeTarget) setEditTypeTarget(null);
       else if (showForm) setShowForm(false);
       else if (pendingBatchDelete) setPendingBatchDelete(false);
       else if (pendingDelete) setPendingDelete(null);
@@ -1341,6 +1380,7 @@ export default function App() {
                 onClose={() => setDetailsEntry(null)}
                 onDownload={download}
                 onShare={share}
+                onEditType={setEditTypeTarget}
               />
             )}
 
@@ -1428,6 +1468,17 @@ export default function App() {
           submitLabel="创建"
           onSubmit={createBucket}
           onCancel={() => setShowNewBucket(false)}
+        />
+      )}
+
+      {editTypeTarget && (
+        <PromptDialog
+          title="修改内容类型"
+          placeholder="如 image/png、application/pdf"
+          initial={editTypeTarget.content_type ?? ""}
+          submitLabel="保存"
+          onSubmit={doSetContentType}
+          onCancel={() => setEditTypeTarget(null)}
         />
       )}
 
@@ -1595,7 +1646,7 @@ export default function App() {
       items.push({ label: "预览", onClick: () => openPreview(entry) });
     }
     items.push(
-      { label: "详情", onClick: () => setDetailsEntry(entry) },
+      { label: "详情", onClick: () => openDetails(entry) },
       { label: "下载", onClick: () => download(entry) },
       { label: "校验完整性", onClick: () => verifyEntry(entry) },
       { label: "转换存储类型", onClick: () => setStorageClassTarget(entry) },

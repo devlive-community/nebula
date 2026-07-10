@@ -865,6 +865,21 @@ body.resizing {
   user-select: text;
 }
 
+.details__edit {
+  margin-left: 8px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.details__edit:hover {
+  color: var(--primary);
+  background: var(--bg-elev-2);
+}
+
 .details__actions {
   display: flex;
   gap: 8px;

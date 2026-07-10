@@ -174,6 +174,13 @@ export const downloadFile = (
   transferId: string,
 ) => invoke<void>("download_file", { account, remotePath, localPath, transferId });
 
+/** 修改对象的内容类型(Content-Type)。 */
+export const setContentType = (
+  account: string,
+  path: string,
+  contentType: string,
+) => invoke<void>("set_content_type", { account, path, contentType });
+
 /** 统计文件夹 / Bucket 的文件数与总大小。 */
 export const folderStats = (account: string, path: string) =>
   invoke<FolderStats>("folder_stats", { account, path });

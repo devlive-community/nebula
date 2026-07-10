@@ -111,4 +111,6 @@ export interface Entry {
   etag: string | null;
   /** 存储类型 / 归档层(如 STANDARD / IA / ARCHIVE);未知为 null。 */
   storage_class: string | null;
+  /** 内容类型(MIME);列举时通常为 null,stat 才有。 */
+  content_type: string | null;
 }
