@@ -711,6 +711,60 @@ async fn delete_folder(
         .map_err(|e| e.to_string())
 }
 
+/// 递归把整个远端文件夹转换存储类型。每处理一个发一次 `folder-progress`。
+#[tauri::command]
+async fn set_storage_class_folder(
+    app: AppHandle,
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    class: String,
+) -> Result<(), String> {
+    let core = state.inner().clone();
+    let event_path = path.clone();
+    let progress = move |done: u64, total: u64| {
+        let _ = app.emit(
+            "folder-progress",
+            FolderProgress {
+                op: "storage-class".into(),
+                path: event_path.clone(),
+                done,
+                total,
+            },
+        );
+    };
+    core.set_storage_class_folder(&account, &path, &class, &progress)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 递归取回整个远端文件夹里的归档对象。每处理一个发一次 `folder-progress`。
+#[tauri::command]
+async fn restore_folder(
+    app: AppHandle,
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    days: u32,
+) -> Result<(), String> {
+    let core = state.inner().clone();
+    let event_path = path.clone();
+    let progress = move |done: u64, total: u64| {
+        let _ = app.emit(
+            "folder-progress",
+            FolderProgress {
+                op: "restore".into(),
+                path: event_path.clone(),
+                done,
+                total,
+            },
+        );
+    };
+    core.restore_folder(&account, &path, days, &progress)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 生成对象的预签名下载链接。
 #[tauri::command]
 async fn presign(
@@ -919,6 +973,8 @@ pub fn run() {
             download_folder,
             migrate_folder,
             delete_folder,
+            set_storage_class_folder,
+            restore_folder,
             presign,
             presign_batch,
             expand_upload_paths,

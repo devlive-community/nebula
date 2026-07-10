@@ -732,6 +732,46 @@ impl App {
         Ok(())
     }
 
+    /// 把 `root` 下所有文件递归转换到存储类型 `class`(如整个前缀转归档省钱)。
+    /// `progress(已处理, 总数)`。逐个复用 [`set_storage_class`](Self::set_storage_class)。
+    pub async fn set_storage_class_folder(
+        &self,
+        account: &str,
+        root: &str,
+        class: &str,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let provider = self.provider(account)?;
+        let files = walk_dir(&provider, root).await?.0;
+        let total = files.len() as u64;
+        for (i, file) in files.iter().enumerate() {
+            provider.set_storage_class(&file.path, class).await?;
+            progress((i + 1) as u64, total);
+        }
+        Ok(())
+    }
+
+    /// 递归取回 `root` 下所有归档对象,`days` 为保持天数。`progress(已处理, 总数)`。
+    ///
+    /// 非归档对象取回会被服务端拒绝;这里逐个尽力发起,单个失败不中断整体(记为已处理)。
+    pub async fn restore_folder(
+        &self,
+        account: &str,
+        root: &str,
+        days: u32,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let provider = self.provider(account)?;
+        let files = walk_dir(&provider, root).await?.0;
+        let total = files.len() as u64;
+        for (i, file) in files.iter().enumerate() {
+            // 非归档对象会被拒绝,忽略单个错误以便对整层尽力取回。
+            let _ = provider.restore(&file.path, days).await;
+            progress((i + 1) as u64, total);
+        }
+        Ok(())
+    }
+
     /// 生成预签名下载链接,`expires_secs` 秒后失效。
     pub async fn presign(&self, account: &str, path: &str, expires_secs: u64) -> Result<String> {
         Ok(self.provider(account)?.presign(path, expires_secs).await?)
@@ -1003,6 +1043,8 @@ mod tests {
     struct RecordingTree {
         copied: Mutex<Vec<(String, String)>>,
         deleted: Mutex<Vec<String>>,
+        classed: Mutex<Vec<(String, String)>>,
+        restored: Mutex<Vec<(String, u32)>>,
     }
 
     impl RecordingTree {
@@ -1010,6 +1052,8 @@ mod tests {
             Self {
                 copied: Mutex::new(Vec::new()),
                 deleted: Mutex::new(Vec::new()),
+                classed: Mutex::new(Vec::new()),
+                restored: Mutex::new(Vec::new()),
             }
         }
     }
@@ -1058,6 +1102,56 @@ mod tests {
             self.deleted.lock().unwrap().push(path.to_string());
             Ok(())
         }
+        async fn set_storage_class(&self, path: &str, class: &str) -> nebula_provider::Result<()> {
+            self.classed
+                .lock()
+                .unwrap()
+                .push((path.to_string(), class.to_string()));
+            Ok(())
+        }
+        async fn restore(&self, path: &str, days: u32) -> nebula_provider::Result<()> {
+            self.restored.lock().unwrap().push((path.to_string(), days));
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn set_storage_class_folder_applies_to_every_file() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+        app.set_storage_class_folder("rec", "b", "ARCHIVE", &|_, _| {})
+            .await
+            .unwrap();
+        let mut classed = rec.classed.lock().unwrap().clone();
+        classed.sort();
+        assert_eq!(
+            classed,
+            [
+                ("b/photos/cat.jpg".into(), "ARCHIVE".into()),
+                ("b/photos/dog.png".into(), "ARCHIVE".into()),
+                ("b/readme.txt".into(), "ARCHIVE".into()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn restore_folder_requests_every_file() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+        app.restore_folder("rec", "b/photos", 3, &|_, _| {})
+            .await
+            .unwrap();
+        let mut restored = rec.restored.lock().unwrap().clone();
+        restored.sort();
+        assert_eq!(
+            restored,
+            [
+                ("b/photos/cat.jpg".into(), 3),
+                ("b/photos/dog.png".into(), 3),
+            ]
+        );
     }
 
     #[tokio::test]
