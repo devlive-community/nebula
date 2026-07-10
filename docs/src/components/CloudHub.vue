@@ -35,12 +35,14 @@
 </template>
 
 <script setup lang="ts">
+// 7 家云均匀分布在中心 Nebula 周围(椭圆,顺时针)
 const nodes = [
   {name: '阿里云 OSS', active: true, x: 50, y: 7},
-  {name: '腾讯云 COS', active: false, x: 90, y: 28},
-  {name: '华为云 OBS', active: true, x: 84, y: 78},
-  {name: 'AWS S3', active: true, x: 50, y: 94},
-  {name: '七牛云 Kodo', active: true, x: 16, y: 78},
-  {name: 'Cloudflare R2', active: true, x: 10, y: 28}
+  {name: '腾讯云 COS', active: false, x: 81, y: 23},
+  {name: '华为云 OBS', active: true, x: 89, y: 60},
+  {name: 'AWS S3', active: true, x: 67, y: 89},
+  {name: 'MinIO', active: true, x: 33, y: 89},
+  {name: '七牛云 Kodo', active: true, x: 11, y: 60},
+  {name: 'Cloudflare R2', active: true, x: 19, y: 23}
 ]
 </script>
