@@ -8,6 +8,7 @@
 //! 逻辑可以完全用 `cargo test` 覆盖,无需启动 GUI。
 
 mod error;
+mod integrity;
 mod secret;
 mod settings;
 mod store;
@@ -25,6 +26,7 @@ use provider_r2::R2Provider;
 use provider_tencent::TencentProvider;
 
 pub use error::{AppError, Result};
+pub use integrity::{verify_bytes, Integrity};
 pub use nebula_provider::{ByteStream, Capabilities, EntryKind, Page, ProgressFn};
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
@@ -476,6 +478,17 @@ impl App {
         Ok(self.provider(account)?.read(path).await?)
     }
 
+    /// 校验对象内容完整性:下载内容,用远端 ETag 与其 MD5 比对。
+    ///
+    /// 整对象上传的文件 ETag 即内容 MD5,可判断是否损坏;分片对象无法这样校验,
+    /// 返回 [`Integrity::Unverifiable`]。逻辑对所有厂商通用(见 [`integrity`])。
+    pub async fn verify(&self, account: &str, path: &str) -> Result<Integrity> {
+        let provider = self.provider(account)?;
+        let meta = provider.stat(path).await?;
+        let data = provider.read(path).await?;
+        Ok(integrity::verify_bytes(&data, meta.etag.as_deref()))
+    }
+
     /// 流式下载:返回 `(内容长度, 分块流)`,供调用方边写边报进度。
     pub async fn download_stream(
         &self,
@@ -680,7 +693,11 @@ mod tests {
             let store = self.store.lock().unwrap();
             store
                 .get(path)
-                .map(|v| Entry::file(path.to_string(), v.len() as u64))
+                // 模拟对象存储:整对象上传的 ETag 即内容 MD5,供完整性校验测试用。
+                .map(|v| {
+                    Entry::file(path.to_string(), v.len() as u64)
+                        .with_etag(cloud_core::crypto::md5_hex(v))
+                })
                 .ok_or_else(|| ProviderError::NotFound(path.to_string()))
         }
         async fn read(&self, path: &str) -> nebula_provider::Result<Bytes> {
@@ -801,6 +818,16 @@ mod tests {
         let meta = app.stat("mem", "b/k.txt").await.unwrap();
         assert_eq!(meta.kind, EntryKind::File);
         assert_eq!(meta.size, data.len() as u64);
+    }
+
+    #[tokio::test]
+    async fn verify_passes_for_intact_object() {
+        let app = app_with_memory();
+        app.upload("mem", "b/k.txt", Bytes::from_static(b"hello app-core"), None)
+            .await
+            .unwrap();
+        // MemoryProvider 的 stat 返回内容 MD5 作为 ETag → 校验应通过。
+        assert_eq!(app.verify("mem", "b/k.txt").await.unwrap(), Integrity::Verified);
     }
 
     #[tokio::test]

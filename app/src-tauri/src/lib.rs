@@ -2,7 +2,7 @@
 //!
 //! 业务逻辑都在 `app-core`(可 `cargo test`),这里只做 JS ↔ Rust 的桥接与本地文件读写。
 
-use app_core::{AccountInfo, App, Page, SearchResult, Settings};
+use app_core::{AccountInfo, App, Integrity, Page, SearchResult, Settings};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
@@ -186,6 +186,17 @@ async fn browse_page(
 async fn stat(state: State<'_, App>, account: String, path: String) -> Result<Entry, String> {
     let app = state.inner().clone();
     app.stat(&account, &path).await.map_err(|e| e.to_string())
+}
+
+/// 校验对象内容完整性:下载内容并与远端 ETag(整对象上传即为 MD5)比对。
+#[tauri::command]
+async fn verify_object(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<Integrity, String> {
+    let app = state.inner().clone();
+    app.verify(&account, &path).await.map_err(|e| e.to_string())
 }
 
 /// 在某账号的 `root`(桶 / 前缀)下递归搜索名字包含 `query` 的文件,最多 `max_results` 条。
@@ -578,6 +589,7 @@ pub fn run() {
             browse,
             browse_page,
             stat,
+            verify_object,
             search,
             upload_file,
             download_file,

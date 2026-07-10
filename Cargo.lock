@@ -36,6 +36,7 @@ version = "1.4.0"
 dependencies = [
  "async-trait",
  "bytes",
+ "cloud-core",
  "futures",
  "keyring",
  "nebula-provider",

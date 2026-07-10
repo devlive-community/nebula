@@ -9,6 +9,7 @@ authors.workspace = true
 publish = false
 
 [dependencies]
+cloud-core = { path = "../cloud-core" }
 nebula-provider = { path = "../nebula-provider" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
 provider-tencent = { path = "../providers/provider-tencent" }

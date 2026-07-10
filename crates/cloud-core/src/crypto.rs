@@ -56,6 +56,12 @@ pub fn content_md5(data: &[u8]) -> String {
     base64_encode(&digest)
 }
 
+/// 内容 MD5 的小写十六进制字符串。用于与对象存储返回的 ETag(整对象上传时即为 MD5)
+/// 比对做下载 / 迁移完整性校验。
+pub fn md5_hex(data: &[u8]) -> String {
+    hex::encode(Md5::digest(data))
+}
+
 /// 小写十六进制编码。
 pub fn hex_encode(data: &[u8]) -> String {
     hex::encode(data)
@@ -116,5 +122,11 @@ mod tests {
     #[test]
     fn content_md5_empty() {
         assert_eq!(content_md5(b""), "1B2M2Y8AsgTpgAmY7PhCfg==");
+    }
+
+    #[test]
+    fn md5_hex_known_vectors() {
+        assert_eq!(md5_hex(b""), "d41d8cd98f00b204e9800998ecf8427e");
+        assert_eq!(md5_hex(b"abc"), "900150983cd24fb0d6963f7d28e17f72");
     }
 }
