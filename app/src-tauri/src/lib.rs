@@ -2,12 +2,62 @@
 //!
 //! 业务逻辑都在 `app-core`(可 `cargo test`),这里只做 JS ↔ Rust 的桥接与本地文件读写。
 
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+
 use app_core::{AccountInfo, App, Integrity, Page, SearchResult, Settings};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, State};
+
+/// 进行中传输的取消登记表:传输 id → 取消标志。前端点"取消"时置位对应标志,
+/// 传输循环在分片 / 数据块之间检查后中止。
+#[derive(Default)]
+struct Transfers {
+    map: Mutex<HashMap<String, Arc<AtomicBool>>>,
+}
+
+impl Transfers {
+    /// 登记一个传输,返回其取消标志(初始 false)。
+    fn begin(&self, id: &str) -> Arc<AtomicBool> {
+        let flag = Arc::new(AtomicBool::new(false));
+        self.map
+            .lock()
+            .unwrap()
+            .insert(id.to_string(), flag.clone());
+        flag
+    }
+    /// 请求取消某传输(若在册)。
+    fn cancel(&self, id: &str) {
+        if let Some(f) = self.map.lock().unwrap().get(id) {
+            f.store(true, Ordering::Relaxed);
+        }
+    }
+    /// 注销传输(完成 / 出错 / 取消后)。
+    fn end(&self, id: &str) {
+        self.map.lock().unwrap().remove(id);
+    }
+}
+
+/// 作用域退出即注销传输,确保任意返回路径都清理登记表。
+struct CancelGuard<'a> {
+    transfers: &'a Transfers,
+    id: String,
+}
+impl Drop for CancelGuard<'_> {
+    fn drop(&mut self) {
+        self.transfers.end(&self.id);
+    }
+}
+
+/// 请求取消一个进行中的传输(下载 / 上传 / 文件夹下载)。
+#[tauri::command]
+fn cancel_transfer(transfers: State<'_, Transfers>, id: String) {
+    transfers.cancel(&id);
+}
 
 /// 上传进度事件负载,发往前端 `upload-progress`。
 #[derive(Clone, Serialize)]
@@ -229,15 +279,23 @@ async fn search(
 
 /// 把本地文件上传到远端路径。
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn upload_file(
     app: AppHandle,
     state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    transfer_id: String,
     account: String,
     remote_path: String,
     local_path: String,
     content_type: Option<String>,
 ) -> Result<(), String> {
     let core = state.inner().clone();
+    let cancel = transfers.begin(&transfer_id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: transfer_id.clone(),
+    };
 
     let event_path = remote_path.clone();
     let progress = move |uploaded: u64, total: u64| {
@@ -257,10 +315,14 @@ async fn upload_file(
         &remote_path,
         &local_path,
         content_type.as_deref(),
+        &cancel,
         &progress,
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| match e {
+        app_core::AppError::Cancelled => "已取消".to_string(),
+        other => other.to_string(),
+    })
 }
 
 /// 流式下载远端对象到本地路径,边写边发 `download-progress` 事件。
@@ -271,6 +333,8 @@ async fn upload_file(
 async fn download_file(
     app: AppHandle,
     state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    transfer_id: String,
     account: String,
     remote_path: String,
     local_path: String,
@@ -280,6 +344,11 @@ async fn download_file(
 
     let core = state.inner().clone();
     let limits = core.transfer_limits();
+    let cancel = transfers.begin(&transfer_id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: transfer_id.clone(),
+    };
     let part_path = format!("{local_path}.part");
 
     // 已有 .part → 从其大小续传;offset>0 且服务端拒绝(如 416 过期/越界)则清掉从头下。
@@ -315,6 +384,10 @@ async fn download_file(
 
     let mut downloaded = offset;
     while let Some(chunk) = stream.next().await {
+        // 取消:保留 .part,重下即续传。
+        if cancel.load(Ordering::Relaxed) {
+            return Err("已取消".into());
+        }
         let chunk = chunk.map_err(|e| e.to_string())?;
         limits.throttle(chunk.len() as u64).await; // 全局带宽限速
         file.write_all(&chunk)
@@ -419,6 +492,8 @@ async fn copy_across(
 async fn download_folder(
     app: AppHandle,
     state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    transfer_id: String,
     account: String,
     remote_root: String,
     local_dir: String,
@@ -428,6 +503,11 @@ async fn download_folder(
 
     let core = state.inner().clone();
     let limits = core.transfer_limits();
+    let cancel = transfers.begin(&transfer_id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: transfer_id.clone(),
+    };
     let files = core
         .list_all_files(&account, &remote_root)
         .await
@@ -447,6 +527,9 @@ async fn download_folder(
     let root_dir = std::path::Path::new(&local_dir).join(folder);
 
     for (i, file) in files.iter().enumerate() {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("已取消".into());
+        }
         let rel = file.path.strip_prefix(&base).unwrap_or(&file.path);
         // 按 `/` 分段拼本地路径,跨平台安全。
         let mut local = root_dir.clone();
@@ -466,6 +549,9 @@ async fn download_folder(
             .await
             .map_err(|e| format!("创建本地文件失败: {e}"))?;
         while let Some(chunk) = stream.next().await {
+            if cancel.load(Ordering::Relaxed) {
+                return Err("已取消".into());
+            }
             let chunk = chunk.map_err(|e| e.to_string())?;
             limits.throttle(chunk.len() as u64).await; // 全局带宽限速
             f.write_all(&chunk)
@@ -707,6 +793,7 @@ pub fn run() {
             std::fs::create_dir_all(&dir)?;
             let core = App::with_store(dir.join("nebula.db"))?;
             app.manage(core);
+            app.manage(Transfers::default());
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -735,6 +822,7 @@ pub fn run() {
             browse_page,
             stat,
             verify_object,
+            cancel_transfer,
             search,
             upload_file,
             download_file,

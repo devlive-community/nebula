@@ -9,12 +9,13 @@
 //! 回退到整体上传。出错时**不**放弃服务端已上传分片(不 abort),以便下次续传。
 
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytes::{Bytes, BytesMut};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use crate::store::UploadSessionRow;
-use crate::{App, ProgressFn, Result};
+use crate::{App, AppError, ProgressFn, Result};
 
 /// 默认分片大小:8 MiB。
 pub(crate) const PART_SIZE: u64 = 8 * 1024 * 1024;
@@ -24,12 +25,16 @@ impl App {
     ///
     /// 中断后重发同一个 `(账号, 远端路径, 本地文件)` 会续传;小文件或 provider 不支持续传时
     /// 回退到整体上传。`progress(已上传字节, 总字节)`。
+    ///
+    /// `cancel` 置位后,下一个分片前会中止并返回 [`AppError::Cancelled`];已传分片与会话保留,
+    /// 之后重发即续传(取消 = 暂停)。
     pub async fn upload_resumable(
         &self,
         account: &str,
         remote_path: &str,
         local_path: &str,
         content_type: Option<&str>,
+        cancel: &AtomicBool,
         progress: ProgressFn<'_>,
     ) -> Result<()> {
         self.upload_resumable_parted(
@@ -38,12 +43,14 @@ impl App {
             local_path,
             content_type,
             PART_SIZE,
+            cancel,
             progress,
         )
         .await
     }
 
     /// 同 [`upload_resumable`](Self::upload_resumable),但可指定分片大小(测试用小分片验证续传)。
+    #[allow(clippy::too_many_arguments)]
     async fn upload_resumable_parted(
         &self,
         account: &str,
@@ -51,6 +58,7 @@ impl App {
         local_path: &str,
         content_type: Option<&str>,
         part_size: u64,
+        cancel: &AtomicBool,
         progress: ProgressFn<'_>,
     ) -> Result<()> {
         let provider = self.provider(account)?;
@@ -91,6 +99,10 @@ impl App {
         for n in 1..=num_parts {
             if done_nums.contains(&n) {
                 continue;
+            }
+            // 取消:中止但保留会话与已传分片,重发即续传。
+            if cancel.load(Ordering::Relaxed) {
+                return Err(AppError::Cancelled);
             }
             let len = part_len(n, num_parts, size, part_size);
             let bytes = read_part(&mut file, (n as u64 - 1) * part_size, len).await?;
@@ -304,9 +316,17 @@ mod tests {
         let (app, db) = app_with_store("all", rec.clone());
         let file = temp_file("all", &vec![7u8; 10]); // 10 字节,分片 4 → (4,4,2)
 
-        app.upload_resumable_parted("rec", "b/k", file.to_str().unwrap(), None, 4, &|_, _| {})
-            .await
-            .unwrap();
+        app.upload_resumable_parted(
+            "rec",
+            "b/k",
+            file.to_str().unwrap(),
+            None,
+            4,
+            &AtomicBool::new(false),
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
 
         assert_eq!(*rec.parts.lock().unwrap(), vec![(1, 4), (2, 4), (3, 2)]);
         let completed = rec.completed.lock().unwrap().clone().unwrap();
@@ -332,14 +352,57 @@ mod tests {
 
         // 第一次:分片 1 成功、分片 2 失败 → 整体报错,会话已持久化(含分片 1)。
         assert!(app
-            .upload_resumable_parted("rec", "b/k", path, None, 4, &|_, _| {})
+            .upload_resumable_parted(
+                "rec",
+                "b/k",
+                path,
+                None,
+                4,
+                &AtomicBool::new(false),
+                &|_, _| {}
+            )
             .await
             .is_err());
         assert_eq!(*rec.parts.lock().unwrap(), vec![(1, 4)]);
         assert!(rec.completed.lock().unwrap().is_none());
 
         // 第二次:续传,应只补分片 2、3,分片 1 不再重传。
-        app.upload_resumable_parted("rec", "b/k", path, None, 4, &|_, _| {})
+        app.upload_resumable_parted(
+            "rec",
+            "b/k",
+            path,
+            None,
+            4,
+            &AtomicBool::new(false),
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
+        assert_eq!(*rec.parts.lock().unwrap(), vec![(1, 4), (2, 4), (3, 2)]);
+        assert!(rec.completed.lock().unwrap().is_some());
+
+        let _ = std::fs::remove_file(&file);
+        let _ = std::fs::remove_file(&db);
+    }
+
+    #[tokio::test]
+    async fn cancelled_upload_stops_and_resumes_later() {
+        let rec = Arc::new(ResumableRec::new(None));
+        let (app, db) = app_with_store("cancel", rec.clone());
+        let file = temp_file("cancel", &vec![5u8; 10]); // (4,4,2)
+        let path = file.to_str().unwrap();
+
+        // 取消已置位:第一个分片前就中止,什么都没传。
+        let cancel = AtomicBool::new(true);
+        let out = app
+            .upload_resumable_parted("rec", "b/k", path, None, 4, &cancel, &|_, _| {})
+            .await;
+        assert!(matches!(out, Err(AppError::Cancelled)));
+        assert!(rec.parts.lock().unwrap().is_empty());
+
+        // 清除取消后重发:正常传完。
+        let go = AtomicBool::new(false);
+        app.upload_resumable_parted("rec", "b/k", path, None, 4, &go, &|_, _| {})
             .await
             .unwrap();
         assert_eq!(*rec.parts.lock().unwrap(), vec![(1, 4), (2, 4), (3, 2)]);
@@ -355,9 +418,17 @@ mod tests {
         let (app, db) = app_with_store("small", rec.clone());
         let file = temp_file("small", b"hi"); // 2 字节 <= 分片 4 → 整体上传
 
-        app.upload_resumable_parted("rec", "b/k", file.to_str().unwrap(), None, 4, &|_, _| {})
-            .await
-            .unwrap();
+        app.upload_resumable_parted(
+            "rec",
+            "b/k",
+            file.to_str().unwrap(),
+            None,
+            4,
+            &AtomicBool::new(false),
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
 
         // 未走分片路径。
         assert!(rec.parts.lock().unwrap().is_empty());

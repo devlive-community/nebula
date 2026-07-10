@@ -25,6 +25,10 @@ pub enum AppError {
     /// 本地文件读写错误(如断点续传上传时读本地分片)。
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// 传输被用户取消。
+    #[error("cancelled")]
+    Cancelled,
 }
 
 /// App 层 Result 别名。
