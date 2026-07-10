@@ -38,7 +38,7 @@ impl RetryPolicy {
     }
 
     /// 第 `attempt` 次重试(从 0 计)前应等待的退避时长。
-    fn backoff(&self, attempt: u32) -> Duration {
+    pub fn backoff(&self, attempt: u32) -> Duration {
         let factor = 1u32.checked_shl(attempt).unwrap_or(u32::MAX);
         let delay = self.base_delay.saturating_mul(factor);
         delay.min(self.max_delay)
