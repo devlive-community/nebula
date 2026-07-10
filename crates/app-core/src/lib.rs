@@ -592,6 +592,16 @@ impl App {
         Ok(self.provider(account)?.restore(path, days).await?)
     }
 
+    /// 在某账号下新建一个 bucket。
+    pub async fn create_bucket(&self, account: &str, bucket: &str) -> Result<()> {
+        Ok(self.provider(account)?.create_bucket(bucket).await?)
+    }
+
+    /// 删除某账号下的一个 bucket(通常要求为空)。
+    pub async fn delete_bucket(&self, account: &str, bucket: &str) -> Result<()> {
+        Ok(self.provider(account)?.delete_bucket(bucket).await?)
+    }
+
     /// 跨账号 / 跨云复制:把 `src_account` 的 `src_path` 搬到 `dst_account` 的 `dst_path`,
     /// 保留源对象。两端可以是不同的云。
     pub async fn copy_across(
@@ -1306,6 +1316,9 @@ mod tests {
             .await
             .is_err());
         assert!(app.restore("mem", "b/k", 1).await.is_err());
+        // bucket 操作同样默认 Unsupported。
+        assert!(app.create_bucket("mem", "newb").await.is_err());
+        assert!(app.delete_bucket("mem", "newb").await.is_err());
     }
 
     #[tokio::test]

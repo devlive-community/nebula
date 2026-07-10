@@ -446,6 +446,32 @@ async fn create_folder(state: State<'_, App>, account: String, path: String) -> 
         .map_err(|e| e.to_string())
 }
 
+/// 新建一个 bucket。
+#[tauri::command]
+async fn create_bucket(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.create_bucket(&account, &bucket)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 删除一个 bucket(通常要求为空)。
+#[tauri::command]
+async fn delete_bucket(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.delete_bucket(&account, &bucket)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 重命名 / 移动对象。
 #[tauri::command]
 async fn rename(
@@ -965,6 +991,8 @@ pub fn run() {
             download_file,
             delete,
             create_folder,
+            create_bucket,
+            delete_bucket,
             rename,
             copy,
             set_storage_class,
