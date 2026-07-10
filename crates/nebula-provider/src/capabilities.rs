@@ -13,6 +13,8 @@ pub struct Capabilities {
     pub storage_class_ops: bool,
     /// 支持新建 / 删除 bucket(create_bucket / delete_bucket 已实现)。
     pub bucket_ops: bool,
+    /// 支持修改对象元数据(set_content_type 已实现)。
+    pub metadata_ops: bool,
     /// 支持生成预签名临时链接。
     pub presign: bool,
     /// 支持服务端复制(跨对象 / 跨桶免中转)。

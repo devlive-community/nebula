@@ -81,6 +81,7 @@ impl StorageProvider for TencentProvider {
             resumable_upload: true,
             storage_class_ops: true,
             bucket_ops: true,
+            metadata_ops: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -174,6 +175,9 @@ impl StorageProvider for TencentProvider {
                 }
                 if let Some(lm) = meta.last_modified {
                     entry = entry.with_last_modified(lm);
+                }
+                if let Some(ct) = meta.content_type {
+                    entry = entry.with_content_type(ct);
                 }
                 Ok(entry)
             }
@@ -355,6 +359,14 @@ impl StorageProvider for TencentProvider {
 
     async fn delete_bucket(&self, bucket: &str) -> Result<()> {
         self.client.delete_bucket(bucket).await.map_err(map_err)
+    }
+
+    async fn set_content_type(&self, path: &str, content_type: &str) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .set_content_type(bucket, key, content_type)
+            .await
+            .map_err(map_err)
     }
 
     async fn delete(&self, path: &str) -> Result<()> {

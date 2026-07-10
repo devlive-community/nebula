@@ -190,6 +190,13 @@ pub trait StorageProvider: Send + Sync {
         Err(ProviderError::Unsupported("restore archived object".into()))
     }
 
+    /// 修改对象的内容类型(`Content-Type`)。通常通过"带新 Content-Type 且元数据指令为
+    /// REPLACE 的自我复制"实现。默认 [`ProviderError::Unsupported`];支持的适配层覆盖并在
+    /// [`capabilities`](Self::capabilities) 置 `metadata_ops = true`。
+    async fn set_content_type(&self, _path: &str, _content_type: &str) -> Result<()> {
+        Err(ProviderError::Unsupported("set content type".into()))
+    }
+
     /// 新建一个 bucket。默认 [`ProviderError::Unsupported`];支持的适配层覆盖并在
     /// [`capabilities`](Self::capabilities) 置 `bucket_ops = true`。
     async fn create_bucket(&self, _bucket: &str) -> Result<()> {

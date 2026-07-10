@@ -178,6 +178,39 @@ impl ObsClient {
         Ok(())
     }
 
+    /// 修改内容类型:带新 `Content-Type` + `x-obs-metadata-directive: REPLACE` 的自我复制。
+    pub async fn set_content_type(
+        &self,
+        bucket: &str,
+        key: &str,
+        content_type: &str,
+    ) -> Result<()> {
+        let date = now_gmt();
+        let copy_source = format!("/{bucket}/{}", encode_key(key));
+        let obs_headers = sign::canonicalized_obs_headers([
+            ("x-obs-copy-source", copy_source.as_str()),
+            ("x-obs-metadata-directive", "REPLACE"),
+        ]);
+        let canonical = format!("/{bucket}/{key}");
+        let sts = sign::string_to_sign("PUT", "", content_type, &date, &obs_headers, &canonical);
+        let authorization = sign::authorization(self.access_key(), self.secret_key(), &sts);
+        let url = format!("{}/{}", self.bucket_base_url(bucket), encode_key(key));
+        let request = self
+            .http()
+            .inner()
+            .request(Method::PUT, &url)
+            .header(DATE, &date)
+            .header(AUTHORIZATION, authorization)
+            .header(CONTENT_TYPE, content_type)
+            .header("x-obs-copy-source", &copy_source)
+            .header("x-obs-metadata-directive", "REPLACE")
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(ObsError::from)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 组装并签名一次 CopyObject 请求。抽出 `date` 便于确定性测试。
     fn build_copy_request(
         &self,

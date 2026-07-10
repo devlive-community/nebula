@@ -223,6 +223,33 @@ impl CosClient {
         Ok(())
     }
 
+    /// 修改内容类型:带新 `Content-Type` + `x-cos-metadata-directive: Replace` 的自我复制。
+    pub async fn set_content_type(
+        &self,
+        bucket: &str,
+        key: &str,
+        content_type: &str,
+    ) -> Result<()> {
+        let copy_source = format!("{}/{}", self.bucket_host(bucket), encode_key(key));
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let request = self.build_signed(SignSpec {
+            method: Method::PUT,
+            host: &host,
+            uri_path: &uri,
+            query: &[],
+            content_type: Some(content_type),
+            content_md5: None,
+            cos_headers: &[
+                ("x-cos-copy-source", copy_source),
+                ("x-cos-metadata-directive", "Replace".to_string()),
+            ],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 取回归档对象:`POST /{key}?restore`,请求体指定保持天数与取回层级。
     pub async fn restore_object(&self, bucket: &str, key: &str, days: u32) -> Result<()> {
         let host = self.bucket_host(bucket);

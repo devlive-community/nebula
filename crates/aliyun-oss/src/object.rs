@@ -180,6 +180,41 @@ impl OssClient {
         Ok(())
     }
 
+    /// 修改内容类型:带新 `Content-Type` + `x-oss-metadata-directive: REPLACE` 的自我复制。
+    pub async fn set_content_type(
+        &self,
+        bucket: &str,
+        key: &str,
+        content_type: &str,
+    ) -> Result<()> {
+        let date = now_gmt();
+        let copy_source = format!("/{bucket}/{}", encode_key(key));
+        let oss_headers = sign::canonicalized_oss_headers([
+            ("x-oss-copy-source", copy_source.as_str()),
+            ("x-oss-metadata-directive", "REPLACE"),
+        ]);
+        let canonical = format!("/{bucket}/{key}");
+        // Content-Type 计入 StringToSign 的 Content-Type 行。
+        let sts = sign::string_to_sign("PUT", "", content_type, &date, &oss_headers, &canonical);
+        let authorization =
+            sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
+        let url = format!("{}/{}", self.bucket_base_url(bucket), encode_key(key));
+        let request = self
+            .http()
+            .inner()
+            .request(Method::PUT, &url)
+            .header(DATE, &date)
+            .header(AUTHORIZATION, authorization)
+            .header(CONTENT_TYPE, content_type)
+            .header("x-oss-copy-source", &copy_source)
+            .header("x-oss-metadata-directive", "REPLACE")
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(OssError::from)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 组装并签名一次 CopyObject 请求。抽出 `date` 便于确定性测试。
     fn build_copy_request(
         &self,

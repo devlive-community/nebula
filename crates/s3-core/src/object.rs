@@ -202,6 +202,29 @@ impl S3Client {
         Ok(())
     }
 
+    /// 修改内容类型:带新 `Content-Type` + `x-amz-metadata-directive: REPLACE` 的自我复制。
+    pub async fn set_content_type(
+        &self,
+        bucket: &str,
+        key: &str,
+        content_type: &str,
+    ) -> Result<()> {
+        let copy_source = format!("/{bucket}/{}", encode_path(key));
+        let request = self.build_signed(RequestSpec {
+            method: Method::PUT,
+            canonical_uri: &object_uri(bucket, key),
+            query: &[],
+            content_type: Some(content_type),
+            amz_headers: &[
+                ("x-amz-copy-source", copy_source),
+                ("x-amz-metadata-directive", "REPLACE".to_string()),
+            ],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 取回归档对象:`POST /{bucket}/{key}?restore`,请求体指定保持天数。
     pub async fn restore_object(&self, bucket: &str, key: &str, days: u32) -> Result<()> {
         let body = format!("<RestoreRequest><Days>{days}</Days></RestoreRequest>");

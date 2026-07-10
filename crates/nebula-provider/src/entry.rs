@@ -27,6 +27,8 @@ pub struct Entry {
     pub etag: Option<String>,
     /// 存储类型 / 归档层(如 `STANDARD` / `IA` / `ARCHIVE`);未知或目录为 `None`。
     pub storage_class: Option<String>,
+    /// 内容类型(MIME,来自 HEAD 的 `Content-Type`);列举时通常为 `None`,`stat` 才有。
+    pub content_type: Option<String>,
 }
 
 impl Entry {
@@ -41,6 +43,7 @@ impl Entry {
             last_modified: None,
             etag: None,
             storage_class: None,
+            content_type: None,
         }
     }
 
@@ -55,6 +58,7 @@ impl Entry {
             last_modified: None,
             etag: None,
             storage_class: None,
+            content_type: None,
         }
     }
 
@@ -74,6 +78,12 @@ impl Entry {
     pub fn with_storage_class(mut self, value: impl Into<String>) -> Self {
         let value = value.into();
         self.storage_class = (!value.is_empty()).then_some(value);
+        self
+    }
+
+    /// 链式设置内容类型(MIME)。
+    pub fn with_content_type(mut self, value: impl Into<String>) -> Self {
+        self.content_type = Some(value.into());
         self
     }
 
