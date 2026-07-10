@@ -71,7 +71,9 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                   i.status === "cancelled" ||
                   i.status === "interrupted") &&
                   i.kind !== "迁移" &&
-                  i.kind !== "迁移文件夹" && (
+                  i.kind !== "迁移文件夹" &&
+                  i.kind !== "转换存储类型" &&
+                  i.kind !== "取回归档" && (
                     <button
                       className="transfers__retry"
                       title={i.status === "error" ? "重试" : "继续"}

@@ -956,11 +956,57 @@ export default function App() {
     }
   };
 
+  // 文件夹级批量操作:创建一个传输面板任务并跑,进度经 folder-progress 汇入。
+  const runFolderOp = async (
+    id: string,
+    kind: TransferItem["kind"],
+    name: string,
+    op: () => Promise<void>,
+  ) => {
+    setTransfers((prev) => ({
+      ...prev,
+      [id]: {
+        id,
+        kind,
+        name,
+        account: current ?? "",
+        remote: name,
+        local: "",
+        done: 0,
+        total: 0,
+        status: "active",
+      },
+    }));
+    try {
+      await op();
+      setTransfers((prev) =>
+        prev[id]
+          ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
+          : prev,
+      );
+      await load();
+    } catch (e) {
+      setError(String(e));
+      setTransfers((prev) =>
+        prev[id] ? { ...prev, [id]: { ...prev[id], status: "error" } } : prev,
+      );
+    }
+  };
+
   const doSetStorageClass = async (storageClass: string) => {
     const entry = storageClassTarget;
     setStorageClassTarget(null);
     if (!current || !entry) return;
     setError(null);
+    if (entry.kind === "directory") {
+      await runFolderOp(
+        `folder:storage-class:${entry.path}`,
+        "转换存储类型",
+        entry.name,
+        () => api.setStorageClassFolder(current, entry.path, storageClass),
+      );
+      return;
+    }
     setNotice({ tone: "info", text: `正在转换 ${entry.name} 的存储类型…` });
     try {
       await api.setStorageClass(current, entry.path, storageClass);
@@ -977,6 +1023,15 @@ export default function App() {
     setRestoreTarget(null);
     if (!current || !entry) return;
     setError(null);
+    if (entry.kind === "directory") {
+      await runFolderOp(
+        `folder:restore:${entry.path}`,
+        "取回归档",
+        entry.name,
+        () => api.restoreFolder(current, entry.path, days),
+      );
+      return;
+    }
     setNotice({ tone: "info", text: `正在发起取回 ${entry.name}…` });
     try {
       await api.restoreObject(current, entry.path, days);
@@ -1384,6 +1439,10 @@ export default function App() {
           onClick: () => setMigrateTarget(entry),
         });
       }
+      dirItems.push(
+        { label: "转换存储类型", onClick: () => setStorageClassTarget(entry) },
+        { label: "取回归档", onClick: () => setRestoreTarget(entry) },
+      );
       dirItems.push({
         label: "删除文件夹",
         danger: true,

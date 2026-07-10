@@ -56,7 +56,14 @@ export interface Settings {
 /** 传输任务列表中的一项(含重试所需的参数)。 */
 export interface TransferItem {
   id: string;
-  kind: "上传" | "下载" | "迁移" | "下载文件夹" | "迁移文件夹";
+  kind:
+    | "上传"
+    | "下载"
+    | "迁移"
+    | "下载文件夹"
+    | "迁移文件夹"
+    | "转换存储类型"
+    | "取回归档";
   name: string;
   account: string;
   remote: string;

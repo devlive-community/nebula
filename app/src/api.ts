@@ -88,6 +88,22 @@ export const setStorageClass = (
 export const restoreObject = (account: string, path: string, days: number) =>
   invoke<void>("restore_object", { account, path, days });
 
+/** 递归转换整个文件夹的存储类型。 */
+export const setStorageClassFolder = (
+  account: string,
+  path: string,
+  storageClass: string,
+) =>
+  invoke<void>("set_storage_class_folder", {
+    account,
+    path,
+    class: storageClass,
+  });
+
+/** 递归取回整个文件夹里的归档对象。 */
+export const restoreFolder = (account: string, path: string, days: number) =>
+  invoke<void>("restore_folder", { account, path, days });
+
 export const downloadFolder = (
   account: string,
   remoteRoot: string,
