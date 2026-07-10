@@ -28,6 +28,7 @@ const messages = {
         upload: {title: '上传无忧', desc: '拖拽文件或整个文件夹、多选上传;大文件并发分片,进度、并发、失败重试尽在掌握。'},
         download: {title: '流式下载', desc: '边下边写,大文件不占内存;支持断点续传,批量下载到指定目录,每个任务独立进度。'},
         migrate: {title: '跨云迁移', desc: '把对象从一个账号搬到另一个账号,任意云到任意云;同账号走服务端复制,跨账号自动中转。'},
+        integrity: {title: '完整性校验', desc: '下载内容算 MD5 与远端 ETag 比对,一键确认文件是否在传输中损坏;逻辑只依赖 ETag,对每家云通用。'},
         share: {title: '一键分享', desc: '为对象生成预签名临时链接,有效期可配置,复制即分享。'},
         secure: {title: '安全省心', desc: '密钥存入系统钥匙串,元信息与设置存本地 SQLite,明暗主题、快捷键、右键菜单俱全。'},
         update: {title: '自动更新', desc: '应用内检测新版本,一键下载安装并校验更新签名,始终用上最新特性。'}
@@ -80,6 +81,7 @@ const messages = {
         upload: {title: 'Effortless upload', desc: 'Drag files or whole folders, multi-select; large files upload in concurrent chunks with progress and retries.'},
         download: {title: 'Streaming download', desc: 'Stream to disk without buffering huge files; resumable downloads and batch download with per-task progress.'},
         migrate: {title: 'Cross-cloud migration', desc: 'Move objects from one account to another, any cloud to any cloud; same-account uses server-side copy, cross-account relays automatically.'},
+        integrity: {title: 'Integrity check', desc: 'Hash the downloaded bytes and compare against the remote ETag to confirm a file survived transfer intact; keyed only on ETag, so it works for every cloud.'},
         share: {title: 'One-click share', desc: 'Generate presigned temporary links with a configurable expiry — copy and share.'},
         secure: {title: 'Secure by design', desc: 'Secrets in the system keyring, metadata and settings in local SQLite; theming, shortcuts and context menus included.'},
         update: {title: 'Auto-update', desc: 'Detect new versions in-app and install with one click, verified by update signatures — always on the latest.'}
