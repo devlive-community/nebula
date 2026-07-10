@@ -87,6 +87,7 @@ impl StorageProvider for HuaweiProvider {
             multipart_upload: true,
             resumable_upload: true,
             storage_class_ops: true,
+            bucket_ops: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -356,6 +357,14 @@ impl StorageProvider for HuaweiProvider {
             .restore_object(bucket, key, days)
             .await
             .map_err(map_err)
+    }
+
+    async fn create_bucket(&self, bucket: &str) -> Result<()> {
+        self.client.create_bucket(bucket).await.map_err(map_err)
+    }
+
+    async fn delete_bucket(&self, bucket: &str) -> Result<()> {
+        self.client.delete_bucket(bucket).await.map_err(map_err)
     }
 
     async fn delete(&self, path: &str) -> Result<()> {

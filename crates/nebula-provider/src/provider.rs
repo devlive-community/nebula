@@ -190,6 +190,17 @@ pub trait StorageProvider: Send + Sync {
         Err(ProviderError::Unsupported("restore archived object".into()))
     }
 
+    /// 新建一个 bucket。默认 [`ProviderError::Unsupported`];支持的适配层覆盖并在
+    /// [`capabilities`](Self::capabilities) 置 `bucket_ops = true`。
+    async fn create_bucket(&self, _bucket: &str) -> Result<()> {
+        Err(ProviderError::Unsupported("create bucket".into()))
+    }
+
+    /// 删除一个 bucket(通常要求为空)。默认 [`ProviderError::Unsupported`]。
+    async fn delete_bucket(&self, _bucket: &str) -> Result<()> {
+        Err(ProviderError::Unsupported("delete bucket".into()))
+    }
+
     /// 删除单个对象。
     async fn delete(&self, path: &str) -> Result<()>;
 

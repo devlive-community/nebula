@@ -11,6 +11,8 @@ pub struct Capabilities {
     pub resumable_upload: bool,
     /// 支持存储类型转换与归档取回(set_storage_class / restore 已实现)。
     pub storage_class_ops: bool,
+    /// 支持新建 / 删除 bucket(create_bucket / delete_bucket 已实现)。
+    pub bucket_ops: bool,
     /// 支持生成预签名临时链接。
     pub presign: bool,
     /// 支持服务端复制(跨对象 / 跨桶免中转)。
