@@ -834,12 +834,10 @@ pub fn run() {
         })
         .on_menu_event(|app, event| {
             // 只转发自定义项;系统预定义项(退出/复制等)自行处理。
-            match event.id().as_ref() {
-                id @ ("about" | "check-update" | "settings" | "add-account" | "refresh"
-                | "toggle-theme") => {
-                    let _ = app.emit("menu-action", id);
-                }
-                _ => {}
+            if let id @ ("about" | "check-update" | "settings" | "add-account" | "refresh"
+            | "toggle-theme") = event.id().as_ref()
+            {
+                let _ = app.emit("menu-action", id);
             }
         })
         .invoke_handler(tauri::generate_handler![

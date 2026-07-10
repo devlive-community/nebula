@@ -314,7 +314,7 @@ mod tests {
     async fn resumable_upload_sends_all_parts_in_order() {
         let rec = Arc::new(ResumableRec::new(None));
         let (app, db) = app_with_store("all", rec.clone());
-        let file = temp_file("all", &vec![7u8; 10]); // 10 字节,分片 4 → (4,4,2)
+        let file = temp_file("all", &[7u8; 10]); // 10 字节,分片 4 → (4,4,2)
 
         app.upload_resumable_parted(
             "rec",
@@ -347,7 +347,7 @@ mod tests {
         // 让分片 2 首次失败。
         let rec = Arc::new(ResumableRec::new(Some(2)));
         let (app, db) = app_with_store("resume", rec.clone());
-        let file = temp_file("resume", &vec![9u8; 10]); // (4,4,2)
+        let file = temp_file("resume", &[9u8; 10]); // (4,4,2)
         let path = file.to_str().unwrap();
 
         // 第一次:分片 1 成功、分片 2 失败 → 整体报错,会话已持久化(含分片 1)。
@@ -389,7 +389,7 @@ mod tests {
     async fn cancelled_upload_stops_and_resumes_later() {
         let rec = Arc::new(ResumableRec::new(None));
         let (app, db) = app_with_store("cancel", rec.clone());
-        let file = temp_file("cancel", &vec![5u8; 10]); // (4,4,2)
+        let file = temp_file("cancel", &[5u8; 10]); // (4,4,2)
         let path = file.to_str().unwrap();
 
         // 取消已置位:第一个分片前就中止,什么都没传。
