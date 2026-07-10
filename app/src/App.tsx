@@ -817,7 +817,7 @@ export default function App() {
         },
       }));
       try {
-        await api.migrateFolder(current, entry.path, dstAccount, dstPath);
+        await api.migrateFolder(current, entry.path, dstAccount, dstPath, fid);
         setTransfers((prev) =>
           prev[fid]
             ? { ...prev, [fid]: { ...prev[fid], status: "done", done: prev[fid].total } }
@@ -825,10 +825,14 @@ export default function App() {
         );
         if (dstAccount === current) await load();
       } catch (e) {
-        setError(String(e));
+        const msg = String(e);
+        const cancelled = msg === "已取消";
         setTransfers((prev) =>
-          prev[fid] ? { ...prev, [fid]: { ...prev[fid], status: "error" } } : prev,
+          prev[fid]
+            ? { ...prev, [fid]: { ...prev[fid], status: cancelled ? "cancelled" : "error" } }
+            : prev,
         );
+        if (!cancelled) setError(msg);
       }
       return;
     }
@@ -850,7 +854,7 @@ export default function App() {
       },
     }));
     try {
-      await api.copyAcross(current, entry.path, dstAccount, dstPath);
+      await api.copyAcross(current, entry.path, dstAccount, dstPath, id);
       setTransfers((prev) =>
         prev[id]
           ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
@@ -859,10 +863,14 @@ export default function App() {
       // 目标恰为当前视图时刷新以显示新对象。
       if (dstAccount === current) await load();
     } catch (e) {
-      setError(String(e));
+      const msg = String(e);
+      const cancelled = msg === "已取消";
       setTransfers((prev) =>
-        prev[id] ? { ...prev, [id]: { ...prev[id], status: "error" } } : prev,
+        prev[id]
+          ? { ...prev, [id]: { ...prev[id], status: cancelled ? "cancelled" : "error" } }
+          : prev,
       );
+      if (!cancelled) setError(msg);
     }
   };
 

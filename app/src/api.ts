@@ -94,7 +94,15 @@ export const migrateFolder = (
   srcRoot: string,
   dstAccount: string,
   dstDir: string,
-) => invoke<void>("migrate_folder", { srcAccount, srcRoot, dstAccount, dstDir });
+  transferId: string,
+) =>
+  invoke<void>("migrate_folder", {
+    srcAccount,
+    srcRoot,
+    dstAccount,
+    dstDir,
+    transferId,
+  });
 
 export const deleteFolder = (account: string, path: string) =>
   invoke<void>("delete_folder", { account, path });
@@ -145,7 +153,15 @@ export const copyAcross = (
   srcPath: string,
   dstAccount: string,
   dstPath: string,
-) => invoke<void>("copy_across", { srcAccount, srcPath, dstAccount, dstPath });
+  transferId: string,
+) =>
+  invoke<void>("copy_across", {
+    srcAccount,
+    srcPath,
+    dstAccount,
+    dstPath,
+    transferId,
+  });
 
 export const presign = (account: string, path: string, expiresSecs: number) =>
   invoke<string>("presign", { account, path, expiresSecs });
