@@ -52,7 +52,7 @@ crates/<vendor-crate>/
 | 5 | 对象操作 `object.rs` | put/get/delete/head | 离线:请求 URL + 签名头逐字节比对 |
 | 6 | 列举对象 `bucket.rs` | list_objects + `cloud_core::paginate` | 离线:签名/查询/XML 解析 + 翻页游标 |
 | 7 | 桶管理 | list/create/delete bucket | 离线:service/bucket-root 签名 |
-| 8 | 分片上传 `multipart.rs` | 四件套 + 高层 + **子资源签名** | 离线:子资源排序签名 + complete body |
+| 8 | 分片上传 `multipart.rs` | 四件套 + 高层 + **流式** `upload_multipart_stream` + **子资源签名** | 离线:子资源排序签名 + complete body |
 | 9 | `examples/<vendor>_smoke.rs` | 真账号跑通全链路 | ★**用户用真实账号运行通过** |
 
 > **示例命名**:example 目标名在整个 workspace 内必须唯一,否则 Windows 下多个同名
@@ -61,6 +61,15 @@ crates/<vendor-crate>/
 > `<vendor>_smoke.rs`,适配层用 `<vendor>_provider_smoke.rs`。
 
 > 分片上传通常需要扩展 `sign.rs` 支持**子资源**(计入 CanonicalizedResource 的特殊参数)。
+
+> **流式分片(每家必做)**:`multipart.rs` 除了"整块数据"的 `upload_multipart_progress`,
+> 还必须提供 `upload_multipart_stream<S, E>(bucket, key, stream, part_size, content_type,
+> total_hint, on_progress)` —— 从 `Stream<Item = Result<Bytes, E>>` 边收边攒够一片就传一片,
+> 内存占用与对象大小无关(参考 `s3-core` / `aliyun-oss` 的实现,直接照抄改类型即可)。
+> 对应的适配层(`providers/provider-<vendor>`)覆盖 `StorageProvider::write_stream`:已知且
+> 不大的对象收集后简单 PUT,否则调 `upload_multipart_stream`。**跨账号 / 跨云迁移**依赖它把
+> 内存压到常数级。即使某家暂时没写,trait 的默认 `write_stream` 会收集整个流兜底(功能正确、
+> 但不省内存),所以迁移永远可用——但**新增厂商的验收里必须补上流式实现**。
 
 ---
 
@@ -108,5 +117,6 @@ delete → multipart 上传(强制多片)+ 校验 + 清理`,每一条**新增的
 - [ ] 复制《厂商规格卡》模板到 `docs/sdk/<crate>.md`,填厂商特有参数
 - [ ] 建 crate 骨架并加入 workspace `members`
 - [ ] 按第 2 节顺序逐个增量开发,每步满足第 3 节验收
+- [ ] 分片上传含**流式** `upload_multipart_stream`,适配层覆盖 `write_stream`(跨云迁移内存受控)
 - [ ] `smoke.rs` 真账号跑通
 - [ ] 更新对应规格卡的进度勾选

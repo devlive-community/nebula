@@ -50,7 +50,7 @@
 - [ ] 5 对象操作 put/get/delete/head
 - [ ] 6 list_objects 分页
 - [ ] 7 桶管理 list/create/delete
-- [ ] 8 分片上传
+- [ ] 8 分片上传(含**流式** `upload_multipart_stream` + 适配层 `write_stream` 覆盖)
 - [ ] 9 smoke 真账号跑通
 
 ## 待办 / 后续
