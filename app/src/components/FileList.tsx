@@ -8,6 +8,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { formatBytes, formatDate } from "../util";
+import { useIncremental } from "../hooks";
 import { Checkbox } from "./Checkbox";
 
 type SortKey = "name" | "size" | "modified";
@@ -48,6 +49,7 @@ export function FileList({
   onDropDir,
 }: Props) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const { shown, shownCount, total, hasMore, onScroll } = useIncremental(entries);
   const someSelected = entries.some(
     (e) => e.kind === "file" && selected.has(e.path),
   );
@@ -86,8 +88,8 @@ export function FileList({
         {header("size", "大小", "col-size")}
         {header("modified", "修改时间", "col-modified")}
       </div>
-      <div className="filelist__body">
-        {entries.map((entry) => {
+      <div className="filelist__body" onScroll={onScroll}>
+        {shown.map((entry) => {
           const isDir = entry.kind === "directory";
           return (
             <div
@@ -149,6 +151,9 @@ export function FileList({
             </div>
           );
         })}
+        {hasMore && (
+          <div className="list-more">下滑加载更多 · 已显示 {shownCount} / {total}</div>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFile, faFolder } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
+import { useIncremental } from "../hooks";
 import { Checkbox } from "./Checkbox";
 
 interface Props {
@@ -30,6 +31,7 @@ export function FileGrid({
   onDropDir,
 }: Props) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const { shown, shownCount, total, hasMore, onScroll } = useIncremental(entries);
   if (loading) {
     return <div className="filelist__state">加载中…</div>;
   }
@@ -38,8 +40,8 @@ export function FileGrid({
   }
 
   return (
-    <div className="grid">
-      {entries.map((entry) => {
+    <div className="grid" onScroll={onScroll}>
+      {shown.map((entry) => {
         const isDir = entry.kind === "directory";
         const thumb = thumbs[entry.path];
         return (
@@ -97,6 +99,9 @@ export function FileGrid({
           </div>
         );
       })}
+      {hasMore && (
+        <div className="list-more">下滑加载更多 · 已显示 {shownCount} / {total}</div>
+      )}
     </div>
   );
 }

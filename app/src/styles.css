@@ -453,6 +453,19 @@ body.resizing {
   overflow-y: auto;
 }
 
+/* 增量渲染的底部提示:滚到底部继续加载下一批。 */
+.list-more {
+  padding: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* 网格视图里让提示横跨整行。 */
+.grid > .list-more {
+  grid-column: 1 / -1;
+}
+
 .row {
   height: 46px;
   border-bottom: 1px solid var(--border);
