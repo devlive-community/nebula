@@ -238,9 +238,6 @@ async fn upload_file(
     content_type: Option<String>,
 ) -> Result<(), String> {
     let core = state.inner().clone();
-    let data = tokio::fs::read(&local_path)
-        .await
-        .map_err(|e| format!("读取本地文件失败: {e}"))?;
 
     let event_path = remote_path.clone();
     let progress = move |uploaded: u64, total: u64| {
@@ -254,10 +251,11 @@ async fn upload_file(
         );
     };
 
-    core.upload_with_progress(
+    // 大文件走可断点续传的分片上传;小文件回退整体上传。逐块从磁盘读,内存受控。
+    core.upload_resumable(
         &account,
         &remote_path,
-        Bytes::from(data),
+        &local_path,
         content_type.as_deref(),
         &progress,
     )

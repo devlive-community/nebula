@@ -13,6 +13,7 @@ mod limits;
 mod secret;
 mod settings;
 mod store;
+mod upload;
 
 use std::sync::Arc;
 

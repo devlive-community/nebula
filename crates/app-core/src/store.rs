@@ -36,6 +36,14 @@ impl AccountStore {
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS upload_sessions (
+                session_key TEXT PRIMARY KEY,
+                upload_id   TEXT NOT NULL,
+                size        INTEGER NOT NULL,
+                mtime       INTEGER NOT NULL,
+                part_size   INTEGER NOT NULL,
+                parts       TEXT NOT NULL
             );",
         )?;
         Ok(Self {
@@ -109,6 +117,67 @@ impl AccountStore {
         )?;
         Ok(())
     }
+
+    /// 读取一个断点续传上传会话(不存在返回 `None`)。
+    pub fn get_upload_session(&self, key: &str) -> rusqlite::Result<Option<UploadSessionRow>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT upload_id, size, mtime, part_size, parts
+             FROM upload_sessions WHERE session_key = ?1",
+            params![key],
+            |r| {
+                Ok(UploadSessionRow {
+                    upload_id: r.get(0)?,
+                    size: r.get::<_, i64>(1)? as u64,
+                    mtime: r.get::<_, i64>(2)? as u64,
+                    part_size: r.get::<_, i64>(3)? as u64,
+                    parts: r.get(4)?,
+                })
+            },
+        )
+        .optional()
+    }
+
+    /// 写入(或覆盖)一个上传会话。
+    pub fn put_upload_session(&self, key: &str, row: &UploadSessionRow) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO upload_sessions (session_key, upload_id, size, mtime, part_size, parts)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(session_key) DO UPDATE SET
+                upload_id = ?2, size = ?3, mtime = ?4, part_size = ?5, parts = ?6",
+            params![
+                key,
+                row.upload_id,
+                row.size as i64,
+                row.mtime as i64,
+                row.part_size as i64,
+                row.parts
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// 删除一个上传会话(上传完成或放弃时)。
+    pub fn delete_upload_session(&self, key: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM upload_sessions WHERE session_key = ?1",
+            params![key],
+        )?;
+        Ok(())
+    }
+}
+
+/// 一条断点续传上传会话记录。`parts` 是 `[(分片号, ETag)]` 的 JSON。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UploadSessionRow {
+    pub upload_id: String,
+    pub size: u64,
+    pub mtime: u64,
+    pub part_size: u64,
+    /// 已完成分片,序列化为 JSON 的 `[[番号, etag], ...]`。
+    pub parts: String,
 }
 
 #[cfg(test)]

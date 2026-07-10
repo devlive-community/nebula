@@ -21,6 +21,10 @@ pub enum AppError {
     /// 密钥存储(钥匙串)错误。
     #[error("secret store error: {0}")]
     Secret(#[from] keyring::Error),
+
+    /// 本地文件读写错误(如断点续传上传时读本地分片)。
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 /// App 层 Result 别名。
