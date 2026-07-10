@@ -78,6 +78,7 @@ impl StorageProvider for TencentProvider {
     fn capabilities(&self) -> Capabilities {
         Capabilities {
             multipart_upload: true,
+            resumable_upload: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -281,6 +282,49 @@ impl StorageProvider for TencentProvider {
                 len.unwrap_or(0),
                 progress,
             )
+            .await
+            .map_err(map_err)
+    }
+
+    async fn begin_multipart(&self, path: &str, content_type: Option<&str>) -> Result<String> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .initiate_multipart_upload(bucket, key, content_type)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn upload_part(
+        &self,
+        path: &str,
+        upload_id: &str,
+        part_number: u32,
+        data: Bytes,
+    ) -> Result<String> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .upload_part(bucket, key, upload_id, part_number, data)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn complete_multipart(
+        &self,
+        path: &str,
+        upload_id: &str,
+        parts: &[(u32, String)],
+    ) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .complete_multipart_upload(bucket, key, upload_id, parts)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn abort_multipart(&self, path: &str, upload_id: &str) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .abort_multipart_upload(bucket, key, upload_id)
             .await
             .map_err(map_err)
     }

@@ -135,6 +135,47 @@ pub trait StorageProvider: Send + Sync {
             .await
     }
 
+    /// 开始一次分片上传,返回 `upload_id`。用于**可断点续传**的大文件上传。
+    ///
+    /// 默认返回 [`ProviderError::Unsupported`],调用方据此回退到整体上传;
+    /// 支持分片的适配层应覆盖这四个方法(begin / upload_part / complete / abort)
+    /// 并在 [`capabilities`](Self::capabilities) 里置 `resumable_upload = true`。
+    async fn begin_multipart(&self, _path: &str, _content_type: Option<&str>) -> Result<String> {
+        Err(ProviderError::Unsupported(
+            "resumable multipart upload".into(),
+        ))
+    }
+
+    /// 上传第 `part_number` 个分片(从 1 计),返回该分片的 ETag。
+    async fn upload_part(
+        &self,
+        _path: &str,
+        _upload_id: &str,
+        _part_number: u32,
+        _data: Bytes,
+    ) -> Result<String> {
+        Err(ProviderError::Unsupported(
+            "resumable multipart upload".into(),
+        ))
+    }
+
+    /// 完成分片上传。`parts` 为 `(part_number, etag)` 列表(可乱序,由适配层排序)。
+    async fn complete_multipart(
+        &self,
+        _path: &str,
+        _upload_id: &str,
+        _parts: &[(u32, String)],
+    ) -> Result<()> {
+        Err(ProviderError::Unsupported(
+            "resumable multipart upload".into(),
+        ))
+    }
+
+    /// 放弃分片上传,清理服务端已上传的分片。默认无操作。
+    async fn abort_multipart(&self, _path: &str, _upload_id: &str) -> Result<()> {
+        Ok(())
+    }
+
     /// 删除单个对象。
     async fn delete(&self, path: &str) -> Result<()>;
 

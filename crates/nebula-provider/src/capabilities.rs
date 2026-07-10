@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct Capabilities {
     /// 支持分片上传大文件。
     pub multipart_upload: bool,
+    /// 支持可断点续传的分片上传(begin/upload_part/complete/abort 已实现)。
+    pub resumable_upload: bool,
     /// 支持生成预签名临时链接。
     pub presign: bool,
     /// 支持服务端复制(跨对象 / 跨桶免中转)。
