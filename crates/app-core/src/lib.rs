@@ -7,6 +7,7 @@
 //! Tauri 外壳(`app/src-tauri`)只是把这里的方法包成 `#[tauri::command]`,因此这些
 //! 逻辑可以完全用 `cargo test` 覆盖,无需启动 GUI。
 
+mod cancel;
 mod error;
 mod integrity;
 mod limits;
@@ -15,6 +16,7 @@ mod settings;
 mod store;
 mod upload;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use bytes::Bytes;
@@ -571,21 +573,31 @@ impl App {
         dst_account: &str,
         dst_path: &str,
     ) -> Result<()> {
-        self.copy_across_with_progress(src_account, src_path, dst_account, dst_path, &|_, _| {})
-            .await
+        self.copy_across_with_progress(
+            src_account,
+            src_path,
+            dst_account,
+            dst_path,
+            Arc::new(AtomicBool::new(false)),
+            &|_, _| {},
+        )
+        .await
     }
 
-    /// 同 [`Self::copy_across`],但在上传过程中回调 `(已传字节, 总字节)`。
+    /// 同 [`Self::copy_across`],但在上传过程中回调 `(已传字节, 总字节)`,并支持取消。
     ///
     /// - **同账号**:直接走 provider 的服务端复制,不下载数据。
     /// - **跨账号 / 跨云**:服务端复制无法跨账号,改为**流式中转**——源的分块下载流直接
     ///   喂给目标的流式分片上传,内存只保留一个滑动窗口,与对象大小无关。
+    ///
+    /// `cancel` 置位后,中转流会在下一个分块处终止,返回 [`AppError::Cancelled`]。
     pub async fn copy_across_with_progress(
         &self,
         src_account: &str,
         src_path: &str,
         dst_account: &str,
         dst_path: &str,
+        cancel: Arc<AtomicBool>,
         progress: ProgressFn<'_>,
     ) -> Result<()> {
         if src_account == dst_account {
@@ -596,13 +608,20 @@ impl App {
             return Ok(());
         }
         // 跨账号:服务端复制无能为力,边下边传中转——源的分块流直接喂给目标的流式分片
-        // 上传,内存只保留一个滑动窗口,与对象大小无关。读取流经全局限速节流。
+        // 上传,内存只保留一个滑动窗口,与对象大小无关。读取流先套取消,再套全局限速。
         let src = self.provider(src_account)?;
         let dst = self.provider(dst_account)?;
         let (len, stream) = src.read_stream(src_path).await?;
+        let stream = cancel::cancellable(stream, cancel.clone());
         let stream = self.limits.throttled(stream);
-        dst.write_stream(dst_path, len, stream, None, progress)
-            .await?;
+        let result = dst
+            .write_stream(dst_path, len, stream, None, progress)
+            .await;
+        // 取消导致的流错误归一化为 Cancelled。
+        if cancel.load(Ordering::Relaxed) {
+            return Err(AppError::Cancelled);
+        }
+        result?;
         Ok(())
     }
 
@@ -617,14 +636,15 @@ impl App {
     /// 把 `src_account` 下的整个目录 `src_root` 迁移到 `dst_account` 的 `dst_dir` 下——
     /// 作为其子目录(按 `src_root` 最后一段命名),保留内部相对结构;源对象保留。
     ///
-    /// 逐个文件复用 [`Self::copy_across`](同账号服务端复制、跨账号流式中转);
-    /// `progress(已完成文件数, 总文件数)`。
+    /// 逐个文件复用 [`Self::copy_across_with_progress`](同账号服务端复制、跨账号流式中转);
+    /// `progress(已完成文件数, 总文件数)`。`cancel` 置位后在下个文件前(或中转流中)中止。
     pub async fn migrate_folder(
         &self,
         src_account: &str,
         src_root: &str,
         dst_account: &str,
         dst_dir: &str,
+        cancel: Arc<AtomicBool>,
         progress: ProgressFn<'_>,
     ) -> Result<()> {
         let files = self.list_all_files(src_account, src_root).await?;
@@ -636,10 +656,20 @@ impl App {
             folder_name(src_root)
         );
         for (i, file) in files.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(AppError::Cancelled);
+            }
             let rel = file.path.strip_prefix(&base).unwrap_or(file.path.as_str());
             let dst_path = format!("{dst_base}{rel}");
-            self.copy_across(src_account, &file.path, dst_account, &dst_path)
-                .await?;
+            self.copy_across_with_progress(
+                src_account,
+                &file.path,
+                dst_account,
+                &dst_path,
+                cancel.clone(),
+                &|_, _| {},
+            )
+            .await?;
             progress((i + 1) as u64, total);
         }
         Ok(())
@@ -1010,9 +1040,16 @@ mod tests {
         app.add_account(rec.clone());
 
         // 把 b/photos 迁移到 arch/ 下 → 落到 arch/photos/... 保留相对结构。
-        app.migrate_folder("rec", "b/photos", "rec", "arch", &|_, _| {})
-            .await
-            .unwrap();
+        app.migrate_folder(
+            "rec",
+            "b/photos",
+            "rec",
+            "arch",
+            Arc::new(AtomicBool::new(false)),
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
         let mut copied = rec.copied.lock().unwrap().clone();
         copied.sort();
         assert_eq!(
@@ -1140,9 +1177,16 @@ mod tests {
             .unwrap();
 
         let seen = std::sync::Mutex::new(None);
-        app.copy_across_with_progress("mem", "b/a.txt", "mem", "b/b.txt", &|done, total| {
-            *seen.lock().unwrap() = Some((done, total));
-        })
+        app.copy_across_with_progress(
+            "mem",
+            "b/a.txt",
+            "mem",
+            "b/b.txt",
+            Arc::new(AtomicBool::new(false)),
+            &|done, total| {
+                *seen.lock().unwrap() = Some((done, total));
+            },
+        )
         .await
         .unwrap();
 

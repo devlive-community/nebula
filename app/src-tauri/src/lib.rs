@@ -459,15 +459,23 @@ async fn copy(
 /// 跨账号 / 跨云迁移复制:把 `src_account` 的 `src_path` 搬到 `dst_account` 的 `dst_path`,
 /// 保留源对象。跨账号时走"下载源 → 上传目标",过程中发 `transfer-progress` 事件。
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn copy_across(
     app: AppHandle,
     state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    transfer_id: String,
     src_account: String,
     src_path: String,
     dst_account: String,
     dst_path: String,
 ) -> Result<(), String> {
     let core = state.inner().clone();
+    let cancel = transfers.begin(&transfer_id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: transfer_id.clone(),
+    };
 
     let event_to = dst_path.clone();
     let progress = move |transferred: u64, total: u64| {
@@ -481,9 +489,19 @@ async fn copy_across(
         );
     };
 
-    core.copy_across_with_progress(&src_account, &src_path, &dst_account, &dst_path, &progress)
-        .await
-        .map_err(|e| e.to_string())
+    core.copy_across_with_progress(
+        &src_account,
+        &src_path,
+        &dst_account,
+        &dst_path,
+        cancel,
+        &progress,
+    )
+    .await
+    .map_err(|e| match e {
+        app_core::AppError::Cancelled => "已取消".to_string(),
+        other => other.to_string(),
+    })
 }
 
 /// 递归下载整个远端文件夹到本地目录,保留相对结构(落到 `{local_dir}/{文件夹名}/…`)。
@@ -577,15 +595,23 @@ async fn download_folder(
 /// 把整个远端文件夹迁移到另一账号的目标目录下(作为子目录),保留相对结构;源保留。
 /// 每完成一个文件发一次 `folder-progress`。
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn migrate_folder(
     app: AppHandle,
     state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    transfer_id: String,
     src_account: String,
     src_root: String,
     dst_account: String,
     dst_dir: String,
 ) -> Result<(), String> {
     let core = state.inner().clone();
+    let cancel = transfers.begin(&transfer_id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: transfer_id.clone(),
+    };
     let event_path = src_root.clone();
     let progress = move |done: u64, total: u64| {
         let _ = app.emit(
@@ -598,9 +624,19 @@ async fn migrate_folder(
             },
         );
     };
-    core.migrate_folder(&src_account, &src_root, &dst_account, &dst_dir, &progress)
-        .await
-        .map_err(|e| e.to_string())
+    core.migrate_folder(
+        &src_account,
+        &src_root,
+        &dst_account,
+        &dst_dir,
+        cancel,
+        &progress,
+    )
+    .await
+    .map_err(|e| match e {
+        app_core::AppError::Cancelled => "已取消".to_string(),
+        other => other.to_string(),
+    })
 }
 
 /// 递归删除整个远端文件夹(文件 + 目录占位)。每删一个发一次 `folder-progress`。
