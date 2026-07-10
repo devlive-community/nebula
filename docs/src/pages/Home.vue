@@ -100,7 +100,7 @@ import {latestRelease} from '../content/releases'
 
 const {t} = useI18n()
 
-const chips = ['分片上传', '流式下载', '拖拽上传', '文件夹递归', '批量下载', '预签名分享', '图片视频预览', '列表 / 网格', '并发传输', '失败重试', '明暗主题', '快捷键']
+const chips = ['并发分片', '流式下载', '断点续传', '跨云迁移', '拖拽上传', '文件夹递归', '批量下载', '预签名分享', '图片视频预览', '列表 / 网格', '并发传输', '失败重试', '明暗主题', '快捷键']
 const marquee = [...chips, ...chips]
 
 const stats = computed(() => [
@@ -132,7 +132,9 @@ const features = [
   {key: 'browse', icon: i('<rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="11" width="18" height="4" rx="1"/><rect x="3" y="18" width="10" height="3" rx="1"/>')},
   {key: 'upload', icon: i('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>')},
   {key: 'download', icon: i('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>')},
+  {key: 'migrate', icon: i('<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>')},
   {key: 'share', icon: i('<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>')},
-  {key: 'secure', icon: i('<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>')}
+  {key: 'secure', icon: i('<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>')},
+  {key: 'update', icon: i('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>')}
 ]
 </script>
