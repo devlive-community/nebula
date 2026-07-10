@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use app_core::{AccountInfo, App, Integrity, Page, SearchResult, Settings};
+use app_core::{AccountInfo, App, Integrity, Page, SearchResult, Settings, TransferRecord};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
@@ -57,6 +57,24 @@ impl Drop for CancelGuard<'_> {
 #[tauri::command]
 fn cancel_transfer(transfers: State<'_, Transfers>, id: String) {
     transfers.cancel(&id);
+}
+
+/// 列出持久化的传输任务(重启后恢复面板)。
+#[tauri::command]
+fn list_transfers(state: State<'_, App>) -> Vec<TransferRecord> {
+    state.transfers()
+}
+
+/// 写入(或覆盖)一条传输任务。
+#[tauri::command]
+fn save_transfer(state: State<'_, App>, record: TransferRecord) {
+    state.save_transfer(&record);
+}
+
+/// 删除一条持久化传输任务(完成或清除时)。
+#[tauri::command]
+fn delete_transfer(state: State<'_, App>, id: String) {
+    state.delete_transfer(&id);
 }
 
 /// 上传进度事件负载,发往前端 `upload-progress`。
@@ -857,6 +875,9 @@ pub fn run() {
             stat,
             verify_object,
             cancel_transfer,
+            list_transfers,
+            save_transfer,
+            delete_transfer,
             search,
             upload_file,
             download_file,

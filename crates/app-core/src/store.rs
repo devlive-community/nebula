@@ -44,6 +44,17 @@ impl AccountStore {
                 mtime       INTEGER NOT NULL,
                 part_size   INTEGER NOT NULL,
                 parts       TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS transfers (
+                id      TEXT PRIMARY KEY,
+                kind    TEXT NOT NULL,
+                name    TEXT NOT NULL,
+                account TEXT NOT NULL,
+                remote  TEXT NOT NULL,
+                local   TEXT NOT NULL,
+                done    INTEGER NOT NULL,
+                total   INTEGER NOT NULL,
+                status  TEXT NOT NULL
             );",
         )?;
         Ok(Self {
@@ -167,6 +178,59 @@ impl AccountStore {
         )?;
         Ok(())
     }
+
+    /// 列出持久化的传输任务(用于重启后恢复面板)。
+    pub fn list_transfers(&self) -> rusqlite::Result<Vec<crate::TransferRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, kind, name, account, remote, local, done, total, status FROM transfers",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(crate::TransferRecord {
+                id: r.get(0)?,
+                kind: r.get(1)?,
+                name: r.get(2)?,
+                account: r.get(3)?,
+                remote: r.get(4)?,
+                local: r.get(5)?,
+                done: r.get::<_, i64>(6)? as u64,
+                total: r.get::<_, i64>(7)? as u64,
+                status: r.get(8)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// 写入(或覆盖)一条传输任务。
+    pub fn put_transfer(&self, t: &crate::TransferRecord) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO transfers (id, kind, name, account, remote, local, done, total, status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(id) DO UPDATE SET
+                kind = ?2, name = ?3, account = ?4, remote = ?5, local = ?6,
+                done = ?7, total = ?8, status = ?9",
+            params![
+                t.id,
+                t.kind,
+                t.name,
+                t.account,
+                t.remote,
+                t.local,
+                t.done as i64,
+                t.total as i64,
+                t.status
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// 删除一条传输任务(完成或被清除时)。
+    pub fn delete_transfer(&self, id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM transfers WHERE id = ?1", params![id])?;
+        Ok(())
+    }
 }
 
 /// 一条断点续传上传会话记录。`parts` 是 `[(分片号, ETag)]` 的 JSON。
@@ -215,6 +279,37 @@ mod tests {
         let listed = store.list().unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, "b");
+    }
+
+    #[test]
+    fn transfer_crud_roundtrip() {
+        let store = AccountStore::open(":memory:").unwrap();
+        assert!(store.list_transfers().unwrap().is_empty());
+
+        let rec = crate::TransferRecord {
+            id: "dl:bucket/big.bin".into(),
+            kind: "下载".into(),
+            name: "big.bin".into(),
+            account: "oss".into(),
+            remote: "bucket/big.bin".into(),
+            local: "/tmp/big.bin".into(),
+            done: 100,
+            total: 500,
+            status: "active".into(),
+        };
+        store.put_transfer(&rec).unwrap();
+        assert_eq!(store.list_transfers().unwrap().len(), 1);
+
+        // 覆盖:同 id 更新状态。
+        let mut updated = rec.clone();
+        updated.status = "interrupted".into();
+        store.put_transfer(&updated).unwrap();
+        let listed = store.list_transfers().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].status, "interrupted");
+
+        store.delete_transfer(&rec.id).unwrap();
+        assert!(store.list_transfers().unwrap().is_empty());
     }
 
     #[test]

@@ -61,6 +61,21 @@ pub struct AccountInfo {
     pub access_key_id: String,
     pub endpoint: String,
 }
+
+/// 传输面板任务的持久化记录,用于跨重启恢复列表。字段与前端 TransferItem 对应;
+/// `kind` / `status` 为不透明字符串(App 层不解释其含义)。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TransferRecord {
+    pub id: String,
+    pub kind: String,
+    pub name: String,
+    pub account: String,
+    pub remote: String,
+    pub local: String,
+    pub done: u64,
+    pub total: u64,
+    pub status: String,
+}
 /// 钥匙串里存储密钥用的服务名。
 const KEYRING_SERVICE: &str = "org.devlive.nebula";
 
@@ -765,6 +780,28 @@ impl App {
     /// 全局传输限速句柄(与 App 各克隆共享)。Tauri 下载循环用它对每块限速。
     pub fn transfer_limits(&self) -> TransferLimits {
         self.limits.clone()
+    }
+
+    /// 列出持久化的传输任务(重启后恢复面板用)。无存储时返回空。
+    pub fn transfers(&self) -> Vec<TransferRecord> {
+        self.store
+            .as_ref()
+            .and_then(|s| s.list_transfers().ok())
+            .unwrap_or_default()
+    }
+
+    /// 写入(或覆盖)一条传输任务。无存储时无操作。
+    pub fn save_transfer(&self, record: &TransferRecord) {
+        if let Some(store) = &self.store {
+            let _ = store.put_transfer(record);
+        }
+    }
+
+    /// 删除一条传输任务(完成或清除时)。无存储时无操作。
+    pub fn delete_transfer(&self, id: &str) {
+        if let Some(store) = &self.store {
+            let _ = store.delete_transfer(id);
+        }
     }
 
     /// 按 id 解析 provider,未注册则报 [`AppError::NoSuchProvider`]。
