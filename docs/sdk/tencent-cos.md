@@ -41,9 +41,9 @@
 - [x] 3 client(COS 签名请求器)
 - [x] 4 error
 - [x] 5 对象操作 put/get/delete/head(含 copy / 预签名)
-- [ ] 6 list_objects 分页
-- [ ] 7 桶管理 list/create/delete
-- [ ] 8 分片上传
+- [x] 6 list_objects 分页(V1 marker + 目录折叠)
+- [x] 7 桶管理 list/create/delete
+- [x] 8 分片上传
 - [ ] 9 smoke 真账号跑通
 
 ## 待办 / 后续
