@@ -94,4 +94,6 @@ export interface Entry {
   size: number;
   last_modified: string | null;
   etag: string | null;
+  /** 存储类型 / 归档层(如 STANDARD / IA / ARCHIVE);未知为 null。 */
+  storage_class: string | null;
 }
