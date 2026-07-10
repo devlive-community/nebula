@@ -147,6 +147,8 @@ export default function App() {
   };
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingBatchDelete, setPendingBatchDelete] = useState(false);
+  const [batchStorageClass, setBatchStorageClass] = useState(false);
+  const [batchRestore, setBatchRestore] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(
     () => (localStorage.getItem("nebula-theme") as "dark" | "light") || "dark",
@@ -648,6 +650,53 @@ export default function App() {
     setBusy(false);
   };
 
+  const doBatchStorageClass = async (storageClass: string) => {
+    setBatchStorageClass(false);
+    if (!current || selected.size === 0) return;
+    const paths = [...selected];
+    setError(null);
+    setNotice({ tone: "info", text: `正在转换 ${paths.length} 个对象的存储类型…` });
+    let ok = 0;
+    let fail = 0;
+    await runPool(paths, settings.concurrency, async (p) => {
+      try {
+        await api.setStorageClass(current, p, storageClass);
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    });
+    clearSelection();
+    setNotice({
+      tone: fail ? "warn" : "ok",
+      text: `存储类型转换:成功 ${ok}${fail ? `,失败 ${fail}` : ""}`,
+    });
+    await load();
+  };
+
+  const doBatchRestore = async (days: number) => {
+    setBatchRestore(false);
+    if (!current || selected.size === 0) return;
+    const paths = [...selected];
+    setError(null);
+    setNotice({ tone: "info", text: `正在发起取回 ${paths.length} 个对象…` });
+    let ok = 0;
+    let fail = 0;
+    await runPool(paths, settings.concurrency, async (p) => {
+      try {
+        await api.restoreObject(current, p, days);
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    });
+    clearSelection();
+    setNotice({
+      tone: fail ? "warn" : "ok",
+      text: `已发起取回:成功 ${ok}${fail ? `,失败 ${fail}(可能非归档对象)` : ""}`,
+    });
+  };
+
   // 上传一组本地路径(文件或文件夹)到当前目录,文件夹递归、保留相对路径。
   const uploadLocalPaths = async (localPaths: string[]) => {
     if (!current || !path || localPaths.length === 0) return;
@@ -1069,6 +1118,8 @@ export default function App() {
     !!migrateTarget ||
     !!storageClassTarget ||
     !!restoreTarget ||
+    batchStorageClass ||
+    batchRestore ||
     !!shareUrl ||
     showNewFolder ||
     pendingBatchDelete ||
@@ -1086,6 +1137,8 @@ export default function App() {
       else if (migrateTarget) setMigrateTarget(null);
       else if (storageClassTarget) setStorageClassTarget(null);
       else if (restoreTarget) setRestoreTarget(null);
+      else if (batchStorageClass) setBatchStorageClass(false);
+      else if (batchRestore) setBatchRestore(false);
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
       else if (showForm) setShowForm(false);
@@ -1176,6 +1229,12 @@ export default function App() {
                 <div className="batch-bar__spacer" />
                 <button className="btn" onClick={batchDownload}>
                   批量下载
+                </button>
+                <button className="btn" onClick={() => setBatchStorageClass(true)}>
+                  转换存储类型
+                </button>
+                <button className="btn" onClick={() => setBatchRestore(true)}>
+                  取回归档
                 </button>
                 <button
                   className="btn btn--danger"
@@ -1376,6 +1435,24 @@ export default function App() {
           name={restoreTarget.name}
           onConfirm={doRestore}
           onCancel={() => setRestoreTarget(null)}
+        />
+      )}
+
+      {batchStorageClass && current && (
+        <StorageClassDialog
+          vendor={accounts.find((a) => a.id === current)?.vendor ?? ""}
+          name={`已选 ${selected.size} 项`}
+          current={null}
+          onConfirm={doBatchStorageClass}
+          onCancel={() => setBatchStorageClass(false)}
+        />
+      )}
+
+      {batchRestore && (
+        <RestoreDialog
+          name={`已选 ${selected.size} 项`}
+          onConfirm={doBatchRestore}
+          onCancel={() => setBatchRestore(false)}
         />
       )}
 
