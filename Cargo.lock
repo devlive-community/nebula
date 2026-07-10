@@ -1427,6 +1427,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tencent-cos"
+version = "1.3.0"
+dependencies = [
+ "bytes",
+ "cloud-core",
+ "futures",
+ "httpdate",
+ "percent-encoding",
+ "quick-xml",
+ "reqwest",
+ "serde",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

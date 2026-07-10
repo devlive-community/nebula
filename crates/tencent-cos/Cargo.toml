@@ -1,0 +1,22 @@
+[package]
+name = "tencent-cos"
+version.workspace = true
+description = "Hand-written async Rust SDK for Tencent Cloud COS (object storage), no aggregation library"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["tencent", "cos", "object-storage", "qcloud"]
+categories = ["api-bindings"]
+
+[dependencies]
+cloud-core = { path = "../cloud-core", version = "1" }
+thiserror = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+futures = { workspace = true }
+httpdate = "1"
+quick-xml = { version = "0.36", features = ["serialize"] }
+percent-encoding = "2"

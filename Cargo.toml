@@ -19,7 +19,7 @@ members = [
     "crates/aliyun-oss",
     # "crates/aliyun-openapi",
     # "crates/aliyun-pan",
-    # "crates/tencent-cos",
+    "crates/tencent-cos",
     # "crates/tencent-cloud-api",
     "crates/huawei-obs",
     # "crates/huawei-openapi",
@@ -43,7 +43,7 @@ members = [
     "crates/providers/provider-r2",
     "crates/providers/provider-minio",
 
-    # 桌面 App 后端
+    # 桌面 App 后端(独立 workspace,不纳入根)
     # "app/src-tauri",
 ]
 
