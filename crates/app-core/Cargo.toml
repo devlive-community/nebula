@@ -19,6 +19,7 @@ provider-r2 = { path = "../providers/provider-r2" }
 provider-minio = { path = "../providers/provider-minio" }
 bytes = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 rusqlite = { version = "0.32", features = ["bundled"] }
 # 各平台原生后端:macOS Keychain / Windows Credential / Linux 内核 keyutils

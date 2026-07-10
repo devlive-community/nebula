@@ -47,6 +47,7 @@ dependencies = [
  "provider-tencent",
  "rusqlite",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
 ]
