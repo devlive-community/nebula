@@ -8,6 +8,7 @@
 //! 无需 V2 那样的子资源特判。
 
 use bytes::Bytes;
+use futures::StreamExt;
 use reqwest::header::ETAG;
 use reqwest::Method;
 use serde::Deserialize;
@@ -20,6 +21,9 @@ use crate::object::{check_status, object_uri};
 
 /// S3 分片下限:除最后一片外,每片至少 5 MiB。
 pub const MIN_PART_SIZE: usize = 5 * 1024 * 1024;
+
+/// 分片并发上传的默认并发度。取 4 是吞吐与内存 / 连接数的折中。
+pub const UPLOAD_CONCURRENCY: usize = 4;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -183,25 +187,50 @@ impl S3Client {
         on_progress: &mut F,
     ) -> Result<Vec<(u32, String)>> {
         let total = data.len() as u64;
-        let mut parts = Vec::new();
-        let mut offset = 0usize;
-        let mut part_number = 1u32;
-        loop {
-            let end = (offset + part_size).min(data.len());
-            let chunk = data.slice(offset..end);
-            let etag = self
-                .upload_part(bucket, key, upload_id, part_number, chunk)
-                .await?;
-            parts.push((part_number, etag));
-            offset = end;
-            on_progress(offset as u64, total);
-            part_number += 1;
-            if offset >= data.len() {
-                break;
+        let specs = split_parts(data, part_size);
+
+        // 有界并发上传:同时最多 [`UPLOAD_CONCURRENCY`] 片在飞。`buffer_unordered` 谁先完成谁
+        // 先返回,进度在这个消费循环里串行累加,回调不进并发任务,无需加锁。分片乱序完成不影响
+        // 最终结果——`complete_multipart_upload` 会按 part number 重新排序。
+        let mut stream = futures::stream::iter(specs.into_iter().map(|(number, chunk)| {
+            let len = chunk.len() as u64;
+            async move {
+                let etag = self
+                    .upload_part(bucket, key, upload_id, number, chunk)
+                    .await?;
+                Ok::<(u32, String, u64), S3Error>((number, etag, len))
             }
+        }))
+        .buffer_unordered(UPLOAD_CONCURRENCY);
+
+        let mut parts = Vec::new();
+        let mut uploaded = 0u64;
+        while let Some(result) = stream.next().await {
+            let (number, etag, len) = result?;
+            parts.push((number, etag));
+            uploaded += len;
+            on_progress(uploaded, total);
         }
         Ok(parts)
     }
+}
+
+/// 把整块数据切成 `(part_number, chunk)` 列表,part number 从 1 开始。
+/// 空数据切成一个空分片(部分实现要求至少一片)。
+fn split_parts(data: &Bytes, part_size: usize) -> Vec<(u32, Bytes)> {
+    let mut specs = Vec::new();
+    let mut offset = 0usize;
+    let mut part_number = 1u32;
+    while offset < data.len() {
+        let end = (offset + part_size).min(data.len());
+        specs.push((part_number, data.slice(offset..end)));
+        offset = end;
+        part_number += 1;
+    }
+    if specs.is_empty() {
+        specs.push((1, data.slice(0..0)));
+    }
+    specs
 }
 
 /// 生成 CompleteMultipartUpload 的请求体 XML(按 part number 升序)。
@@ -237,6 +266,28 @@ mod tests {
              <Part><PartNumber>3</PartNumber><ETag>\"E3\"</ETag></Part>\
              </CompleteMultipartUpload>"
         );
+    }
+
+    #[test]
+    fn split_parts_covers_all_bytes_in_order() {
+        let data = Bytes::from(vec![0u8; 25]);
+        let specs = split_parts(&data, 10);
+        assert_eq!(specs.len(), 3);
+        assert_eq!(specs.iter().map(|(n, _)| *n).collect::<Vec<_>>(), [1, 2, 3]);
+        assert_eq!(
+            specs.iter().map(|(_, c)| c.len()).collect::<Vec<_>>(),
+            [10, 10, 5]
+        );
+        let total: usize = specs.iter().map(|(_, c)| c.len()).sum();
+        assert_eq!(total, 25);
+    }
+
+    #[test]
+    fn split_parts_empty_data_yields_one_empty_part() {
+        let specs = split_parts(&Bytes::new(), 10);
+        assert_eq!(specs.len(), 1);
+        assert_eq!(specs[0].0, 1);
+        assert!(specs[0].1.is_empty());
     }
 
     #[test]
