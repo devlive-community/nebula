@@ -373,12 +373,12 @@ export default function App() {
       if (!current || path === "") return;
       setSearch({ query, results: [], loading: true, truncated: false });
       try {
-        const results = await api.search(current, path, query, 500);
+        const res = await api.search(current, path, query, 500);
         setSearch({
           query,
-          results,
+          results: res.entries,
           loading: false,
-          truncated: results.length >= 500,
+          truncated: res.truncated,
         });
       } catch (e) {
         setError(String(e));

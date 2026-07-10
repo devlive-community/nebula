@@ -2,7 +2,7 @@
 //!
 //! 业务逻辑都在 `app-core`(可 `cargo test`),这里只做 JS ↔ Rust 的桥接与本地文件读写。
 
-use app_core::{AccountInfo, App, Page, Settings};
+use app_core::{AccountInfo, App, Page, SearchResult, Settings};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
@@ -196,7 +196,7 @@ async fn search(
     root: String,
     query: String,
     max_results: usize,
-) -> Result<Vec<Entry>, String> {
+) -> Result<SearchResult, String> {
     let app = state.inner().clone();
     app.search(&account, &root, &query, max_results)
         .await

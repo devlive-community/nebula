@@ -38,6 +38,14 @@ const VENDOR_R2: &str = "r2";
 const VENDOR_MINIO: &str = "minio";
 const VENDOR_TENCENT: &str = "tencent";
 
+/// 递归搜索结果:命中条目 + 是否因触及上限而**可能不完整**。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SearchResult {
+    pub entries: Vec<Entry>,
+    /// 因结果数或扫描量触顶而提前结束 → 结果可能不完整。
+    pub truncated: bool,
+}
+
 /// 账号的非敏感信息(不含密钥),供编辑回填用。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AccountInfo {
@@ -422,11 +430,12 @@ impl App {
         root: &str,
         query: &str,
         max_results: usize,
-    ) -> Result<Vec<Entry>> {
+    ) -> Result<SearchResult> {
         let provider = self.provider(account)?;
         let needle = query.trim().to_lowercase();
         let mut results = Vec::new();
         let mut scanned = 0usize;
+        let mut truncated = false;
         let mut queue = std::collections::VecDeque::new();
         queue.push_back(root.to_string());
 
@@ -441,11 +450,13 @@ impl App {
                     } else if needle.is_empty() || entry.name.to_lowercase().contains(&needle) {
                         results.push(entry);
                         if results.len() >= max_results {
+                            truncated = true;
                             break 'walk;
                         }
                     }
                 }
                 if scanned >= SEARCH_SCAN_LIMIT {
+                    truncated = true;
                     break 'walk;
                 }
                 match page.cursor {
@@ -454,7 +465,10 @@ impl App {
                 }
             }
         }
-        Ok(results)
+        Ok(SearchResult {
+            entries: results,
+            truncated,
+        })
     }
 
     /// 下载对象内容。
@@ -750,11 +764,12 @@ mod tests {
 
         // "cat" 命中两层深处的两个文件(photos/cat.jpg 与 docs/cat-notes.md)。
         let hits = app.search("tree", "b", "cat", 100).await.unwrap();
-        let mut names: Vec<_> = hits.iter().map(|e| e.name.clone()).collect();
+        let mut names: Vec<_> = hits.entries.iter().map(|e| e.name.clone()).collect();
         names.sort();
         assert_eq!(names, ["cat-notes.md", "cat.jpg"]);
-        // 只返回文件,不含目录。
-        assert!(hits.iter().all(|e| !e.is_dir()));
+        // 只返回文件,不含目录;正常穷尽,不截断。
+        assert!(hits.entries.iter().all(|e| !e.is_dir()));
+        assert!(!hits.truncated);
     }
 
     #[tokio::test]
@@ -764,10 +779,12 @@ mod tests {
 
         // 空查询返回全部文件(readme + cat.jpg + dog.png + cat-notes.md = 4)。
         let all = app.search("tree", "b", "", 100).await.unwrap();
-        assert_eq!(all.len(), 4);
-        // 结果数封顶生效。
+        assert_eq!(all.entries.len(), 4);
+        assert!(!all.truncated);
+        // 结果数封顶生效,并标记结果不完整。
         let capped = app.search("tree", "b", "", 2).await.unwrap();
-        assert_eq!(capped.len(), 2);
+        assert_eq!(capped.entries.len(), 2);
+        assert!(capped.truncated);
     }
 
     #[tokio::test]

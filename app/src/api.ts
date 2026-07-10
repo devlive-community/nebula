@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Entry, Page, Settings, UploadEntry } from "./types";
+import type { AccountInfo, Entry, Page, SearchResult, Settings, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -79,7 +79,7 @@ export const search = (
   root: string,
   query: string,
   maxResults: number,
-) => invoke<Entry[]>("search", { account, root, query, maxResults });
+) => invoke<SearchResult>("search", { account, root, query, maxResults });
 
 export const uploadFile = (
   account: string,

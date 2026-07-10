@@ -61,6 +61,13 @@ export interface Page {
   cursor: string | null;
 }
 
+/** 递归搜索结果(与 Rust 端 app_core::SearchResult 对应)。 */
+export interface SearchResult {
+  entries: Entry[];
+  /** 因结果数或扫描量触顶而提前结束 → 结果可能不完整。 */
+  truncated: boolean;
+}
+
 /** 与 Rust 端 nebula_provider::Entry 对应。 */
 export interface Entry {
   name: string;
