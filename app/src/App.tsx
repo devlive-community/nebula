@@ -81,6 +81,7 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>({
     share_expiry_secs: 3600,
     concurrency: 3,
+    rate_limit_kib_per_sec: 0,
   });
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);

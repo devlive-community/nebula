@@ -12,7 +12,11 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
     Math.round(settings.share_expiry_secs / 60),
   );
   const [concurrency, setConcurrency] = useState(settings.concurrency);
-  const valid = minutes >= 1 && concurrency >= 1 && concurrency <= 10;
+  const [rateLimit, setRateLimit] = useState(
+    settings.rate_limit_kib_per_sec ?? 0,
+  );
+  const valid =
+    minutes >= 1 && concurrency >= 1 && concurrency <= 10 && rateLimit >= 0;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -40,6 +44,15 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
               onChange={(e) => setConcurrency(Number(e.target.value))}
             />
           </label>
+          <label className="field">
+            <span>传输限速(KiB/秒,0 = 不限速)</span>
+            <input
+              type="number"
+              min={0}
+              value={rateLimit}
+              onChange={(e) => setRateLimit(Number(e.target.value))}
+            />
+          </label>
         </div>
         <div className="modal__footer">
           <button className="btn" onClick={onClose}>
@@ -49,7 +62,11 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
             className="btn btn--primary"
             disabled={!valid}
             onClick={() =>
-              onSave({ share_expiry_secs: minutes * 60, concurrency })
+              onSave({
+                share_expiry_secs: minutes * 60,
+                concurrency,
+                rate_limit_kib_per_sec: rateLimit,
+              })
             }
           >
             保存

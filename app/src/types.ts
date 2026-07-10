@@ -49,6 +49,8 @@ export interface UploadEntry {
 export interface Settings {
   share_expiry_secs: number;
   concurrency: number;
+  /** 全局传输带宽上限,KiB/秒;0 表示不限速。 */
+  rate_limit_kib_per_sec: number;
 }
 
 /** 传输任务列表中的一项(含重试所需的参数)。 */
