@@ -50,6 +50,13 @@ export const addMinioAccount = (
   endpoint: string,
 ) => invoke<void>("add_minio_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addTencentAccount = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_tencent_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 export const getAccount = (id: string) =>

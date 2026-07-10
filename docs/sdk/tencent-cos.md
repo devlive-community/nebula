@@ -44,8 +44,8 @@
 - [x] 6 list_objects 分页(V1 marker + 目录折叠)
 - [x] 7 桶管理 list/create/delete
 - [x] 8 分片上传
-- [ ] 9 smoke 真账号跑通
+- [ ] 9 smoke 真账号跑通(待用户验证)
 
 ## 待办 / 后续
 
-- [ ] provider-tencent 适配层 + app-core 注册 + GUI 选项
+- [x] provider-tencent 适配层 + app-core 注册 + GUI 选项(App::add_tencent_account)

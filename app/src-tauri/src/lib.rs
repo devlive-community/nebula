@@ -121,6 +121,20 @@ fn add_minio_account(
         .map_err(|e| e.to_string())
 }
 
+/// 新增一个腾讯云 COS 账号(持久化到 SQLite)。access_key_id 传 SecretId。
+#[tauri::command]
+fn add_tencent_account(
+    state: State<'_, App>,
+    id: String,
+    access_key_id: String,
+    access_key_secret: String,
+    endpoint: String,
+) -> Result<(), String> {
+    state
+        .add_tencent_account(id, access_key_id, access_key_secret, endpoint)
+        .map_err(|e| e.to_string())
+}
+
 /// 移除账号(从注册表与 SQLite)。
 #[tauri::command]
 fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
@@ -459,6 +473,7 @@ pub fn run() {
             add_aws_account,
             add_r2_account,
             add_minio_account,
+            add_tencent_account,
             remove_account,
             get_account,
             browse,

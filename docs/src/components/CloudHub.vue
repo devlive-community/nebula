@@ -38,7 +38,7 @@
 // 7 家云均匀分布在中心 Nebula 周围(椭圆,顺时针)
 const nodes = [
   {name: '阿里云 OSS', active: true, x: 50, y: 7},
-  {name: '腾讯云 COS', active: false, x: 81, y: 23},
+  {name: '腾讯云 COS', active: true, x: 81, y: 23},
   {name: '华为云 OBS', active: true, x: 89, y: 60},
   {name: 'AWS S3', active: true, x: 67, y: 89},
   {name: 'MinIO', active: true, x: 33, y: 89},

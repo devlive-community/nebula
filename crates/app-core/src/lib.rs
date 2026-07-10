@@ -22,6 +22,7 @@ use provider_huawei::HuaweiProvider;
 use provider_minio::MinioProvider;
 use provider_qiniu::QiniuProvider;
 use provider_r2::R2Provider;
+use provider_tencent::TencentProvider;
 
 pub use error::{AppError, Result};
 pub use nebula_provider::{ByteStream, Capabilities, EntryKind, ProgressFn};
@@ -35,6 +36,7 @@ const VENDOR_QINIU: &str = "qiniu";
 const VENDOR_AWS: &str = "aws";
 const VENDOR_R2: &str = "r2";
 const VENDOR_MINIO: &str = "minio";
+const VENDOR_TENCENT: &str = "tencent";
 
 /// 账号的非敏感信息(不含密钥),供编辑回填用。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -140,6 +142,12 @@ impl App {
                 rec.endpoint.clone(),
             ))),
             VENDOR_MINIO => self.registry.register(Arc::new(MinioProvider::new(
+                rec.id.clone(),
+                rec.access_key_id.clone(),
+                secret.to_string(),
+                rec.endpoint.clone(),
+            ))),
+            VENDOR_TENCENT => self.registry.register(Arc::new(TencentProvider::new(
                 rec.id.clone(),
                 rec.access_key_id.clone(),
                 secret.to_string(),
@@ -301,6 +309,33 @@ impl App {
         let rec = AccountRecord {
             id,
             vendor: VENDOR_MINIO.to_string(),
+            access_key_id: access_key.into(),
+            access_key_secret: String::new(),
+            endpoint: endpoint.into(),
+        };
+        if let Some(store) = &self.store {
+            store.upsert(&rec)?;
+        }
+        self.register_record(&rec, &secret);
+        Ok(())
+    }
+
+    /// 便捷:新增一个腾讯云 COS 账号。密钥进钥匙串,元信息进 SQLite。
+    /// COS 的凭证是 SecretId/SecretKey;`access_key` 传 SecretId,`secret_key` 传 SecretKey。
+    pub fn add_tencent_account(
+        &self,
+        id: impl Into<String>,
+        access_key: impl Into<String>,
+        secret_key: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Result<()> {
+        let id = id.into();
+        let secret = secret_key.into();
+        self.secrets.set(&id, &secret)?;
+
+        let rec = AccountRecord {
+            id,
+            vendor: VENDOR_TENCENT.to_string(),
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),

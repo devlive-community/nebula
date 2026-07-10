@@ -16,6 +16,14 @@ export const VENDORS = {
     endpoint: "obs.cn-north-4.myhuaweicloud.com",
     idPlaceholder: "如 huawei-main",
   },
+  tencent: {
+    label: "腾讯云 COS",
+    color: "#006eff",
+    akLabel: "SecretId",
+    skLabel: "SecretKey",
+    endpoint: "cos.ap-beijing.myqcloud.com",
+    idPlaceholder: "如 tencent-main",
+  },
   qiniu: {
     label: "七牛云 Kodo",
     color: "#12b5a5",

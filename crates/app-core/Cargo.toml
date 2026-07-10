@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 nebula-provider = { path = "../nebula-provider" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
+provider-tencent = { path = "../providers/provider-tencent" }
 provider-huawei = { path = "../providers/provider-huawei" }
 provider-qiniu = { path = "../providers/provider-qiniu" }
 provider-aws = { path = "../providers/provider-aws" }

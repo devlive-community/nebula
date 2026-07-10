@@ -415,7 +415,7 @@ export default function App() {
   };
 
   const addAccount = async (
-    vendor: "aliyun" | "huawei" | "qiniu" | "aws" | "r2" | "minio",
+    vendor: "aliyun" | "huawei" | "qiniu" | "aws" | "r2" | "minio" | "tencent",
     id: string,
     ak: string,
     sk: string,
@@ -432,6 +432,7 @@ export default function App() {
         aws: api.addAwsAccount,
         r2: api.addR2Account,
         minio: api.addMinioAccount,
+        tencent: api.addTencentAccount,
       };
       await adders[vendor](id, ak, sk, endpoint);
       await refreshAccounts();
