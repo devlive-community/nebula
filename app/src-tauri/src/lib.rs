@@ -6,7 +6,9 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use app_core::{AccountInfo, App, Integrity, Page, SearchResult, Settings, TransferRecord};
+use app_core::{
+    AccountInfo, App, FolderStats, Integrity, Page, SearchResult, Settings, TransferRecord,
+};
 use bytes::Bytes;
 use nebula_provider::Entry;
 use serde::Serialize;
@@ -442,6 +444,19 @@ async fn delete(state: State<'_, App>, account: String, path: String) -> Result<
 async fn create_folder(state: State<'_, App>, account: String, path: String) -> Result<(), String> {
     let app = state.inner().clone();
     app.upload(&account, &path, Bytes::new(), None)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 统计文件夹 / Bucket 下的文件数与总字节数。
+#[tauri::command]
+async fn folder_stats(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<FolderStats, String> {
+    let app = state.inner().clone();
+    app.folder_stats(&account, &path)
         .await
         .map_err(|e| e.to_string())
 }
@@ -993,6 +1008,7 @@ pub fn run() {
             create_folder,
             create_bucket,
             delete_bucket,
+            folder_stats,
             rename,
             copy,
             set_storage_class,

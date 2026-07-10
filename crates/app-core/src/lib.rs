@@ -53,6 +53,15 @@ pub struct SearchResult {
     pub truncated: bool,
 }
 
+/// 前缀(文件夹 / Bucket)统计:文件数 + 总字节数。
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct FolderStats {
+    pub files: u64,
+    pub bytes: u64,
+    /// 因扫描量触顶而提前结束 → 统计可能偏小。
+    pub truncated: bool,
+}
+
 /// 账号的非敏感信息(不含密钥),供编辑回填用。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AccountInfo {
@@ -663,6 +672,40 @@ impl App {
         Ok(())
     }
 
+    /// 统计 `root`(桶 / 前缀)下的文件数与总字节数。分页遍历,`SEARCH_SCAN_LIMIT` 兜底;
+    /// 触顶时 `truncated = true`(统计可能偏小)。用于下载 / 归档 / 删除前先看目录多大。
+    pub async fn folder_stats(&self, account: &str, root: &str) -> Result<FolderStats> {
+        let provider = self.provider(account)?;
+        let mut stats = FolderStats::default();
+        let mut scanned = 0usize;
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(root.to_string());
+        'walk: while let Some(dir) = queue.pop_front() {
+            let mut cursor = None;
+            loop {
+                let page = provider.list_page(&dir, cursor).await?;
+                for entry in page.entries {
+                    scanned += 1;
+                    if entry.is_dir() {
+                        queue.push_back(entry.path);
+                    } else {
+                        stats.files += 1;
+                        stats.bytes += entry.size;
+                    }
+                }
+                if scanned >= SEARCH_SCAN_LIMIT {
+                    stats.truncated = true;
+                    break 'walk;
+                }
+                match page.cursor {
+                    Some(next) => cursor = Some(next),
+                    None => break,
+                }
+            }
+        }
+        Ok(stats)
+    }
+
     /// 递归列出 `root`(桶 / 前缀)下的所有文件(不含目录占位)。
     ///
     /// 分页遍历,`SEARCH_SCAN_LIMIT` 兜底防止在超大目录上失控。文件夹级下载 / 迁移 / 删除的基础件。
@@ -1185,6 +1228,17 @@ mod tests {
                 "b/readme.txt"
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn folder_stats_counts_files_and_bytes() {
+        let app = App::new();
+        app.add_account(Arc::new(TreeProvider));
+        // TreeProvider 下 4 个文件,每个 1 字节。
+        let stats = app.folder_stats("tree", "b").await.unwrap();
+        assert_eq!(stats.files, 4);
+        assert_eq!(stats.bytes, 4);
+        assert!(!stats.truncated);
     }
 
     #[tokio::test]
