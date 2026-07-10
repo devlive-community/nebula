@@ -579,6 +579,19 @@ impl App {
         Ok(self.provider(account)?.copy(from, to).await?)
     }
 
+    /// 转换对象存储类型 / 归档层(`class` 为厂商的存储类型字符串)。
+    pub async fn set_storage_class(&self, account: &str, path: &str, class: &str) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .set_storage_class(path, class)
+            .await?)
+    }
+
+    /// 取回(解冻)归档对象,`days` 为取回后可读的保持天数。
+    pub async fn restore(&self, account: &str, path: &str, days: u32) -> Result<()> {
+        Ok(self.provider(account)?.restore(path, days).await?)
+    }
+
     /// 跨账号 / 跨云复制:把 `src_account` 的 `src_path` 搬到 `dst_account` 的 `dst_path`,
     /// 保留源对象。两端可以是不同的云。
     pub async fn copy_across(
@@ -1184,6 +1197,21 @@ mod tests {
             app.verify("mem", "b/k.txt").await.unwrap(),
             Integrity::Verified
         );
+    }
+
+    #[tokio::test]
+    async fn storage_class_ops_unsupported_by_default() {
+        // MemoryProvider 不覆盖 set_storage_class / restore → 走 trait 默认(Unsupported),
+        // 上层安全地报错而非 panic。真实厂商适配层覆盖它们。
+        let app = app_with_memory();
+        app.upload("mem", "b/k", Bytes::from_static(b"x"), None)
+            .await
+            .unwrap();
+        assert!(app
+            .set_storage_class("mem", "b/k", "ARCHIVE")
+            .await
+            .is_err());
+        assert!(app.restore("mem", "b/k", 1).await.is_err());
     }
 
     #[tokio::test]

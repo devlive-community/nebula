@@ -474,6 +474,34 @@ async fn copy(
         .map_err(|e| e.to_string())
 }
 
+/// 转换对象存储类型 / 归档层。`class` 为厂商的存储类型字符串。
+#[tauri::command]
+async fn set_storage_class(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    class: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_storage_class(&account, &path, &class)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 取回(解冻)归档对象,`days` 为保持天数。
+#[tauri::command]
+async fn restore_object(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    days: u32,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.restore(&account, &path, days)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 跨账号 / 跨云迁移复制:把 `src_account` 的 `src_path` 搬到 `dst_account` 的 `dst_path`,
 /// 保留源对象。跨账号时走"下载源 → 上传目标",过程中发 `transfer-progress` 事件。
 #[tauri::command]
@@ -885,6 +913,8 @@ pub fn run() {
             create_folder,
             rename,
             copy,
+            set_storage_class,
+            restore_object,
             copy_across,
             download_folder,
             migrate_folder,
