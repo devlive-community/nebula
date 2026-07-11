@@ -149,8 +149,18 @@ export const search = (
   account: string,
   root: string,
   query: string,
+  minSize: number | null,
+  ext: string | null,
   maxResults: number,
-) => invoke<SearchResult>("search", { account, root, query, maxResults });
+) =>
+  invoke<SearchResult>("search", {
+    account,
+    root,
+    query,
+    minSize,
+    ext,
+    maxResults,
+  });
 
 export const uploadFile = (
   account: string,

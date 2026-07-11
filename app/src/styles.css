@@ -488,6 +488,34 @@ body.resizing {
   color: var(--text-dim);
 }
 
+.search-results__filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-results__filters select,
+.search-results__ext {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+.search-results__ext {
+  width: 180px;
+}
+
+.search-results__filters select:focus,
+.search-results__ext:focus {
+  border-color: var(--primary);
+}
+
 .search-results__body {
   flex: 1;
   overflow-y: auto;

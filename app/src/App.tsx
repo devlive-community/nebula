@@ -68,6 +68,8 @@ export default function App() {
     loading: boolean;
     truncated: boolean;
   } | null>(null);
+  // 搜索过滤:minSize 字节(0=不限),ext 扩展名(空=不限)。
+  const [searchFilter, setSearchFilter] = useState({ minSize: 0, ext: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{
@@ -460,11 +462,18 @@ export default function App() {
 
   // 从当前目录递归搜索(全桶或子树,取决于所在层级)。
   const runSearch = useCallback(
-    async (query: string) => {
+    async (query: string, filter: { minSize: number; ext: string }) => {
       if (!current || path === "") return;
       setSearch({ query, results: [], loading: true, truncated: false });
       try {
-        const res = await api.search(current, path, query, 500);
+        const res = await api.search(
+          current,
+          path,
+          query,
+          filter.minSize || null,
+          filter.ext.trim() || null,
+          500,
+        );
         setSearch({
           query,
           results: res.entries,
@@ -478,6 +487,12 @@ export default function App() {
     },
     [current, path],
   );
+
+  // 改变过滤条件时,用当前关键词重跑搜索。
+  const applySearchFilter = (minSize: number, ext: string) => {
+    setSearchFilter({ minSize, ext });
+    if (search) void runSearch(search.query, { minSize, ext });
+  };
 
   // 打开搜索结果:跳到其所在目录并退出搜索。
   const openSearchResult = (entry: Entry) => {
@@ -1284,7 +1299,7 @@ export default function App() {
                 atRoot={path === "" && !!current}
                 onNewBucket={() => setShowNewBucket(true)}
                 onFilter={setFilter}
-                onSearch={runSearch}
+                onSearch={(q) => runSearch(q, searchFilter)}
                 onUp={() => setPath(parentPath(path))}
                 onRefresh={load}
                 onToggleView={() =>
@@ -1336,6 +1351,9 @@ export default function App() {
                 results={search.results}
                 loading={search.loading}
                 truncated={search.truncated}
+                minSize={searchFilter.minSize}
+                ext={searchFilter.ext}
+                onFilter={applySearchFilter}
                 onOpen={openSearchResult}
                 onClear={() => setSearch(null)}
               />
