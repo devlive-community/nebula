@@ -4,6 +4,7 @@ import { faArrowUp, faFolder } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import * as api from "../api";
 import { baseName, breadcrumbs, joinRemote, parentPath } from "../util";
+import { useI18n } from "../i18n";
 
 interface Props {
   account: string;
@@ -16,6 +17,7 @@ interface Props {
 
 /** 级联浏览选择目标目录,再复制 / 移动过去(支持跨目录、跨桶)。 */
 export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Props) {
+  const { t } = useI18n();
   const [pickPath, setPickPath] = useState("");
   const [dirs, setDirs] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -47,7 +49,7 @@ export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Prop
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal modal--picker" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>复制 / 移动到</h3>
+          <h3>{t("复制 / 移动到")}</h3>
         </div>
 
         <div className="modal__body">
@@ -56,7 +58,7 @@ export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Prop
               className="btn"
               disabled={pickPath === ""}
               onClick={() => setPickPath(parentPath(pickPath))}
-              title="上一层"
+              title={t("上一层")}
             >
               <FontAwesomeIcon icon={faArrowUp} />
             </button>
@@ -79,11 +81,11 @@ export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Prop
 
           <div className="picker__list">
             {loading ? (
-              <div className="picker__state">加载中…</div>
+              <div className="picker__state">{t("加载中…")}</div>
             ) : err ? (
               <div className="picker__state">{err}</div>
             ) : dirs.length === 0 ? (
-              <div className="picker__state">没有子目录</div>
+              <div className="picker__state">{t("没有子目录")}</div>
             ) : (
               dirs.map((d) => (
                 <button
@@ -101,27 +103,27 @@ export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Prop
           </div>
 
           <div className="picker__target">
-            目标:{target || "请进入一个 bucket / 目录"}
+            {t("目标")}:{target || t("请进入一个 bucket / 目录")}
           </div>
         </div>
 
         <div className="modal__footer">
           <button className="btn" onClick={onCancel}>
-            取消
+            {t("取消")}
           </button>
           <button
             className="btn"
             disabled={!canConfirm}
             onClick={() => onMove(target)}
           >
-            移动到此
+            {t("移动到此")}
           </button>
           <button
             className="btn btn--primary"
             disabled={!canConfirm}
             onClick={() => onCopy(target)}
           >
-            复制到此
+            {t("复制到此")}
           </button>
         </div>
       </div>

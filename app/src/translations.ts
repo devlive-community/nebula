@@ -140,8 +140,13 @@ export const EN: Record<string, string> = {
   "对象:{name}": "Object: {name}",
 
   // 分享
-  分享链接有效期: "Share link expires in",
+  "此链接 {minutes} 分钟后失效。": "This link expires in {minutes} minutes.",
+  复制链接: "Copy link",
   已复制: "Copied",
+
+  // 关于
+  "跨平台桌面端多云对象存储管理器,用统一界面管理阿里云 OSS、华为云 OBS 等多家云对象存储:浏览、上传下载、分享、传输管理,一站搞定。":
+    "A cross-platform desktop manager for multi-cloud object storage — browse, upload, download, share and manage transfers across Aliyun OSS, Huawei OBS and more, all from one UI.",
 
   // 搜索结果
   退出搜索: "Exit search",

@@ -5,6 +5,7 @@ import type { AccountInfo, Entry } from "../types";
 import * as api from "../api";
 import { VENDORS } from "../vendors";
 import { baseName, breadcrumbs, joinRemote, parentPath } from "../util";
+import { useI18n } from "../i18n";
 import { Select } from "./Select";
 
 interface Props {
@@ -30,6 +31,7 @@ const accountLabel = (a: AccountInfo): string => {
  * 再把源对象复制过去(保留源对象)。目标账号默认排除源账号本身。
  */
 export function MigrateDialog({ accounts, srcAccount, from, isFolder, onConfirm, onCancel }: Props) {
+  const { t } = useI18n();
   const options = useMemo(
     () => accounts.map((a) => ({ value: a.id, label: accountLabel(a) })),
     [accounts],
@@ -84,12 +86,12 @@ export function MigrateDialog({ accounts, srcAccount, from, isFolder, onConfirm,
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal modal--picker" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>迁移到其他账号</h3>
+          <h3>{t("迁移到其他账号")}</h3>
         </div>
 
         <div className="modal__body">
           <div className="picker__account">
-            <span className="picker__account-label">目标账号</span>
+            <span className="picker__account-label">{t("目标账号")}</span>
             <Select value={dstAccount} options={options} onChange={pickAccount} />
           </div>
 
@@ -98,7 +100,7 @@ export function MigrateDialog({ accounts, srcAccount, from, isFolder, onConfirm,
               className="btn"
               disabled={pickPath === ""}
               onClick={() => setPickPath(parentPath(pickPath))}
-              title="上一层"
+              title={t("上一层")}
             >
               <FontAwesomeIcon icon={faArrowUp} />
             </button>
@@ -121,11 +123,11 @@ export function MigrateDialog({ accounts, srcAccount, from, isFolder, onConfirm,
 
           <div className="picker__list">
             {loading ? (
-              <div className="picker__state">加载中…</div>
+              <div className="picker__state">{t("加载中…")}</div>
             ) : err ? (
               <div className="picker__state">{err}</div>
             ) : dirs.length === 0 ? (
-              <div className="picker__state">没有子目录</div>
+              <div className="picker__state">{t("没有子目录")}</div>
             ) : (
               dirs.map((d) => (
                 <button
@@ -143,20 +145,20 @@ export function MigrateDialog({ accounts, srcAccount, from, isFolder, onConfirm,
           </div>
 
           <div className="picker__target">
-            目标:{target || "请进入一个 bucket / 目录"}
+            {t("目标")}:{target || t("请进入一个 bucket / 目录")}
           </div>
         </div>
 
         <div className="modal__footer">
           <button className="btn" onClick={onCancel}>
-            取消
+            {t("取消")}
           </button>
           <button
             className="btn btn--primary"
             disabled={!canConfirm}
             onClick={() => onConfirm(dstAccount, isFolder ? pickPath : target)}
           >
-            <FontAwesomeIcon icon={faRightLeft} /> 迁移到此
+            <FontAwesomeIcon icon={faRightLeft} /> {t("迁移到此")}
           </button>
         </div>
       </div>
