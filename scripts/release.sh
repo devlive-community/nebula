@@ -87,9 +87,9 @@ if [ "$ALLOW_DIRTY" -eq 0 ] && [ -n "$(git status --porcelain)" ]; then
 fi
 
 # 4) tag 不能已存在(本地或远端)
-git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "本地已存在 tag $TAG"
-if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-  die "远端已存在 tag $TAG(该版本已发过?)"
+git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && die "本地已存在 tag ${TAG}"
+if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+  die "远端已存在 tag ${TAG}(该版本已发过?)"
 fi
 
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
@@ -108,8 +108,8 @@ fi
 # ── 确认 ───────────────────────────────────────────────────────────────────
 echo
 echo "即将发布:"
-echo "  版本   $VERSION  (tag $TAG)"
-echo "  分支   $BRANCH → origin/$BRANCH"
+echo "  版本   $VERSION  (tag ${TAG})"
+echo "  分支   ${BRANCH} → origin/${BRANCH}"
 echo "  正文   $NOTES"
 echo "  动作   推分支 + 打 tag → 触发 CI 多平台构建,建草稿 Release$([ "$PUBLISH" -eq 1 ] && echo ',构建成功后自动转正式发布')"
 echo
@@ -120,14 +120,14 @@ if [ "$ASSUME_YES" -eq 0 ]; then
 fi
 
 # ── 执行 ───────────────────────────────────────────────────────────────────
-note "推送分支 $BRANCH…"
-git push origin "$BRANCH"
+note "推送分支 ${BRANCH}…"
+git push origin "${BRANCH}"
 
-note "打 tag $TAG 并推送…"
-git tag -a "$TAG" -m "Nebula $TAG"
-git push origin "$TAG"
+note "打 tag ${TAG} 并推送…"
+git tag -a "${TAG}" -m "Nebula ${TAG}"
+git push origin "${TAG}"
 
-echo "✓ 已推送 tag $TAG,CI 发布流程已触发。"
+echo "✓ 已推送 tag ${TAG},CI 发布流程已触发。"
 echo "  Actions: https://github.com/devlive-community/nebula/actions/workflows/release.yml"
 
 # ── 可选:跟踪构建 / 自动转正式发布 ────────────────────────────────────────
@@ -135,34 +135,34 @@ if [ "$WATCH" -eq 1 ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/n
   note "等待 CI 登记本次运行…"
   run_id=""
   for _ in $(seq 1 20); do
-    run_id="$(gh run list --workflow release.yml --branch "$TAG" \
+    run_id="$(gh run list --workflow release.yml --branch "${TAG}" \
               --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
-    [ -n "$run_id" ] && break
+    [ -n "${run_id}" ] && break
     sleep 3
   done
-  if [ -z "$run_id" ]; then
+  if [ -z "${run_id}" ]; then
     echo "⚠ 未能定位到运行,请到 Actions 页面手动查看。"
   else
-    note "跟踪运行 #$run_id(Ctrl-C 可退出跟踪,不影响 CI)…"
-    if gh run watch "$run_id" --exit-status; then
+    note "跟踪运行 #${run_id}(Ctrl-C 可退出跟踪,不影响 CI)…"
+    if gh run watch "${run_id}" --exit-status; then
       echo "✓ 构建成功。"
       if [ "$PUBLISH" -eq 1 ]; then
-        note "把草稿 Release $TAG 转为正式发布…"
-        gh release edit "$TAG" --draft=false --latest
-        echo "✓ $TAG 已正式发布:https://github.com/devlive-community/nebula/releases/tag/$TAG"
+        note "把草稿 Release ${TAG} 转为正式发布…"
+        gh release edit "${TAG}" --draft=false --latest
+        echo "✓ ${TAG} 已正式发布:https://github.com/devlive-community/nebula/releases/tag/${TAG}"
         echo "  自动更新已对存量用户生效(latest.json 已可访问)。"
       else
-        echo "→ 到 Releases 页面复核草稿 Nebula $TAG,确认无误后点 Publish。"
+        echo "→ 到 Releases 页面复核草稿 Nebula ${TAG},确认无误后点 Publish。"
       fi
     else
-      die "CI 构建失败;请查看日志:gh run view $run_id --log-failed"
+      die "CI 构建失败;请查看日志:gh run view ${run_id} --log-failed"
     fi
   fi
 else
   echo
   echo "接下来:"
   echo "  1. 在 Actions 里等三平台(macOS/Linux/Windows)构建完成"
-  echo "  2. 打开草稿 Release「Nebula $TAG」复核安装包与说明"
+  echo "  2. 打开草稿 Release「Nebula ${TAG}」复核安装包与说明"
   echo "  3. 点 Publish release —— 发布后 latest.json 生效,自动更新对存量用户可用"
   echo
   echo "  (下次可用 scripts/release.sh $VERSION --publish 让脚本等构建成功后自动转正式发布)"
