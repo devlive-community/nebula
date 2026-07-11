@@ -873,6 +873,19 @@ impl App {
         Ok(self.provider(account)?.presign(path, expires_secs).await?)
     }
 
+    /// 生成预签名**上传**链接(持链接者可直接 PUT 上传到该路径),`expires_secs` 秒后失效。
+    pub async fn presign_put(
+        &self,
+        account: &str,
+        path: &str,
+        expires_secs: u64,
+    ) -> Result<String> {
+        Ok(self
+            .provider(account)?
+            .presign_put(path, expires_secs)
+            .await?)
+    }
+
     /// 批量生成预签名链接(用于网格缩略图)。顺序对应 `paths`。
     pub async fn presign_batch(
         &self,

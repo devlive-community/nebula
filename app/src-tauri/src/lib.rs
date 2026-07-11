@@ -837,6 +837,20 @@ async fn presign(
         .map_err(|e| e.to_string())
 }
 
+/// 生成对象的预签名上传链接(PUT)。
+#[tauri::command]
+async fn presign_put(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    expires_secs: u64,
+) -> Result<String, String> {
+    let app = state.inner().clone();
+    app.presign_put(&account, &path, expires_secs)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 一个待上传的本地文件:本地绝对路径 + 相对(远端)路径。
 #[derive(Clone, Serialize)]
 struct UploadEntry {
@@ -1038,6 +1052,7 @@ pub fn run() {
             set_storage_class_folder,
             restore_folder,
             presign,
+            presign_put,
             presign_batch,
             expand_upload_paths,
             get_settings,
