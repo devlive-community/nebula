@@ -143,6 +143,9 @@ export const EN: Record<string, string> = {
   "此链接 {minutes} 分钟后失效。": "This link expires in {minutes} minutes.",
   复制链接: "Copy link",
   已复制: "Copied",
+  上传链接: "Upload link",
+  "持链接者用 PUT 直接上传即可,例如:":
+    "Whoever has the link can upload with a PUT, e.g.:",
 
   // 关于
   "跨平台桌面端多云对象存储管理器,用统一界面管理阿里云 OSS、华为云 OBS 等多家云对象存储:浏览、上传下载、分享、传输管理,一站搞定。":

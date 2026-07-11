@@ -231,6 +231,10 @@ export const copyAcross = (
 export const presign = (account: string, path: string, expiresSecs: number) =>
   invoke<string>("presign", { account, path, expiresSecs });
 
+/** 生成预签名上传链接(PUT)。 */
+export const presignPut = (account: string, path: string, expiresSecs: number) =>
+  invoke<string>("presign_put", { account, path, expiresSecs });
+
 export const expandUploadPaths = (paths: string[]) =>
   invoke<UploadEntry[]>("expand_upload_paths", { paths });
 

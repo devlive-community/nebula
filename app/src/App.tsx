@@ -88,7 +88,10 @@ export default function App() {
     null,
   );
   const [restoreTarget, setRestoreTarget] = useState<Entry | null>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState<{
+    url: string;
+    upload: boolean;
+  } | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [editTypeTarget, setEditTypeTarget] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -998,7 +1001,22 @@ export default function App() {
         entry.path,
         settings.share_expiry_secs,
       );
-      setShareUrl(url);
+      setShareUrl({ url, upload: false });
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const shareUpload = async (entry: Entry) => {
+    if (!current) return;
+    setError(null);
+    try {
+      const url = await api.presignPut(
+        current,
+        entry.path,
+        settings.share_expiry_secs,
+      );
+      setShareUrl({ url, upload: true });
     } catch (e) {
       setError(String(e));
     }
@@ -1595,7 +1613,8 @@ export default function App() {
 
       {shareUrl && (
         <ShareDialog
-          url={shareUrl}
+          url={shareUrl.url}
+          upload={shareUrl.upload}
           minutes={Math.round(settings.share_expiry_secs / 60)}
           onClose={() => setShareUrl(null)}
         />
@@ -1694,6 +1713,7 @@ export default function App() {
     }
     items.push(
       { label: t("分享链接"), onClick: () => share(entry) },
+      { label: t("上传链接"), onClick: () => shareUpload(entry) },
       { label: t("删除"), danger: true, onClick: () => setPendingDelete(entry) },
     );
     return items;
