@@ -394,6 +394,13 @@ impl StorageProvider for AwsProvider {
             .presign_get(bucket, key, expires_secs)
             .map_err(map_err)
     }
+
+    async fn presign_put(&self, path: &str, expires_secs: u64) -> Result<String> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .presign_put(bucket, key, expires_secs)
+            .map_err(map_err)
+    }
 }
 
 #[cfg(test)]

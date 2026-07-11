@@ -198,6 +198,17 @@ pub fn presigned_get_url(
     expires_in: u64,
     now: SystemTime,
 ) -> String {
+    presigned_url(params, "GET", canonical_uri, expires_in, now)
+}
+
+/// 生成 SigV4 query 方式、指定 HTTP 方法的预签名 URL(GET 下载 / PUT 上传等)。纯本地签名。
+pub fn presigned_url(
+    params: &SigningParams<'_>,
+    method: &str,
+    canonical_uri: &str,
+    expires_in: u64,
+    now: SystemTime,
+) -> String {
     let (amz_date, date) = amz_datetime(now);
     let scope = sign::credential_scope(&date, params.region, params.service);
     let credential = format!("{}/{scope}", params.access_key);
@@ -213,7 +224,7 @@ pub fn presigned_get_url(
 
     let canonical_headers = format!("host:{}\n", params.endpoint);
     let cr = sign::canonical_request(
-        "GET",
+        method,
         canonical_uri,
         &canonical_query,
         &canonical_headers,

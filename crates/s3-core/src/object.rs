@@ -242,18 +242,30 @@ impl S3Client {
 
     /// 生成一个 GET 预签名 URL(SigV4 query 方式),`expires_in` 秒后失效。纯本地签名。
     pub fn presign_get(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
-        Ok(self.build_presigned_url(bucket, key, expires_in, SystemTime::now()))
+        Ok(self.build_presigned_url("GET", bucket, key, expires_in, SystemTime::now()))
     }
 
-    /// 用固定时间构造预签名 URL,便于确定性测试。委托给共享 SigV4 实现。
+    /// 生成一个 PUT 预签名 URL(上传链接),`expires_in` 秒后失效。持链接者可直接 PUT 上传。
+    pub fn presign_put(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
+        Ok(self.build_presigned_url("PUT", bucket, key, expires_in, SystemTime::now()))
+    }
+
+    /// 用固定时间与方法构造预签名 URL,便于确定性测试。委托给共享 SigV4 实现。
     fn build_presigned_url(
         &self,
+        method: &str,
         bucket: &str,
         key: &str,
         expires_in: u64,
         now: SystemTime,
     ) -> String {
-        s3_sigv4::presigned_get_url(&self.params(), &object_uri(bucket, key), expires_in, now)
+        s3_sigv4::presigned_url(
+            &self.params(),
+            method,
+            &object_uri(bucket, key),
+            expires_in,
+            now,
+        )
     }
 }
 
@@ -348,7 +360,7 @@ mod tests {
     #[test]
     fn presign_url_has_sigv4_query_params() {
         let c = client();
-        let url = c.build_presigned_url("mybucket", "hello.txt", 3600, at(1_440_938_160));
+        let url = c.build_presigned_url("GET", "mybucket", "hello.txt", 3600, at(1_440_938_160));
 
         assert!(url.starts_with("https://s3.cn-east-1.qiniucs.com/mybucket/hello.txt?"));
         let parsed = reqwest::Url::parse(&url).unwrap();
@@ -360,6 +372,16 @@ mod tests {
             .get("X-Amz-Credential")
             .unwrap()
             .contains("/cn-east-1/s3/aws4_request"));
+    }
+
+    #[test]
+    fn presign_put_signs_a_different_url_than_get() {
+        let c = client();
+        // PUT 与 GET 的 canonical request 方法不同 → 签名不同(URL 也不同)。
+        let get = c.build_presigned_url("GET", "b", "k", 3600, at(1_440_938_160));
+        let put = c.build_presigned_url("PUT", "b", "k", 3600, at(1_440_938_160));
+        assert!(put.contains("X-Amz-Signature="));
+        assert_ne!(get, put);
     }
 
     #[test]

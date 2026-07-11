@@ -274,17 +274,29 @@ impl CosClient {
 
     /// 生成一个 GET 预签名 URL,`expires_in` 秒后失效。纯本地签名,不发请求。
     pub fn presign_get(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
-        Ok(self.build_presigned_url(bucket, key, expires_in, now_unix()))
+        Ok(self.build_presigned_url("get", bucket, key, expires_in, now_unix()))
     }
 
-    /// 用固定起始时间构造预签名 URL,便于确定性测试。
-    fn build_presigned_url(&self, bucket: &str, key: &str, expires_in: u64, now: u64) -> String {
+    /// 生成一个 PUT 预签名 URL(上传链接),`expires_in` 秒后失效。
+    pub fn presign_put(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
+        Ok(self.build_presigned_url("put", bucket, key, expires_in, now_unix()))
+    }
+
+    /// 用固定起始时间与方法构造预签名 URL,便于确定性测试。
+    fn build_presigned_url(
+        &self,
+        method: &str,
+        bucket: &str,
+        key: &str,
+        expires_in: u64,
+        now: u64,
+    ) -> String {
         let host = self.bucket_host(bucket);
         let uri = object_uri(key);
         let key_time = format!("{};{}", now, now + expires_in);
         // 预签名只签 host 头、无参数。
         let (header_list, header_string) = sign::canonical(&[("host", &host)]);
-        let http = sign::http_string("GET", &uri, "", &header_string);
+        let http = sign::http_string(method, &uri, "", &header_string);
         let sign_key = sign::sign_key(self.secret_key(), &key_time);
         let sts = sign::string_to_sign(&key_time, &http);
         let signature = sign::signature(&sign_key, &sts);
@@ -378,7 +390,7 @@ mod tests {
     #[test]
     fn presign_url_has_qsign_params() {
         let c = client();
-        let url = c.build_presigned_url("bkt-123", "exampleobject", 3600, 1_600_000_000);
+        let url = c.build_presigned_url("get", "bkt-123", "exampleobject", 3600, 1_600_000_000);
         assert!(url.starts_with("https://bkt-123.cos.ap-beijing.myqcloud.com/exampleobject?"));
         assert!(url.contains("q-sign-algorithm=sha1"));
         assert!(url.contains("q-ak=MySecretId"));

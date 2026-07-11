@@ -227,4 +227,10 @@ pub trait StorageProvider: Send + Sync {
     async fn presign(&self, _path: &str, _expires_secs: u64) -> Result<String> {
         Err(ProviderError::Unsupported("presign".into()))
     }
+
+    /// 生成一个 `expires_secs` 秒后失效的预签名**上传**链接(持链接者可直接 PUT 上传到该路径)。
+    /// 默认不支持;支持预签名的适配层覆盖此方法。
+    async fn presign_put(&self, _path: &str, _expires_secs: u64) -> Result<String> {
+        Err(ProviderError::Unsupported("presign upload".into()))
+    }
 }

@@ -247,18 +247,33 @@ impl ObsClient {
 
     /// 生成一个 GET 预签名 URL,`expires_in` 秒后失效。纯本地签名,不发请求。
     pub fn presign_get(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
+        self.build_presigned_url("GET", bucket, key, self.expiry_ts(expires_in)?)
+    }
+
+    /// 生成一个 PUT 预签名 URL(上传链接),`expires_in` 秒后失效。
+    pub fn presign_put(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
+        self.build_presigned_url("PUT", bucket, key, self.expiry_ts(expires_in)?)
+    }
+
+    fn expiry_ts(&self, expires_in: u64) -> Result<u64> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| ObsError::Core(cloud_core::CoreError::Signature(e.to_string())))?
             .as_secs();
-        self.build_presigned_url(bucket, key, now + expires_in)
+        Ok(now + expires_in)
     }
 
-    /// 用绝对过期时间戳构造预签名 URL。抽出 `expiration` 便于确定性测试。
-    fn build_presigned_url(&self, bucket: &str, key: &str, expiration: u64) -> Result<String> {
+    /// 用绝对过期时间戳与方法构造预签名 URL。抽出便于确定性测试。
+    fn build_presigned_url(
+        &self,
+        method: &str,
+        bucket: &str,
+        key: &str,
+        expiration: u64,
+    ) -> Result<String> {
         // 预签名的 StringToSign 用 Expires 顶替 Date 那一行。
         let canonical = format!("/{bucket}/{key}");
-        let sts = sign::string_to_sign("GET", "", "", &expiration.to_string(), "", &canonical);
+        let sts = sign::string_to_sign(method, "", "", &expiration.to_string(), "", &canonical);
         let signature = sign::signature(self.secret_key(), &sts);
 
         let mut url = Url::parse(&format!(
@@ -513,7 +528,7 @@ mod tests {
     fn presign_builds_signed_query_url() {
         let client = test_client();
         let url = client
-            .build_presigned_url("examplebucket", "nelson", 1_234_567_890)
+            .build_presigned_url("GET", "examplebucket", "nelson", 1_234_567_890)
             .unwrap();
 
         assert!(url.starts_with("https://examplebucket.obs.cn-north-4.myhuaweicloud.com/nelson?"));
