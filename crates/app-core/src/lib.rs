@@ -53,6 +53,33 @@ pub struct SearchResult {
     pub truncated: bool,
 }
 
+/// 搜索过滤条件(在名字匹配之外进一步筛选)。全 `None` / 空表示不过滤。
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct SearchFilter {
+    /// 仅保留 `>=` 该字节数的文件。
+    pub min_size: Option<u64>,
+    /// 仅保留该扩展名的文件(不含点,大小写不敏感)。
+    pub ext: Option<String>,
+}
+
+impl SearchFilter {
+    /// 该文件是否通过过滤(大小 + 扩展名)。
+    fn accepts(&self, entry: &Entry) -> bool {
+        if let Some(min) = self.min_size {
+            if entry.size < min {
+                return false;
+            }
+        }
+        if let Some(ext) = &self.ext {
+            let want = ext.trim().trim_start_matches('.').to_lowercase();
+            if !want.is_empty() && !entry.name.to_lowercase().ends_with(&format!(".{want}")) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 /// 前缀(文件夹 / Bucket)统计:文件数 + 总字节数。
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FolderStats {
@@ -467,6 +494,7 @@ impl App {
         account: &str,
         root: &str,
         query: &str,
+        filter: &SearchFilter,
         max_results: usize,
     ) -> Result<SearchResult> {
         let provider = self.provider(account)?;
@@ -485,7 +513,9 @@ impl App {
                     scanned += 1;
                     if entry.is_dir() {
                         queue.push_back(entry.path);
-                    } else if needle.is_empty() || entry.name.to_lowercase().contains(&needle) {
+                    } else if (needle.is_empty() || entry.name.to_lowercase().contains(&needle))
+                        && filter.accepts(&entry)
+                    {
                         results.push(entry);
                         if results.len() >= max_results {
                             truncated = true;
@@ -1312,7 +1342,10 @@ mod tests {
         app.add_account(Arc::new(TreeProvider));
 
         // "cat" 命中两层深处的两个文件(photos/cat.jpg 与 docs/cat-notes.md)。
-        let hits = app.search("tree", "b", "cat", 100).await.unwrap();
+        let hits = app
+            .search("tree", "b", "cat", &SearchFilter::default(), 100)
+            .await
+            .unwrap();
         let mut names: Vec<_> = hits.entries.iter().map(|e| e.name.clone()).collect();
         names.sort();
         assert_eq!(names, ["cat-notes.md", "cat.jpg"]);
@@ -1327,13 +1360,42 @@ mod tests {
         app.add_account(Arc::new(TreeProvider));
 
         // 空查询返回全部文件(readme + cat.jpg + dog.png + cat-notes.md = 4)。
-        let all = app.search("tree", "b", "", 100).await.unwrap();
+        let all = app
+            .search("tree", "b", "", &SearchFilter::default(), 100)
+            .await
+            .unwrap();
         assert_eq!(all.entries.len(), 4);
         assert!(!all.truncated);
         // 结果数封顶生效,并标记结果不完整。
-        let capped = app.search("tree", "b", "", 2).await.unwrap();
+        let capped = app
+            .search("tree", "b", "", &SearchFilter::default(), 2)
+            .await
+            .unwrap();
         assert_eq!(capped.entries.len(), 2);
         assert!(capped.truncated);
+    }
+
+    #[tokio::test]
+    async fn search_filters_by_extension_and_size() {
+        let app = App::new();
+        app.add_account(Arc::new(TreeProvider));
+
+        // 只要 .jpg → 命中 photos/cat.jpg。
+        let jpg = SearchFilter {
+            ext: Some("jpg".into()),
+            ..Default::default()
+        };
+        let hits = app.search("tree", "b", "", &jpg, 100).await.unwrap();
+        let names: Vec<_> = hits.entries.iter().map(|e| e.name.clone()).collect();
+        assert_eq!(names, ["cat.jpg"]);
+
+        // TreeProvider 里每个文件都是 1 字节;min_size=2 → 全过滤掉。
+        let big = SearchFilter {
+            min_size: Some(2),
+            ..Default::default()
+        };
+        let none = app.search("tree", "b", "", &big, 100).await.unwrap();
+        assert!(none.entries.is_empty());
     }
 
     #[tokio::test]

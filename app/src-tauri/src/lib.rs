@@ -289,10 +289,13 @@ async fn search(
     account: String,
     root: String,
     query: String,
+    min_size: Option<u64>,
+    ext: Option<String>,
     max_results: usize,
 ) -> Result<SearchResult, String> {
     let app = state.inner().clone();
-    app.search(&account, &root, &query, max_results)
+    let filter = app_core::SearchFilter { min_size, ext };
+    app.search(&account, &root, &query, &filter, max_results)
         .await
         .map_err(|e| e.to_string())
 }
