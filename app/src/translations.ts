@@ -98,4 +98,75 @@ export const EN: Record<string, string> = {
   语言: "Language",
   中文: "中文",
   English: "English",
+
+  // 对话框
+  文件夹名称: "Folder name",
+  "Bucket 名称(全局唯一,小写字母 / 数字 / 连字符)":
+    "Bucket name (globally unique; lowercase / digits / hyphens)",
+  修改内容类型: "Change content type",
+  "如 image/png、application/pdf": "e.g. image/png, application/pdf",
+  新名称: "New name",
+  "确定删除选中的 {n} 项?此操作不可恢复。":
+    "Delete the {n} selected items? This cannot be undone.",
+  删除确认: "Confirm delete",
+  "确定删除 Bucket {name}?Bucket 需为空,此操作不可恢复。":
+    "Delete bucket {name}? It must be empty. This cannot be undone.",
+  "确定删除整个文件夹 {name}?其下所有对象都会被递归删除,此操作不可恢复。":
+    "Delete the entire folder {name}? Every object under it is removed recursively. This cannot be undone.",
+  "确定删除 {name}?此操作不可恢复。":
+    "Delete {name}? This cannot be undone.",
+
+  // 迁移 / 复制移动对话框
+  迁移到此: "Migrate here",
+  目标账号: "Target account",
+  "请进入一个 bucket / 目录": "Enter a bucket / folder",
+  目标: "Target",
+  没有子目录: "No subfolders",
+  复制到此: "Copy here",
+  移动到此: "Move here",
+  复制: "Copy",
+  移动: "Move",
+
+  // 存储类型 / 取回对话框
+  目标存储类型: "Target storage class",
+  "转换到归档 / 冷归档层后,对象需先「取回」解冻才能下载。":
+    "After moving to an archive / cold tier, an object must be restored before it can be downloaded.",
+  取回归档对象: "Restore archived object",
+  取回后可读天数: "Days available after restore",
+  "取回是异步的,可能需数分钟到数小时;完成后可在该天数内正常下载。":
+    "Restore is async and may take minutes to hours; once done, the object is downloadable for that many days.",
+  取回: "Restore",
+  转换: "Convert",
+  "对象:{name}": "Object: {name}",
+
+  // 分享
+  分享链接有效期: "Share link expires in",
+  已复制: "Copied",
+
+  // 搜索结果
+  退出搜索: "Exit search",
+  不限大小: "Any size",
+  没有匹配的文件: "No matching files",
+  "搜索中…": "Searching…",
+  打开所在目录: "Open containing folder",
+  "在 {root} 下搜索": "Search under {root} for",
+  "{n} 条": "{n} results",
+  "(已达上限)": " (limit reached)",
+  "扩展名,如 jpg(回车应用)": "Extension, e.g. jpg (Enter to apply)",
+
+  // 存储类型标签
+  标准: "Standard",
+  低频访问: "Infrequent Access",
+  "低频 (WARM)": "Warm",
+  归档: "Archive",
+  "归档 (COLD)": "Cold",
+  "归档 (Glacier)": "Glacier",
+  深度归档: "Deep Archive",
+  冷归档: "Cold Archive",
+  智能分层: "Intelligent Tiering",
+  低冗余: "Reduced Redundancy",
+  "低频 (LINE)": "Line (IA)",
+
+  // 关于
+  检查更新: "Check for updates",
 };

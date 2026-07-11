@@ -4,6 +4,7 @@ import { faFile, faXmark } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { formatBytes } from "../util";
 import { useIncremental } from "../hooks";
+import { useI18n } from "../i18n";
 
 interface Props {
   query: string;
@@ -40,6 +41,7 @@ export function SearchResults({
   onOpen,
   onClear,
 }: Props) {
+  const { t } = useI18n();
   const { shown, onScroll } = useIncremental(results);
   const [extInput, setExtInput] = useState(ext);
   useEffect(() => setExtInput(ext), [ext]);
@@ -48,11 +50,17 @@ export function SearchResults({
     <div className="search-results">
       <div className="search-results__head">
         <span className="search-results__title">
-          在 <b>{root || "/"}</b> 下搜索 “{query}”
-          {!loading && <> · {results.length} 条{truncated ? "(已达上限)" : ""}</>}
+          {t("在 {root} 下搜索", { root: root || "/" })} “{query}”
+          {!loading && (
+            <>
+              {" "}
+              · {t("{n} 条", { n: results.length })}
+              {truncated ? t("(已达上限)") : ""}
+            </>
+          )}
         </span>
-        <button className="btn" onClick={onClear} title="退出搜索">
-          <FontAwesomeIcon icon={faXmark} /> 退出搜索
+        <button className="btn" onClick={onClear} title={t("退出搜索")}>
+          <FontAwesomeIcon icon={faXmark} /> {t("退出搜索")}
         </button>
       </div>
 
@@ -63,13 +71,13 @@ export function SearchResults({
         >
           {SIZE_PRESETS.map(([label, v]) => (
             <option key={v} value={v}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
         <input
           className="search-results__ext"
-          placeholder="扩展名,如 jpg(回车应用)"
+          placeholder={t("扩展名,如 jpg(回车应用)")}
           value={extInput}
           onChange={(e) => setExtInput(e.target.value)}
           onKeyDown={(e) => {
@@ -83,16 +91,16 @@ export function SearchResults({
 
       <div className="search-results__body" onScroll={onScroll}>
         {loading ? (
-          <div className="filelist__state">搜索中…</div>
+          <div className="filelist__state">{t("搜索中…")}</div>
         ) : results.length === 0 ? (
-          <div className="filelist__state">没有匹配的文件</div>
+          <div className="filelist__state">{t("没有匹配的文件")}</div>
         ) : (
           shown.map((entry) => (
             <button
               key={entry.path}
               className="search-results__row"
               onClick={() => onOpen(entry)}
-              title="打开所在目录"
+              title={t("打开所在目录")}
             >
               <FontAwesomeIcon icon={faFile} className="search-results__icon" />
               <span className="search-results__path">{entry.path}</span>

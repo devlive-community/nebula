@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../i18n";
 
 /** 各厂商可选的存储类型(value 为发给后端的原始字符串)。新增厂商在此追加。 */
 const STORAGE_CLASSES: Record<string, { value: string; label: string }[]> = {
@@ -52,6 +53,7 @@ interface ClassProps {
 
 /** 转换存储类型:按账号所属厂商列出可选层级。 */
 export function StorageClassDialog({ vendor, name, current, onConfirm, onCancel }: ClassProps) {
+  const { t } = useI18n();
   const options = STORAGE_CLASSES[vendor] ?? [{ value: "STANDARD", label: "标准" }];
   const [sel, setSel] = useState(
     options.find((o) => o.value === current)?.value ?? options[0].value,
@@ -61,32 +63,32 @@ export function StorageClassDialog({ vendor, name, current, onConfirm, onCancel 
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>转换存储类型</h3>
+          <h3>{t("转换存储类型")}</h3>
         </div>
         <div className="modal__body">
           <label className="field">
-            <span>对象:{name}</span>
+            <span>{t("对象:{name}", { name })}</span>
           </label>
           <label className="field">
-            <span>目标存储类型</span>
+            <span>{t("目标存储类型")}</span>
             <select value={sel} onChange={(e) => setSel(e.target.value)}>
               {options.map((o) => (
                 <option key={o.value} value={o.value}>
-                  {o.label}({o.value})
+                  {t(o.label)}({o.value})
                 </option>
               ))}
             </select>
           </label>
           <p className="field__hint">
-            转换到归档 / 冷归档层后,对象需先「取回」解冻才能下载。
+            {t("转换到归档 / 冷归档层后,对象需先「取回」解冻才能下载。")}
           </p>
         </div>
         <div className="modal__footer">
           <button className="btn" onClick={onCancel}>
-            取消
+            {t("取消")}
           </button>
           <button className="btn btn--primary" onClick={() => onConfirm(sel)}>
-            转换
+            {t("转换")}
           </button>
         </div>
       </div>
@@ -102,19 +104,20 @@ interface RestoreProps {
 
 /** 取回归档对象:填写取回后可读的保持天数。 */
 export function RestoreDialog({ name, onConfirm, onCancel }: RestoreProps) {
+  const { t } = useI18n();
   const [days, setDays] = useState(1);
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>取回归档对象</h3>
+          <h3>{t("取回归档对象")}</h3>
         </div>
         <div className="modal__body">
           <label className="field">
-            <span>对象:{name}</span>
+            <span>{t("对象:{name}", { name })}</span>
           </label>
           <label className="field">
-            <span>取回后可读天数</span>
+            <span>{t("取回后可读天数")}</span>
             <input
               type="number"
               min={1}
@@ -123,19 +126,19 @@ export function RestoreDialog({ name, onConfirm, onCancel }: RestoreProps) {
             />
           </label>
           <p className="field__hint">
-            取回是异步的,可能需数分钟到数小时;完成后可在该天数内正常下载。
+            {t("取回是异步的,可能需数分钟到数小时;完成后可在该天数内正常下载。")}
           </p>
         </div>
         <div className="modal__footer">
           <button className="btn" onClick={onCancel}>
-            取消
+            {t("取消")}
           </button>
           <button
             className="btn btn--primary"
             disabled={days < 1}
             onClick={() => onConfirm(days)}
           >
-            取回
+            {t("取回")}
           </button>
         </div>
       </div>

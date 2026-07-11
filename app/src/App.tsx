@@ -1459,16 +1459,23 @@ export default function App() {
 
       {pendingDelete && (
         <ConfirmDialog
-          title="删除确认"
+          title={t("删除确认")}
           message={
             isBucket(pendingDelete)
-              ? `确定删除 Bucket ${pendingDelete.name}?Bucket 需为空,此操作不可恢复。`
+              ? t("确定删除 Bucket {name}?Bucket 需为空,此操作不可恢复。", {
+                  name: pendingDelete.name,
+                })
               : pendingDelete.kind === "directory"
-                ? `确定删除整个文件夹 ${pendingDelete.name}?其下所有对象都会被递归删除,此操作不可恢复。`
-                : `确定删除 ${pendingDelete.name}?此操作不可恢复。`
+                ? t(
+                    "确定删除整个文件夹 {name}?其下所有对象都会被递归删除,此操作不可恢复。",
+                    { name: pendingDelete.name },
+                  )
+                : t("确定删除 {name}?此操作不可恢复。", {
+                    name: pendingDelete.name,
+                  })
           }
           danger
-          confirmLabel="删除"
+          confirmLabel={t("删除")}
           onConfirm={doDelete}
           onCancel={() => setPendingDelete(null)}
         />
@@ -1476,9 +1483,9 @@ export default function App() {
 
       {showNewFolder && (
         <PromptDialog
-          title="新建文件夹"
-          placeholder="文件夹名称"
-          submitLabel="创建"
+          title={t("新建文件夹")}
+          placeholder={t("文件夹名称")}
+          submitLabel={t("创建")}
           onSubmit={createFolder}
           onCancel={() => setShowNewFolder(false)}
         />
@@ -1486,9 +1493,9 @@ export default function App() {
 
       {showNewBucket && (
         <PromptDialog
-          title="新建 Bucket"
-          placeholder="Bucket 名称(全局唯一,小写字母 / 数字 / 连字符)"
-          submitLabel="创建"
+          title={t("新建 Bucket")}
+          placeholder={t("Bucket 名称(全局唯一,小写字母 / 数字 / 连字符)")}
+          submitLabel={t("创建")}
           onSubmit={createBucket}
           onCancel={() => setShowNewBucket(false)}
         />
@@ -1496,10 +1503,10 @@ export default function App() {
 
       {editTypeTarget && (
         <PromptDialog
-          title="修改内容类型"
-          placeholder="如 image/png、application/pdf"
+          title={t("修改内容类型")}
+          placeholder={t("如 image/png、application/pdf")}
           initial={editTypeTarget.content_type ?? ""}
-          submitLabel="保存"
+          submitLabel={t("保存")}
           onSubmit={doSetContentType}
           onCancel={() => setEditTypeTarget(null)}
         />
@@ -1507,10 +1514,10 @@ export default function App() {
 
       {renameTarget && (
         <PromptDialog
-          title="重命名"
-          placeholder="新名称"
+          title={t("重命名")}
+          placeholder={t("新名称")}
           initial={renameTarget.name}
-          submitLabel="重命名"
+          submitLabel={t("重命名")}
           onSubmit={doRename}
           onCancel={() => setRenameTarget(null)}
         />
@@ -1518,10 +1525,12 @@ export default function App() {
 
       {pendingBatchDelete && (
         <ConfirmDialog
-          title="批量删除"
-          message={`确定删除选中的 ${selected.size} 项?此操作不可恢复。`}
+          title={t("批量删除")}
+          message={t("确定删除选中的 {n} 项?此操作不可恢复。", {
+            n: selected.size,
+          })}
           danger
-          confirmLabel="删除"
+          confirmLabel={t("删除")}
           onConfirm={doBatchDelete}
           onCancel={() => setPendingBatchDelete(false)}
         />
