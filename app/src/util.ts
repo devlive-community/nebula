@@ -22,6 +22,17 @@ export function formatBytes(size: number): string {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** 人类可读的时长(秒),用于传输 ETA。非有限 / 负数返回空串。 */
+export function formatDuration(secs: number): string {
+  if (!Number.isFinite(secs) || secs < 0) return "";
+  const s = Math.round(secs);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m${s % 60}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h${m % 60}m`;
+}
+
 /** 以最多 `limit` 个并发执行 `worker`,全部完成后 resolve。 */
 export async function runPool<T>(
   items: T[],

@@ -169,10 +169,23 @@ export default function App() {
   }, [theme]);
   const [transfers, setTransfers] = useState<Record<string, TransferItem>>({});
 
-  const updateProgress = (id: string, done: number, total: number) =>
+  // 每个传输的上次采样,用于算瞬时速度(EMA 平滑)。不入 state,不持久化。
+  const speedRef = useRef<Record<string, { t: number; done: number; speed: number }>>(
+    {},
+  );
+  const updateProgress = (id: string, done: number, total: number) => {
+    const now = Date.now();
+    const p = speedRef.current[id];
+    let speed = 0;
+    if (p && now > p.t && done >= p.done) {
+      const inst = ((done - p.done) * 1000) / (now - p.t);
+      speed = p.speed > 0 ? p.speed * 0.7 + inst * 0.3 : inst;
+    }
+    speedRef.current[id] = { t: now, done, speed };
     setTransfers((prev) =>
-      prev[id] ? { ...prev, [id]: { ...prev[id], done, total } } : prev,
+      prev[id] ? { ...prev, [id]: { ...prev[id], done, total, speed } } : prev,
     );
+  };
 
   // 传输列表持久化:只在**状态**变化时写库(进度 tick 不写),完成即删。
   const persistedRef = useRef<Record<string, TransferItem["status"]>>({});

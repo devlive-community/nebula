@@ -1,7 +1,11 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRotateRight, faXmark } from "@fortawesome/free-solid-svg-icons";
 import type { TransferItem } from "../types";
+import { formatBytes, formatDuration } from "../util";
 import { useI18n } from "../i18n";
+
+/** 进度以字节计的传输种类(可显示速度 / ETA);文件夹类以文件数计,不显示。 */
+const BYTE_KINDS = new Set(["上传", "下载", "迁移"]);
 
 interface Props {
   items: TransferItem[];
@@ -39,6 +43,16 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
               : i.total > 0
                 ? Math.round((i.done / i.total) * 100)
                 : 0;
+          // 进行中的字节类传输:百分比后追加速度与 ETA(如 45% · 3.2 MB/s · ~12s)。
+          let active = `${pct}%`;
+          const speed = i.speed ?? 0;
+          if (BYTE_KINDS.has(i.kind) && speed > 0) {
+            active += ` · ${formatBytes(speed)}/s`;
+            if (i.total > i.done) {
+              const eta = formatDuration((i.total - i.done) / speed);
+              if (eta) active += ` · ~${eta}`;
+            }
+          }
           const label =
             i.status === "error"
               ? t("失败")
@@ -48,7 +62,7 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                   ? t("已中断")
                   : i.status === "done"
                     ? t("完成")
-                    : `${pct}%`;
+                    : active;
           return (
             <div className="transfers__item" key={i.id}>
               <div className="transfers__row">
