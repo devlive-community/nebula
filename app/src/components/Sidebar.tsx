@@ -10,6 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Logo } from "./Logo";
 import { vendorMeta } from "../vendors";
+import { useI18n } from "../i18n";
 import type { AccountInfo } from "../types";
 
 interface Props {
@@ -37,6 +38,7 @@ export function Sidebar({
   onToggleTheme,
   onSettings,
 }: Props) {
+  const { t } = useI18n();
   return (
     <aside className="sidebar" style={{ width }}>
       <div className="sidebar__brand">
@@ -44,9 +46,11 @@ export function Sidebar({
         <span>Nebula</span>
       </div>
 
-      <div className="sidebar__section-title">账号</div>
+      <div className="sidebar__section-title">{t("账号")}</div>
       <nav className="sidebar__accounts">
-        {accounts.length === 0 && <div className="sidebar__empty">还没有账号</div>}
+        {accounts.length === 0 && (
+          <div className="sidebar__empty">{t("还没有账号")}</div>
+        )}
         {accounts.map((acc) => {
           const meta = vendorMeta(acc.vendor);
           return (
@@ -66,7 +70,7 @@ export function Sidebar({
               </span>
               <button
                 className="account-item__action"
-                title="编辑账号"
+                title={t("编辑账号")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit(acc.id);
@@ -76,7 +80,7 @@ export function Sidebar({
               </button>
               <button
                 className="account-item__action account-item__action--danger"
-                title="移除账号"
+                title={t("移除账号")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onRemove(acc.id);
@@ -90,16 +94,16 @@ export function Sidebar({
       </nav>
 
       <button className="btn btn--primary sidebar__add" onClick={onAdd}>
-        <FontAwesomeIcon icon={faPlus} /> 添加账号
+        <FontAwesomeIcon icon={faPlus} /> {t("添加账号")}
       </button>
 
       <div className="sidebar__footer">
         <button className="btn" onClick={onToggleTheme}>
-          <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} />
-          {theme === "dark" ? " 浅色" : " 深色"}
+          <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} />{" "}
+          {theme === "dark" ? t("浅色") : t("深色")}
         </button>
-        <button className="btn" onClick={onSettings} title="设置">
-          <FontAwesomeIcon icon={faGear} /> 设置
+        <button className="btn" onClick={onSettings} title={t("设置")}>
+          <FontAwesomeIcon icon={faGear} /> {t("设置")}
         </button>
       </div>
     </aside>

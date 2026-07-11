@@ -4,6 +4,7 @@ import { faDatabase, faFile, faFolder } from "@fortawesome/free-solid-svg-icons"
 import type { Entry } from "../types";
 import { useIncremental } from "../hooks";
 import { isBucket } from "../util";
+import { useI18n } from "../i18n";
 import { Checkbox } from "./Checkbox";
 
 interface Props {
@@ -39,11 +40,12 @@ export function FileGrid({
     120,
     onReachEnd,
   );
+  const { t } = useI18n();
   if (loading) {
-    return <div className="filelist__state">加载中…</div>;
+    return <div className="filelist__state">{t("加载中…")}</div>;
   }
   if (entries.length === 0) {
-    return <div className="filelist__state">这里空空如也</div>;
+    return <div className="filelist__state">{t("这里空空如也")}</div>;
   }
 
   return (
@@ -110,7 +112,12 @@ export function FileGrid({
         );
       })}
       {hasMore && (
-        <div className="list-more">下滑加载更多 · 已显示 {shownCount} / {total}</div>
+        <div className="list-more">
+          {t("下滑加载更多 · 已显示 {shown} / {total}", {
+            shown: shownCount,
+            total,
+          })}
+        </div>
       )}
     </div>
   );

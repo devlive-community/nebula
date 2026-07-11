@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Settings } from "../types";
+import { useI18n } from "../i18n";
 
 interface Props {
   settings: Settings;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function SettingsDialog({ settings, onSave, onClose }: Props) {
+  const { t, locale, setLocale } = useI18n();
   const [minutes, setMinutes] = useState(
     Math.round(settings.share_expiry_secs / 60),
   );
@@ -22,11 +24,21 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>设置</h3>
+          <h3>{t("设置")}</h3>
         </div>
         <div className="modal__body">
           <label className="field">
-            <span>分享链接有效期(分钟)</span>
+            <span>{t("语言")}</span>
+            <select
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as "zh" | "en")}
+            >
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>{t("分享链接有效期(分钟)")}</span>
             <input
               type="number"
               min={1}
@@ -35,7 +47,7 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
             />
           </label>
           <label className="field">
-            <span>批量传输并发数(1–10)</span>
+            <span>{t("批量传输并发数(1–10)")}</span>
             <input
               type="number"
               min={1}
@@ -45,7 +57,7 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
             />
           </label>
           <label className="field">
-            <span>传输限速(KiB/秒,0 = 不限速)</span>
+            <span>{t("传输限速(KiB/秒,0 = 不限速)")}</span>
             <input
               type="number"
               min={0}
@@ -56,7 +68,7 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
         </div>
         <div className="modal__footer">
           <button className="btn" onClick={onClose}>
-            取消
+            {t("取消")}
           </button>
           <button
             className="btn btn--primary"
@@ -69,7 +81,7 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
               })
             }
           >
-            保存
+            {t("保存")}
           </button>
         </div>
       </div>

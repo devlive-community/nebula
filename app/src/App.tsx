@@ -24,6 +24,7 @@ import {
   previewKind,
   runPool,
 } from "./util";
+import { useI18n } from "./i18n";
 import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
@@ -51,6 +52,7 @@ import { checkForUpdate, type Update } from "./update";
 import { Logo } from "./components/Logo";
 
 export default function App() {
+  const { t } = useI18n();
   const [accounts, setAccounts] = useState<AccountInfo[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -1321,25 +1323,27 @@ export default function App() {
 
             {selected.size > 0 && (
               <div className="batch-bar">
-                <span className="batch-bar__count">已选 {selected.size} 项</span>
+                <span className="batch-bar__count">
+                  {t("已选 {n} 项", { n: selected.size })}
+                </span>
                 <div className="batch-bar__spacer" />
                 <button className="btn" onClick={batchDownload}>
-                  批量下载
+                  {t("批量下载")}
                 </button>
                 <button className="btn" onClick={() => setBatchStorageClass(true)}>
-                  转换存储类型
+                  {t("转换存储类型")}
                 </button>
                 <button className="btn" onClick={() => setBatchRestore(true)}>
-                  取回归档
+                  {t("取回归档")}
                 </button>
                 <button
                   className="btn btn--danger"
                   onClick={() => setPendingBatchDelete(true)}
                 >
-                  批量删除
+                  {t("批量删除")}
                 </button>
                 <button className="btn" onClick={clearSelection}>
-                  取消选择
+                  {t("取消选择")}
                 </button>
               </div>
             )}
@@ -1404,10 +1408,11 @@ export default function App() {
 
             {!loading && (
               <div className="statusbar">
-                {dirCount} 个目录 · {visibleFiles.length} 个文件 · 共{" "}
-                {formatBytes(totalSize)}
-                {filter && " · 已过滤"}
-                {selected.size > 0 && ` · 已选 ${selected.size}`}
+                {t("{n} 个目录", { n: dirCount })} ·{" "}
+                {t("{n} 个文件", { n: visibleFiles.length })} ·{" "}
+                {t("共 {size}", { size: formatBytes(totalSize) })}
+                {filter && t(" · 已过滤")}
+                {selected.size > 0 && t(" · 已选 {n}", { n: selected.size })}
               </div>
             )}
 
@@ -1627,10 +1632,10 @@ export default function App() {
     // Bucket 不是普通文件夹:打开,或删除 Bucket(需为空);不做整桶递归操作(危险)。
     if (isBucket(entry)) {
       return [
-        { label: "打开", onClick: () => openDir(entry) },
-        { label: "统计信息", onClick: () => showFolderStats(entry) },
+        { label: t("打开"), onClick: () => openDir(entry) },
+        { label: t("统计信息"), onClick: () => showFolderStats(entry) },
         {
-          label: "删除 Bucket",
+          label: t("删除 Bucket"),
           danger: true,
           onClick: () => setPendingDelete(entry),
         },
@@ -1638,22 +1643,22 @@ export default function App() {
     }
     if (entry.kind === "directory") {
       const dirItems: MenuItem[] = [
-        { label: "打开", onClick: () => openDir(entry) },
-        { label: "统计信息", onClick: () => showFolderStats(entry) },
-        { label: "下载文件夹", onClick: () => downloadFolderEntry(entry) },
+        { label: t("打开"), onClick: () => openDir(entry) },
+        { label: t("统计信息"), onClick: () => showFolderStats(entry) },
+        { label: t("下载文件夹"), onClick: () => downloadFolderEntry(entry) },
       ];
       if (accounts.length > 1) {
         dirItems.push({
-          label: "迁移到其他账号",
+          label: t("迁移到其他账号"),
           onClick: () => setMigrateTarget(entry),
         });
       }
       dirItems.push(
-        { label: "转换存储类型", onClick: () => setStorageClassTarget(entry) },
-        { label: "取回归档", onClick: () => setRestoreTarget(entry) },
+        { label: t("转换存储类型"), onClick: () => setStorageClassTarget(entry) },
+        { label: t("取回归档"), onClick: () => setRestoreTarget(entry) },
       );
       dirItems.push({
-        label: "删除文件夹",
+        label: t("删除文件夹"),
         danger: true,
         onClick: () => setPendingDelete(entry),
       });
@@ -1661,23 +1666,26 @@ export default function App() {
     }
     const items: MenuItem[] = [];
     if (previewKind(entry.name)) {
-      items.push({ label: "预览", onClick: () => openPreview(entry) });
+      items.push({ label: t("预览"), onClick: () => openPreview(entry) });
     }
     items.push(
-      { label: "详情", onClick: () => openDetails(entry) },
-      { label: "下载", onClick: () => download(entry) },
-      { label: "校验完整性", onClick: () => verifyEntry(entry) },
-      { label: "转换存储类型", onClick: () => setStorageClassTarget(entry) },
-      { label: "取回归档", onClick: () => setRestoreTarget(entry) },
-      { label: "重命名", onClick: () => setRenameTarget(entry) },
-      { label: "复制 / 移动到", onClick: () => setMoveCopyTarget(entry) },
+      { label: t("详情"), onClick: () => openDetails(entry) },
+      { label: t("下载"), onClick: () => download(entry) },
+      { label: t("校验完整性"), onClick: () => verifyEntry(entry) },
+      { label: t("转换存储类型"), onClick: () => setStorageClassTarget(entry) },
+      { label: t("取回归档"), onClick: () => setRestoreTarget(entry) },
+      { label: t("重命名"), onClick: () => setRenameTarget(entry) },
+      { label: t("复制 / 移动到"), onClick: () => setMoveCopyTarget(entry) },
     );
     if (accounts.length > 1) {
-      items.push({ label: "迁移到其他账号", onClick: () => setMigrateTarget(entry) });
+      items.push({
+        label: t("迁移到其他账号"),
+        onClick: () => setMigrateTarget(entry),
+      });
     }
     items.push(
-      { label: "分享链接", onClick: () => share(entry) },
-      { label: "删除", danger: true, onClick: () => setPendingDelete(entry) },
+      { label: t("分享链接"), onClick: () => share(entry) },
+      { label: t("删除"), danger: true, onClick: () => setPendingDelete(entry) },
     );
     return items;
   }

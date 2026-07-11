@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRotateRight, faXmark } from "@fortawesome/free-solid-svg-icons";
 import type { TransferItem } from "../types";
+import { useI18n } from "../i18n";
 
 interface Props {
   items: TransferItem[];
@@ -11,6 +12,7 @@ interface Props {
 
 /** 底部传输任务面板:每个上传 / 下载独立显示进度与状态。 */
 export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
+  const { t } = useI18n();
   const active = items.filter((i) => i.status === "active").length;
   const hasFinished = items.some((i) => i.status !== "active");
 
@@ -18,14 +20,15 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
     <div className="transfers">
       <div className="transfers__head">
         <span className="transfers__title">
-          传输{active > 0 ? ` · 进行中 ${active}` : ""}
+          {t("传输")}
+          {active > 0 ? t(" · 进行中 {n}", { n: active }) : ""}
         </span>
         <button
           className="transfers__clear"
           onClick={onClear}
           disabled={!hasFinished}
         >
-          清除已完成
+          {t("清除已完成")}
         </button>
       </div>
       <div className="transfers__list">
@@ -38,18 +41,18 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                 : 0;
           const label =
             i.status === "error"
-              ? "失败"
+              ? t("失败")
               : i.status === "cancelled"
-                ? "已取消"
+                ? t("已取消")
                 : i.status === "interrupted"
-                  ? "已中断"
+                  ? t("已中断")
                   : i.status === "done"
-                    ? "完成"
+                    ? t("完成")
                     : `${pct}%`;
           return (
             <div className="transfers__item" key={i.id}>
               <div className="transfers__row">
-                <span className="transfers__kind">{i.kind}</span>
+                <span className="transfers__kind">{t(i.kind)}</span>
                 <span className="transfers__name">{i.name}</span>
                 <span
                   className={`transfers__status ${
@@ -61,7 +64,7 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                 {i.status === "active" && (
                   <button
                     className="transfers__retry"
-                    title="取消"
+                    title={t("取消")}
                     onClick={() => onCancel(i.id)}
                   >
                     <FontAwesomeIcon icon={faXmark} />
@@ -76,7 +79,7 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                   i.kind !== "取回归档" && (
                     <button
                       className="transfers__retry"
-                      title={i.status === "error" ? "重试" : "继续"}
+                      title={i.status === "error" ? t("重试") : t("继续")}
                       onClick={() => onRetry(i.id)}
                     >
                       <FontAwesomeIcon icon={faRotateRight} />

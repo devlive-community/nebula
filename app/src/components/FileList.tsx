@@ -9,6 +9,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { formatBytes, formatDate, isBucket } from "../util";
+import { useI18n } from "../i18n";
 import { useIncremental } from "../hooks";
 import { Checkbox } from "./Checkbox";
 
@@ -57,15 +58,16 @@ export function FileList({
     120,
     onReachEnd,
   );
+  const { t } = useI18n();
   const someSelected = entries.some(
     (e) => e.kind === "file" && selected.has(e.path),
   );
 
   if (loading) {
-    return <div className="filelist__state">加载中…</div>;
+    return <div className="filelist__state">{t("加载中…")}</div>;
   }
   if (entries.length === 0) {
-    return <div className="filelist__state">这里空空如也</div>;
+    return <div className="filelist__state">{t("这里空空如也")}</div>;
   }
 
   const header = (key: SortKey, label: string, className: string) => (
@@ -87,13 +89,13 @@ export function FileList({
           <Checkbox
             checked={allSelected}
             indeterminate={someSelected && !allSelected}
-            title="全选 / 取消全选"
+            title={t("全选 / 取消全选")}
             onChange={onToggleSelectAll}
           />
         </span>
-        {header("name", "名称", "col-name")}
-        {header("size", "大小", "col-size")}
-        {header("modified", "修改时间", "col-modified")}
+        {header("name", t("名称"), "col-name")}
+        {header("size", t("大小"), "col-size")}
+        {header("modified", t("修改时间"), "col-modified")}
       </div>
       <div className="filelist__body" onScroll={onScroll}>
         {shown.map((entry) => {
@@ -161,7 +163,12 @@ export function FileList({
           );
         })}
         {hasMore && (
-          <div className="list-more">下滑加载更多 · 已显示 {shownCount} / {total}</div>
+          <div className="list-more">
+            {t("下滑加载更多 · 已显示 {shown} / {total}", {
+              shown: shownCount,
+              total,
+            })}
+          </div>
         )}
       </div>
     </div>
