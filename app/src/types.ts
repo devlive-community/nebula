@@ -73,6 +73,9 @@ export interface TransferItem {
   status: "active" | "done" | "error" | "cancelled" | "interrupted";
   /** 瞬时速度(字节/秒),仅字节类传输、仅前端展示用(不持久化)。 */
   speed?: number;
+  /** 迁移的源端账号 / 路径,供面板内重试再次发起(仅本会话;不持久化,重启后为空)。 */
+  srcAccount?: string;
+  srcPath?: string;
 }
 
 /** 分页列举的一页(与 Rust 端 nebula_provider::Page 对应)。 */

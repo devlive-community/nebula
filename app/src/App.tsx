@@ -269,8 +269,19 @@ export default function App() {
     } else if (t.kind === "下载文件夹") {
       // 文件夹下载:用记下的账号 / 路径 / 本地目录重跑,无需再次选目录。
       void runFolderDownload(t.account, t.remote, t.local, t.name);
+    } else if (t.kind === "迁移" && t.srcAccount && t.srcPath) {
+      // 迁移从头重跑(非断点续传);源端信息仅本会话在内存中,重启后不可用。
+      void runMigrateSingle(
+        t.srcAccount,
+        t.srcPath,
+        t.total,
+        t.account,
+        t.remote,
+        t.name,
+      );
+    } else if (t.kind === "迁移文件夹" && t.srcAccount && t.srcPath) {
+      void runMigrateFolder(t.srcAccount, t.srcPath, t.account, t.remote, t.name);
     }
-    // 迁移 / 迁移文件夹缺少源端信息,无法从面板重发(面板不显示其重试按钮)。
   };
 
   const cancelTransfer = (id: string) => {
@@ -925,67 +936,79 @@ export default function App() {
     }
   };
 
-  const doMigrate = async (dstAccount: string, dstPath: string) => {
-    const entry = migrateTarget;
-    setMigrateTarget(null);
-    if (!current || !entry) return;
-
-    // 文件夹迁移:dstPath 是目标目录,逐文件流式中转,进度按文件数(folder-progress)。
-    if (entry.kind === "directory") {
-      const fid = `folder:migrate:${entry.path}`;
-      setTransfers((prev) => ({
-        ...prev,
-        [fid]: {
-          id: fid,
-          kind: "迁移文件夹",
-          name: entry.name,
-          account: dstAccount,
-          remote: dstPath,
-          local: `${current} → ${dstAccount}`,
-          done: 0,
-          total: 0,
-          status: "active",
-        },
-      }));
-      try {
-        await api.migrateFolder(current, entry.path, dstAccount, dstPath, fid);
-        setTransfers((prev) =>
-          prev[fid]
-            ? { ...prev, [fid]: { ...prev[fid], status: "done", done: prev[fid].total } }
-            : prev,
-        );
-        if (dstAccount === current) await load();
-      } catch (e) {
-        const msg = String(e);
-        const cancelled = msg === "已取消";
-        setTransfers((prev) =>
-          prev[fid]
-            ? { ...prev, [fid]: { ...prev[fid], status: cancelled ? "cancelled" : "error" } }
-            : prev,
-        );
-        if (!cancelled) setError(msg);
-      }
-      return;
+  // 文件夹迁移:逐文件流式中转,进度按文件数(folder-progress)。可被面板重试复用。
+  const runMigrateFolder = async (
+    srcAccount: string,
+    srcRoot: string,
+    dstAccount: string,
+    dstDir: string,
+    name: string,
+  ) => {
+    const fid = `folder:migrate:${srcRoot}`;
+    setTransfers((prev) => ({
+      ...prev,
+      [fid]: {
+        id: fid,
+        kind: "迁移文件夹",
+        name,
+        account: dstAccount,
+        remote: dstDir,
+        local: `${srcAccount} → ${dstAccount}`,
+        srcAccount,
+        srcPath: srcRoot,
+        done: 0,
+        total: 0,
+        status: "active",
+      },
+    }));
+    try {
+      await api.migrateFolder(srcAccount, srcRoot, dstAccount, dstDir, fid);
+      setTransfers((prev) =>
+        prev[fid]
+          ? { ...prev, [fid]: { ...prev[fid], status: "done", done: prev[fid].total } }
+          : prev,
+      );
+      if (dstAccount === current) await load();
+    } catch (e) {
+      const msg = String(e);
+      const cancelled = msg === "已取消";
+      setTransfers((prev) =>
+        prev[fid]
+          ? { ...prev, [fid]: { ...prev[fid], status: cancelled ? "cancelled" : "error" } }
+          : prev,
+      );
+      if (!cancelled) setError(msg);
     }
+  };
 
-    // 单对象迁移:任务 id 与后端 transfer-progress 的 `to` 对齐,用于实时进度。
+  // 单对象迁移:任务 id 与后端 transfer-progress 的 `to` 对齐,用于实时进度。可被面板重试复用。
+  const runMigrateSingle = async (
+    srcAccount: string,
+    srcPath: string,
+    size: number,
+    dstAccount: string,
+    dstPath: string,
+    name: string,
+  ) => {
     const id = `migrate:${dstPath}`;
     setTransfers((prev) => ({
       ...prev,
       [id]: {
         id,
         kind: "迁移",
-        name: baseName(dstPath),
+        name,
         account: dstAccount,
         remote: dstPath,
-        local: `${current} → ${dstAccount}`,
+        local: `${srcAccount} → ${dstAccount}`,
+        srcAccount,
+        srcPath,
         done: 0,
-        total: entry.size,
+        total: size,
         status: "active",
       },
     }));
     try {
-      await api.copyAcross(current, entry.path, dstAccount, dstPath, id);
+      await api.copyAcross(srcAccount, srcPath, dstAccount, dstPath, id);
       setTransfers((prev) =>
         prev[id]
           ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
@@ -1002,6 +1025,24 @@ export default function App() {
           : prev,
       );
       if (!cancelled) setError(msg);
+    }
+  };
+
+  const doMigrate = async (dstAccount: string, dstPath: string) => {
+    const entry = migrateTarget;
+    setMigrateTarget(null);
+    if (!current || !entry) return;
+    if (entry.kind === "directory") {
+      await runMigrateFolder(current, entry.path, dstAccount, dstPath, entry.name);
+    } else {
+      await runMigrateSingle(
+        current,
+        entry.path,
+        entry.size,
+        dstAccount,
+        dstPath,
+        baseName(dstPath),
+      );
     }
   };
 

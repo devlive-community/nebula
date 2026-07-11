@@ -53,6 +53,12 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
               if (eta) active += ` · ~${eta}`;
             }
           }
+          // 可从面板重跑的种类;迁移需带源端信息(重启后丢失 → 不可重试)。
+          const retryable =
+            i.kind === "上传" ||
+            i.kind === "下载" ||
+            i.kind === "下载文件夹" ||
+            ((i.kind === "迁移" || i.kind === "迁移文件夹") && !!i.srcAccount);
           const label =
             i.status === "error"
               ? t("失败")
@@ -87,10 +93,7 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                 {(i.status === "error" ||
                   i.status === "cancelled" ||
                   i.status === "interrupted") &&
-                  i.kind !== "迁移" &&
-                  i.kind !== "迁移文件夹" &&
-                  i.kind !== "转换存储类型" &&
-                  i.kind !== "取回归档" && (
+                  retryable && (
                     <button
                       className="transfers__retry"
                       title={i.status === "error" ? t("重试") : t("继续")}
