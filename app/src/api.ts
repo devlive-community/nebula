@@ -156,6 +156,14 @@ export const moveFolder = (
   transferId: string,
 ) => invoke<void>("move_folder", { account, srcRoot, dstRoot, transferId });
 
+/** 复制整个文件夹到新的完整路径(同账号,保留源)。 */
+export const copyFolder = (
+  account: string,
+  srcRoot: string,
+  dstRoot: string,
+  transferId: string,
+) => invoke<void>("copy_folder", { account, srcRoot, dstRoot, transferId });
+
 export const deleteFolder = (account: string, path: string) =>
   invoke<void>("delete_folder", { account, path });
 

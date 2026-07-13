@@ -863,6 +863,43 @@ async fn move_folder(
         })
 }
 
+/// 把整个远端文件夹复制到新的完整路径(同账号,保留源)。每完成一个文件发一次 `folder-progress`。
+#[tauri::command]
+async fn copy_folder(
+    app: AppHandle,
+    state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    transfer_id: String,
+    account: String,
+    src_root: String,
+    dst_root: String,
+) -> Result<(), String> {
+    let core = state.inner().clone();
+    let cancel = transfers.begin(&transfer_id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: transfer_id.clone(),
+    };
+    let event_path = src_root.clone();
+    let progress = move |done: u64, total: u64| {
+        let _ = app.emit(
+            "folder-progress",
+            FolderProgress {
+                op: "copy".into(),
+                path: event_path.clone(),
+                done,
+                total,
+            },
+        );
+    };
+    core.copy_folder(&account, &src_root, &dst_root, cancel, &progress)
+        .await
+        .map_err(|e| match e {
+            app_core::AppError::Cancelled => "已取消".to_string(),
+            other => other.to_string(),
+        })
+}
+
 /// 递归删除整个远端文件夹(文件 + 目录占位)。每删一个发一次 `folder-progress`。
 #[tauri::command]
 async fn delete_folder(
@@ -1172,6 +1209,7 @@ pub fn run() {
             download_folder,
             migrate_folder,
             move_folder,
+            copy_folder,
             delete_folder,
             set_storage_class_folder,
             restore_folder,
