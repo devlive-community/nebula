@@ -52,12 +52,27 @@ export async function runPool<T>(
   await Promise.all(runners);
 }
 
-/** 判断文件是否可预览(图片 / 视频),返回预览类型或 null。 */
-export function previewKind(name: string): "image" | "video" | null {
+/** 可当作文本预览的扩展名(代码 / 配置 / 数据 / 纯文本)。 */
+const TEXT_EXTS = new Set([
+  "txt", "md", "markdown", "log", "csv", "tsv", "json", "json5", "jsonl",
+  "xml", "yaml", "yml", "toml", "ini", "conf", "cfg", "env", "properties",
+  "html", "htm", "css", "scss", "less", "svg",
+  "js", "jsx", "mjs", "cjs", "ts", "tsx", "vue", "svelte",
+  "rs", "go", "py", "rb", "php", "java", "kt", "kts", "scala", "swift",
+  "c", "h", "cpp", "cc", "hpp", "cs", "m", "mm", "dart", "lua", "pl", "r",
+  "sh", "bash", "zsh", "fish", "ps1", "bat", "sql", "graphql", "gql",
+  "dockerfile", "makefile", "gitignore", "editorconfig",
+]);
+
+/** 判断文件是否可预览,返回预览类型或 null。SVG 归为图片(可渲染)。 */
+export function previewKind(name: string): "image" | "video" | "text" | null {
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"].includes(ext))
     return "image";
   if (["mp4", "webm", "mov", "m4v", "ogg"].includes(ext)) return "video";
+  // 无扩展名时按常见文件名兜底(Dockerfile / Makefile 等)。
+  const base = name.toLowerCase();
+  if (TEXT_EXTS.has(ext) || TEXT_EXTS.has(base)) return "text";
   return null;
 }
 

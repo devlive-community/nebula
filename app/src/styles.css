@@ -727,6 +727,37 @@ body.resizing {
   display: block;
 }
 
+/* 文本预览:宽一些的可读面板 */
+.preview--text {
+  width: min(860px, 90vw);
+}
+
+.preview__textwrap {
+  overflow: auto;
+  max-height: calc(90vh - 44px);
+}
+
+.preview__text {
+  margin: 0;
+  padding: 14px 16px;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre;
+  tab-size: 4;
+}
+
+.preview__note {
+  position: sticky;
+  bottom: 0;
+  padding: 7px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
+}
+
 /* ---------- Context menu ---------- */
 .context-menu {
   position: fixed;

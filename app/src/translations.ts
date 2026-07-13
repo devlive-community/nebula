@@ -43,6 +43,9 @@ export const EN: Record<string, string> = {
   "过滤当前目录 / 回车递归搜索…": "Filter here / Enter to search…",
   "处理中…": "Working…",
 
+  // 预览
+  "内容较大,仅预览前 256 KB。": "Large file — previewing the first 256 KB only.",
+
   // 对象标签
   对象标签: "Object tags",
   标签: "Tags",

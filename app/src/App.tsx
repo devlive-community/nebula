@@ -111,9 +111,11 @@ export default function App() {
     null,
   );
   const [preview, setPreview] = useState<{
-    url: string;
     name: string;
-    kind: "image" | "video";
+    kind: "image" | "video" | "text";
+    url?: string;
+    text?: string;
+    truncated?: boolean;
   } | null>(null);
   const [view, setView] = useState<"list" | "grid">(
     () => (localStorage.getItem("nebula-view") as "list" | "grid") || "list",
@@ -127,7 +129,8 @@ export default function App() {
   const openDir = (entry: Entry) =>
     setPath(entry.path.endsWith("/") ? entry.path : entry.path + "/");
 
-  // 预览图片 / 视频:用预签名链接加载;非可预览类型退回详情。
+  // 预览:图片 / 视频用预签名链接加载;文本类走后端读前 256 KiB(绕开云端 CORS 并限体积);
+  // 非可预览类型退回详情。
   const openPreview = async (entry: Entry) => {
     const kind = previewKind(entry.name);
     if (!current || !kind) {
@@ -136,8 +139,17 @@ export default function App() {
     }
     setError(null);
     try {
-      const url = await api.presign(current, entry.path, 600);
-      setPreview({ url, name: entry.name, kind });
+      if (kind === "text") {
+        const { text, truncated } = await api.readPreview(
+          current,
+          entry.path,
+          256 * 1024,
+        );
+        setPreview({ name: entry.name, kind, text, truncated });
+      } else {
+        const url = await api.presign(current, entry.path, 600);
+        setPreview({ name: entry.name, kind, url });
+      }
     } catch (e) {
       setError(String(e));
     }
@@ -1730,6 +1742,8 @@ export default function App() {
       {preview && (
         <PreviewModal
           url={preview.url}
+          text={preview.text}
+          truncated={preview.truncated}
           name={preview.name}
           kind={preview.kind}
           onClose={() => setPreview(null)}
