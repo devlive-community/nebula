@@ -90,6 +90,7 @@ export const EN: Record<string, string> = {
   完成: "Done",
   迁移: "Migrate",
   迁移文件夹: "Migrate folder",
+  重命名文件夹: "Rename folder",
 
   // 右键菜单
   预览: "Preview",

@@ -889,6 +889,12 @@ export default function App() {
     const entry = renameTarget;
     setRenameTarget(null);
     if (!current || !entry || newName === entry.name) return;
+    // 文件夹重命名是整目录递归移动(可能很多对象)→ 走传输面板任务;单对象直接改名。
+    if (entry.kind === "directory") {
+      const dstRoot = joinRemote(parentPath(entry.path), newName);
+      void runMoveFolder(entry.path, dstRoot, newName);
+      return;
+    }
     const to = joinRemote(parentPath(entry.path), newName);
     setBusy(true);
     setError(null);
@@ -947,6 +953,43 @@ export default function App() {
       setError(String(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  // 文件夹移动 / 重命名:同账号服务端复制到新前缀后删原对象,进度按文件数。
+  const runMoveFolder = async (srcRoot: string, dstRoot: string, name: string) => {
+    const fid = `folder:move:${srcRoot}`;
+    setTransfers((prev) => ({
+      ...prev,
+      [fid]: {
+        id: fid,
+        kind: "重命名文件夹",
+        name,
+        account: current ?? "",
+        remote: dstRoot,
+        local: `${srcRoot} → ${dstRoot}`,
+        done: 0,
+        total: 0,
+        status: "active",
+      },
+    }));
+    try {
+      await api.moveFolder(current!, srcRoot, dstRoot, fid);
+      setTransfers((prev) =>
+        prev[fid]
+          ? { ...prev, [fid]: { ...prev[fid], status: "done", done: prev[fid].total } }
+          : prev,
+      );
+      await load();
+    } catch (e) {
+      const msg = String(e);
+      const cancelled = msg === "已取消";
+      setTransfers((prev) =>
+        prev[fid]
+          ? { ...prev, [fid]: { ...prev[fid], status: cancelled ? "cancelled" : "error" } }
+          : prev,
+      );
+      if (!cancelled) setError(msg);
     }
   };
 
@@ -1770,6 +1813,7 @@ export default function App() {
         { label: t("打开"), onClick: () => openDir(entry) },
         { label: t("统计信息"), onClick: () => showFolderStats(entry) },
         { label: t("下载文件夹"), onClick: () => downloadFolderEntry(entry) },
+        { label: t("重命名"), onClick: () => setRenameTarget(entry) },
       ];
       if (accounts.length > 1) {
         dirItems.push({

@@ -62,6 +62,7 @@ export interface TransferItem {
     | "迁移"
     | "下载文件夹"
     | "迁移文件夹"
+    | "重命名文件夹"
     | "转换存储类型"
     | "取回归档";
   name: string;
