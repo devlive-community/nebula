@@ -841,6 +841,51 @@ impl App {
         Ok(())
     }
 
+    /// 把整个文件夹 `src_root` 移动 / 重命名为 `dst_root`(同账号,新的完整目录路径)。
+    ///
+    /// 逐个文件服务端复制到新前缀再删除原对象,最后清理源目录占位对象;`progress(已处理, 总数)`,
+    /// 可取消(停在干净的文件边界)。目标不得为源自身或其子目录(否则自我吞噬)。
+    pub async fn move_folder(
+        &self,
+        account: &str,
+        src_root: &str,
+        dst_root: &str,
+        cancel: Arc<AtomicBool>,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let src_base = ensure_trailing_slash(src_root);
+        let dst_base = ensure_trailing_slash(dst_root);
+        if is_within(&src_base, &dst_base) {
+            return Err(AppError::InvalidInput(
+                "目标目录不能是源目录自身或其子目录".into(),
+            ));
+        }
+        let provider = self.provider(account)?;
+        let (files, mut dirs) = walk_dir(&provider, src_root).await?;
+        let total = (files.len() + dirs.len() + 1) as u64; // +1:源目录占位对象
+        let mut done = 0u64;
+        for file in &files {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(AppError::Cancelled);
+            }
+            let rel = file.path.strip_prefix(&src_base).unwrap_or(&file.path);
+            let dst_path = format!("{dst_base}{rel}");
+            provider.copy(&file.path, &dst_path).await?;
+            provider.delete(&file.path).await?;
+            done += 1;
+            progress(done, total);
+        }
+        // 清理源目录占位对象(含根),深的先删。
+        dirs.push(src_base);
+        dirs.sort_by_key(|b| std::cmp::Reverse(b.len()));
+        for dir in &dirs {
+            provider.delete(dir).await?;
+            done += 1;
+            progress(done, total);
+        }
+        Ok(())
+    }
+
     /// 递归删除 `root` 下所有对象(文件 + 目录占位对象)。`progress(已删数, 总数)`。
     ///
     /// 对象存储的 DELETE 是幂等的,合成前缀(无实体占位对象)删除也安全,故一并清理目录占位,
@@ -1064,6 +1109,12 @@ fn ensure_trailing_slash(p: &str) -> String {
 /// 取目录路径最后一段作为文件夹名(忽略结尾斜杠)。
 fn folder_name(p: &str) -> &str {
     p.trim_end_matches('/').rsplit('/').next().unwrap_or(p)
+}
+
+/// 目标目录是否落在源目录内部(自身或子目录)。两参数均须以 `/` 结尾,
+/// 结尾斜杠可避免 `a/b/` 与 `a/bc/` 之间的前缀误判。
+fn is_within(src_base: &str, dst_base: &str) -> bool {
+    dst_base.starts_with(src_base)
 }
 
 #[cfg(test)]
@@ -1365,6 +1416,68 @@ mod tests {
                 ("b/photos/dog.png".into(), "arch/photos/dog.png".into()),
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn move_folder_copies_to_new_prefix_and_deletes_originals() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+
+        // 把 b/photos 重命名为 b/archive → 内容改前缀,原对象与目录占位被删。
+        app.move_folder(
+            "rec",
+            "b/photos",
+            "b/archive",
+            Arc::new(AtomicBool::new(false)),
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
+
+        let mut copied = rec.copied.lock().unwrap().clone();
+        copied.sort();
+        assert_eq!(
+            copied,
+            [
+                ("b/photos/cat.jpg".into(), "b/archive/cat.jpg".into()),
+                ("b/photos/dog.png".into(), "b/archive/dog.png".into()),
+            ]
+        );
+        let deleted = rec.deleted.lock().unwrap().clone();
+        assert!(deleted.contains(&"b/photos/cat.jpg".to_string()));
+        assert!(deleted.contains(&"b/photos/dog.png".to_string()));
+        assert!(deleted.contains(&"b/photos/".to_string())); // 源目录占位也清掉
+    }
+
+    #[tokio::test]
+    async fn move_folder_rejects_moving_into_itself() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+
+        let err = app
+            .move_folder(
+                "rec",
+                "b/photos",
+                "b/photos/sub",
+                Arc::new(AtomicBool::new(false)),
+                &|_, _| {},
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::InvalidInput(_)));
+        // 未发生任何复制 / 删除。
+        assert!(rec.copied.lock().unwrap().is_empty());
+        assert!(rec.deleted.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn is_within_uses_trailing_slash_to_avoid_prefix_confusion() {
+        assert!(is_within("a/b/", "a/b/")); // 自身
+        assert!(is_within("a/b/", "a/b/c/")); // 子目录
+        assert!(!is_within("a/b/", "a/bc/")); // 仅前缀相似,不算
+        assert!(!is_within("a/b/", "a/c/")); // 无关
     }
 
     #[tokio::test]
