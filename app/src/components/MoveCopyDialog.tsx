@@ -41,7 +41,9 @@ export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Prop
     load();
   }, [load]);
 
-  const target = pickPath ? joinRemote(pickPath, baseName(from)) : "";
+  // 源可能是文件夹(带结尾斜杠),取末段作为落点名前先去掉结尾斜杠。
+  const leaf = baseName(from.replace(/\/+$/, ""));
+  const target = pickPath ? joinRemote(pickPath, leaf) : "";
   const canConfirm = target !== "" && target !== from;
   const crumbs = breadcrumbs(pickPath);
 

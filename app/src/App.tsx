@@ -907,7 +907,7 @@ export default function App() {
     // 文件夹重命名是整目录递归移动(可能很多对象)→ 走传输面板任务;单对象直接改名。
     if (entry.kind === "directory") {
       const dstRoot = joinRemote(parentPath(entry.path), newName);
-      void runMoveFolder(entry.path, dstRoot, newName);
+      void runMoveFolder(entry.path, dstRoot, newName, "重命名文件夹");
       return;
     }
     const to = joinRemote(parentPath(entry.path), newName);
@@ -958,6 +958,12 @@ export default function App() {
     const entry = moveCopyTarget;
     setMoveCopyTarget(null);
     if (!current || !entry) return;
+    // 文件夹是整目录递归 → 走传输面板任务;单对象走即时的服务端复制 / 改名。
+    if (entry.kind === "directory") {
+      if (mode === "copy") void runCopyFolder(entry.path, to, entry.name);
+      else void runMoveFolder(entry.path, to, entry.name, "移动文件夹");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -972,13 +978,18 @@ export default function App() {
   };
 
   // 文件夹移动 / 重命名:同账号服务端复制到新前缀后删原对象,进度按文件数。
-  const runMoveFolder = async (srcRoot: string, dstRoot: string, name: string) => {
+  const runMoveFolder = async (
+    srcRoot: string,
+    dstRoot: string,
+    name: string,
+    kind: "重命名文件夹" | "移动文件夹" = "移动文件夹",
+  ) => {
     const fid = `folder:move:${srcRoot}`;
     setTransfers((prev) => ({
       ...prev,
       [fid]: {
         id: fid,
-        kind: "重命名文件夹",
+        kind,
         name,
         account: current ?? "",
         remote: dstRoot,
@@ -990,6 +1001,43 @@ export default function App() {
     }));
     try {
       await api.moveFolder(current!, srcRoot, dstRoot, fid);
+      setTransfers((prev) =>
+        prev[fid]
+          ? { ...prev, [fid]: { ...prev[fid], status: "done", done: prev[fid].total } }
+          : prev,
+      );
+      await load();
+    } catch (e) {
+      const msg = String(e);
+      const cancelled = msg === "已取消";
+      setTransfers((prev) =>
+        prev[fid]
+          ? { ...prev, [fid]: { ...prev[fid], status: cancelled ? "cancelled" : "error" } }
+          : prev,
+      );
+      if (!cancelled) setError(msg);
+    }
+  };
+
+  // 文件夹复制:同账号服务端复制到新前缀(保留源),进度按文件数。
+  const runCopyFolder = async (srcRoot: string, dstRoot: string, name: string) => {
+    const fid = `folder:copy:${srcRoot}`;
+    setTransfers((prev) => ({
+      ...prev,
+      [fid]: {
+        id: fid,
+        kind: "复制文件夹",
+        name,
+        account: current ?? "",
+        remote: dstRoot,
+        local: `${srcRoot} → ${dstRoot}`,
+        done: 0,
+        total: 0,
+        status: "active",
+      },
+    }));
+    try {
+      await api.copyFolder(current!, srcRoot, dstRoot, fid);
       setTransfers((prev) =>
         prev[fid]
           ? { ...prev, [fid]: { ...prev[fid], status: "done", done: prev[fid].total } }
@@ -1829,6 +1877,7 @@ export default function App() {
         { label: t("统计信息"), onClick: () => showFolderStats(entry) },
         { label: t("下载文件夹"), onClick: () => downloadFolderEntry(entry) },
         { label: t("重命名"), onClick: () => setRenameTarget(entry) },
+        { label: t("复制 / 移动到"), onClick: () => setMoveCopyTarget(entry) },
       ];
       if (accounts.length > 1) {
         dirItems.push({

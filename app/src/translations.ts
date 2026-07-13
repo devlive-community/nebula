@@ -96,6 +96,8 @@ export const EN: Record<string, string> = {
   迁移: "Migrate",
   迁移文件夹: "Migrate folder",
   重命名文件夹: "Rename folder",
+  移动文件夹: "Move folder",
+  复制文件夹: "Copy folder",
 
   // 右键菜单
   预览: "Preview",
