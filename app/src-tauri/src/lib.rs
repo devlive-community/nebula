@@ -372,7 +372,7 @@ async fn download_file(
     account: String,
     remote_path: String,
     local_path: String,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     use futures::StreamExt;
     use tokio::io::AsyncWriteExt;
 
@@ -383,6 +383,16 @@ async fn download_file(
         transfers: transfers.inner(),
         id: transfer_id.clone(),
     };
+
+    // 下载秒传:本地目标已存在且与远端内容一致(ETag = 本地 MD5)则跳过下载。
+    if core
+        .is_unchanged(&account, &remote_path, &local_path)
+        .await
+        .unwrap_or(false)
+    {
+        return Ok(true);
+    }
+
     let part_path = format!("{local_path}.part");
 
     // 已有 .part → 从其大小续传;offset>0 且服务端拒绝(如 416 过期/越界)则清掉从头下。
@@ -443,7 +453,8 @@ async fn download_file(
     // 完成:.part → 最终文件名。
     tokio::fs::rename(&part_path, &local_path)
         .await
-        .map_err(|e| format!("重命名文件失败: {e}"))
+        .map_err(|e| format!("重命名文件失败: {e}"))?;
+    Ok(false)
 }
 
 /// 删除远端对象。
@@ -671,7 +682,7 @@ async fn download_folder(
     account: String,
     remote_root: String,
     local_dir: String,
-) -> Result<(), String> {
+) -> Result<u64, String> {
     use futures::StreamExt;
     use tokio::io::AsyncWriteExt;
 
@@ -687,6 +698,7 @@ async fn download_folder(
         .await
         .map_err(|e| e.to_string())?;
     let total = files.len() as u64;
+    let mut skipped = 0u64;
 
     let base = if remote_root.ends_with('/') {
         remote_root.clone()
@@ -709,6 +721,24 @@ async fn download_folder(
         let mut local = root_dir.clone();
         for seg in rel.split('/') {
             local.push(seg);
+        }
+        // 下载秒传:本地已存在且与远端一致则跳过该文件。
+        if core
+            .is_unchanged(&account, &file.path, &local.to_string_lossy())
+            .await
+            .unwrap_or(false)
+        {
+            skipped += 1;
+            let _ = app.emit(
+                "folder-progress",
+                FolderProgress {
+                    op: "download".into(),
+                    path: remote_root.clone(),
+                    done: (i + 1) as u64,
+                    total,
+                },
+            );
+            continue;
         }
         if let Some(parent) = local.parent() {
             tokio::fs::create_dir_all(parent)
@@ -745,7 +775,7 @@ async fn download_folder(
             },
         );
     }
-    Ok(())
+    Ok(skipped)
 }
 
 /// 把整个远端文件夹迁移到另一账号的目标目录下(作为子目录),保留相对结构;源保留。
