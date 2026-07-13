@@ -62,6 +62,25 @@ pub fn md5_hex(data: &[u8]) -> String {
     hex::encode(Md5::digest(data))
 }
 
+/// 增量 MD5:反复 [`update`](Self::update) 喂入分块,最后 [`finish`](Self::finish) 得
+/// 小写十六进制。用于流式对本地大文件算 MD5 而不一次性读入内存。结果等同 [`md5_hex`]。
+#[derive(Default)]
+pub struct Md5Hasher(Md5);
+
+impl Md5Hasher {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn update(&mut self, data: &[u8]) {
+        self.0.update(data);
+    }
+
+    pub fn finish(self) -> String {
+        hex::encode(self.0.finalize())
+    }
+}
+
 /// 小写十六进制编码。
 pub fn hex_encode(data: &[u8]) -> String {
     hex::encode(data)
@@ -128,5 +147,15 @@ mod tests {
     fn md5_hex_known_vectors() {
         assert_eq!(md5_hex(b""), "d41d8cd98f00b204e9800998ecf8427e");
         assert_eq!(md5_hex(b"abc"), "900150983cd24fb0d6963f7d28e17f72");
+    }
+
+    #[test]
+    fn incremental_md5_matches_one_shot() {
+        // 分多块喂入,结果应与一次性 md5_hex 相同。
+        let mut h = Md5Hasher::new();
+        h.update(b"a");
+        h.update(b"b");
+        h.update(b"c");
+        assert_eq!(h.finish(), md5_hex(b"abc"));
     }
 }
