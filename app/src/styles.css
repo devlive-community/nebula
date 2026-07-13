@@ -869,7 +869,7 @@ body.resizing {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 320px;
+  width: 380px;
   z-index: 40;
   background: var(--bg-elev);
   border-left: 1px solid var(--border);
@@ -974,6 +974,7 @@ body.resizing {
 
 .details__actions .btn {
   flex: 1;
+  white-space: nowrap;
 }
 
 /* ---------- Grid view ---------- */
