@@ -78,6 +78,13 @@ export interface TransferItem {
   srcPath?: string;
 }
 
+/** 文本预览结果(与 Rust 端 app_core::TextPreview 对应)。 */
+export interface TextPreview {
+  text: string;
+  /** 内容超过上限被截断。 */
+  truncated: boolean;
+}
+
 /** 分页列举的一页(与 Rust 端 nebula_provider::Page 对应)。 */
 export interface Page {
   entries: Entry[];

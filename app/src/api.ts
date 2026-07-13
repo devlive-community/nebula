@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Entry, FolderStats, Integrity, Page, SearchResult, Settings, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Entry, FolderStats, Integrity, Page, SearchResult, Settings, TextPreview, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -190,6 +190,10 @@ export const setContentType = (
   path: string,
   contentType: string,
 ) => invoke<void>("set_content_type", { account, path, contentType });
+
+/** 读取对象前若干字节并解码为文本,用于预览。 */
+export const readPreview = (account: string, path: string, maxBytes: number) =>
+  invoke<TextPreview>("read_preview", { account, path, maxBytes });
 
 /** 读取对象标签(键值对数组)。 */
 export const objectTags = (account: string, path: string) =>

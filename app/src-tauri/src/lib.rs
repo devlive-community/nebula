@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, FolderStats, Integrity, Page, SearchResult, Settings, TransferRecord,
+    AccountInfo, App, FolderStats, Integrity, Page, SearchResult, Settings, TextPreview,
+    TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -488,6 +489,20 @@ async fn set_object_tags(
 ) -> Result<(), String> {
     let app = state.inner().clone();
     app.set_object_tags(&account, &path, &tags)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 读取对象前若干字节并解码为文本,用于预览。
+#[tauri::command]
+async fn read_preview(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    max_bytes: usize,
+) -> Result<TextPreview, String> {
+    let app = state.inner().clone();
+    app.read_preview(&account, &path, max_bytes)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1069,6 +1084,7 @@ pub fn run() {
             set_content_type,
             object_tags,
             set_object_tags,
+            read_preview,
             folder_stats,
             rename,
             copy,
