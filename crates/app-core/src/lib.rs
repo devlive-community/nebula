@@ -8,6 +8,7 @@
 //! 逻辑可以完全用 `cargo test` 覆盖,无需启动 GUI。
 
 mod cancel;
+mod dedup;
 mod error;
 mod integrity;
 mod limits;
@@ -599,6 +600,27 @@ impl App {
             text: preview::decode(&buf),
             truncated,
         })
+    }
+
+    /// 秒传判断:远端 `remote_path` 是否已与本地 `local_path` 内容一致(可跳过上传)。
+    ///
+    /// 保守判定——仅当远端存在、ETag 为整对象 MD5、大小与本地一致、且本地 MD5 与之相等时返回
+    /// `true`;任何不确定(远端缺失 / 分片 ETag / 大小不同 / 读取失败)都返回 `false` 以照常上传。
+    pub async fn is_unchanged(
+        &self,
+        account: &str,
+        remote_path: &str,
+        local_path: &str,
+    ) -> Result<bool> {
+        let Ok(meta) = self.provider(account)?.stat(remote_path).await else {
+            return Ok(false); // 远端不存在 → 需要上传
+        };
+        let local_size = tokio::fs::metadata(local_path).await?.len();
+        let Some(expected) = dedup::worth_comparing(meta.etag.as_deref(), meta.size, local_size)
+        else {
+            return Ok(false); // 分片 ETag / 无 ETag / 大小不同 → 不值得比对,照常上传
+        };
+        Ok(dedup::file_md5(local_path).await? == expected)
     }
 
     /// 上传 / 覆盖对象。

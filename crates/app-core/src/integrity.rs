@@ -23,7 +23,7 @@ pub enum Integrity {
 }
 
 /// 若 ETag 表示"整对象 MD5"(去引号后为 32 位十六进制、无 `-N` 分片后缀),返回其小写形式。
-fn etag_as_md5(etag: &str) -> Option<String> {
+pub(crate) fn etag_as_md5(etag: &str) -> Option<String> {
     let e = etag.trim().trim_matches('"');
     if e.len() == 32 && e.bytes().all(|b| b.is_ascii_hexdigit()) {
         Some(e.to_ascii_lowercase())
