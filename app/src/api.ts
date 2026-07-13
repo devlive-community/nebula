@@ -191,6 +191,17 @@ export const setContentType = (
   contentType: string,
 ) => invoke<void>("set_content_type", { account, path, contentType });
 
+/** 读取对象标签(键值对数组)。 */
+export const objectTags = (account: string, path: string) =>
+  invoke<[string, string][]>("object_tags", { account, path });
+
+/** 覆盖对象标签(整套替换;空数组即清空)。 */
+export const setObjectTags = (
+  account: string,
+  path: string,
+  tags: [string, string][],
+) => invoke<void>("set_object_tags", { account, path, tags });
+
 /** 统计文件夹 / Bucket 的文件数与总大小。 */
 export const folderStats = (account: string, path: string) =>
   invoke<FolderStats>("folder_stats", { account, path });

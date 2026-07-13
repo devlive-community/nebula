@@ -465,6 +465,33 @@ async fn set_content_type(
         .map_err(|e| e.to_string())
 }
 
+/// 读取对象标签(键值对)。
+#[tauri::command]
+async fn object_tags(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<Vec<(String, String)>, String> {
+    let app = state.inner().clone();
+    app.object_tags(&account, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 覆盖对象标签(整套替换;空列表即清空)。
+#[tauri::command]
+async fn set_object_tags(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    tags: Vec<(String, String)>,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_object_tags(&account, &path, &tags)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 统计文件夹 / Bucket 下的文件数与总字节数。
 #[tauri::command]
 async fn folder_stats(
@@ -1040,6 +1067,8 @@ pub fn run() {
             create_bucket,
             delete_bucket,
             set_content_type,
+            object_tags,
+            set_object_tags,
             folder_stats,
             rename,
             copy,
