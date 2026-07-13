@@ -644,6 +644,21 @@ impl App {
             .await?)
     }
 
+    /// 读取对象标签(键值对)。
+    pub async fn object_tags(&self, account: &str, path: &str) -> Result<Vec<(String, String)>> {
+        Ok(self.provider(account)?.object_tags(path).await?)
+    }
+
+    /// 覆盖对象标签(整套替换;空列表即清空)。
+    pub async fn set_object_tags(
+        &self,
+        account: &str,
+        path: &str,
+        tags: &[(String, String)],
+    ) -> Result<()> {
+        Ok(self.provider(account)?.set_object_tags(path, tags).await?)
+    }
+
     /// 在某账号下新建一个 bucket。
     pub async fn create_bucket(&self, account: &str, bucket: &str) -> Result<()> {
         Ok(self.provider(account)?.create_bucket(bucket).await?)

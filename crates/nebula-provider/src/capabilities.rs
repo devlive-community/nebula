@@ -15,6 +15,8 @@ pub struct Capabilities {
     pub bucket_ops: bool,
     /// 支持修改对象元数据(set_content_type 已实现)。
     pub metadata_ops: bool,
+    /// 支持读写对象标签(object_tags / set_object_tags 已实现)。
+    pub object_tagging: bool,
     /// 支持生成预签名临时链接。
     pub presign: bool,
     /// 支持服务端复制(跨对象 / 跨桶免中转)。

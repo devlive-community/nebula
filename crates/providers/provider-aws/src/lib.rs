@@ -84,6 +84,7 @@ impl StorageProvider for AwsProvider {
             storage_class_ops: true,
             bucket_ops: true,
             metadata_ops: true,
+            object_tagging: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -367,6 +368,22 @@ impl StorageProvider for AwsProvider {
         let (bucket, key) = require_object(path)?;
         self.client
             .set_content_type(bucket, key, content_type)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn object_tags(&self, path: &str) -> Result<Vec<(String, String)>> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .get_object_tags(bucket, key)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn set_object_tags(&self, path: &str, tags: &[(String, String)]) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .set_object_tags(bucket, key, tags)
             .await
             .map_err(map_err)
     }

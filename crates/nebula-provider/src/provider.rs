@@ -197,6 +197,17 @@ pub trait StorageProvider: Send + Sync {
         Err(ProviderError::Unsupported("set content type".into()))
     }
 
+    /// 读取对象标签(键值对)。默认 [`ProviderError::Unsupported`];支持的适配层覆盖并在
+    /// [`capabilities`](Self::capabilities) 置 `object_tagging = true`。
+    async fn object_tags(&self, _path: &str) -> Result<Vec<(String, String)>> {
+        Err(ProviderError::Unsupported("object tagging".into()))
+    }
+
+    /// 覆盖对象标签(整套替换;空列表即清空)。默认 [`ProviderError::Unsupported`]。
+    async fn set_object_tags(&self, _path: &str, _tags: &[(String, String)]) -> Result<()> {
+        Err(ProviderError::Unsupported("object tagging".into()))
+    }
+
     /// 新建一个 bucket。默认 [`ProviderError::Unsupported`];支持的适配层覆盖并在
     /// [`capabilities`](Self::capabilities) 置 `bucket_ops = true`。
     async fn create_bucket(&self, _bucket: &str) -> Result<()> {

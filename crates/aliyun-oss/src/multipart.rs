@@ -175,6 +175,51 @@ impl OssClient {
         Ok(())
     }
 
+    /// 读取对象标签:`GET /{key}?tagging`,复用子资源签名并解析 TagSet。
+    pub async fn get_object_tags(&self, bucket: &str, key: &str) -> Result<Vec<(String, String)>> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::GET,
+                key,
+                subresources: &[("tagging", None)],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(cloud_core::CoreError::from)?;
+        parse_tagging(&body)
+    }
+
+    /// 覆盖对象标签:`PUT /{key}?tagging`,请求体为整套 TagSet(空列表即清空)。
+    pub async fn set_object_tags(
+        &self,
+        bucket: &str,
+        key: &str,
+        tags: &[(String, String)],
+    ) -> Result<()> {
+        let date = now_gmt();
+        let body = Bytes::from(build_tagging_xml(tags));
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::PUT,
+                key,
+                subresources: &[("tagging", None)],
+                content_type: Some("application/xml"),
+                content_md5: None,
+                body: Some(body),
+            },
+            &date,
+        )?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 高层封装:把整块数据按 `part_size` 切分并完成分片上传;任一步失败自动 abort。
     ///
     /// `part_size` 会被抬到不小于 [`MIN_PART_SIZE`]。至少上传一个分片(空数据也会
@@ -446,6 +491,69 @@ fn split_parts(data: &Bytes, part_size: usize) -> Vec<(u32, Bytes)> {
         specs.push((1, data.slice(0..0)));
     }
     specs
+}
+
+/// `GetObjectTagging` 响应体(XML)。
+#[derive(Debug, Deserialize)]
+struct Tagging {
+    #[serde(rename = "TagSet", default)]
+    tag_set: TagSet,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct TagSet {
+    #[serde(rename = "Tag", default)]
+    tags: Vec<TagEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TagEntry {
+    #[serde(rename = "Key")]
+    key: String,
+    #[serde(rename = "Value", default)]
+    value: String,
+}
+
+/// 解析对象标签的 XML 响应为键值对(无标签时为空)。
+fn parse_tagging(xml: &str) -> Result<Vec<(String, String)>> {
+    let doc: Tagging = quick_xml::de::from_str(xml)
+        .map_err(|e| OssError::from(cloud_core::CoreError::InvalidRequest(e.to_string())))?;
+    Ok(doc
+        .tag_set
+        .tags
+        .into_iter()
+        .map(|t| (t.key, t.value))
+        .collect())
+}
+
+/// 生成 PutObjectTagging 的请求体 XML(空列表 → 空 TagSet)。
+fn build_tagging_xml(tags: &[(String, String)]) -> String {
+    let mut body = String::from("<Tagging><TagSet>");
+    for (k, v) in tags {
+        body.push_str("<Tag><Key>");
+        body.push_str(&xml_escape(k));
+        body.push_str("</Key><Value>");
+        body.push_str(&xml_escape(v));
+        body.push_str("</Value></Tag>");
+    }
+    body.push_str("</TagSet></Tagging>");
+    body
+}
+
+/// 转义 XML 文本中的保留字符,避免键 / 值里的 `&<>"'` 破坏文档。
+fn xml_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 /// 生成 CompleteMultipartUpload 的请求体 XML(按 part number 升序)。

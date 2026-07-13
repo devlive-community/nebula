@@ -272,6 +272,49 @@ impl CosClient {
         Ok(())
     }
 
+    /// 读取对象标签:`GET /{key}?tagging`,解析 TagSet 为键值对。
+    pub async fn get_object_tags(&self, bucket: &str, key: &str) -> Result<Vec<(String, String)>> {
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let request = self.build_signed(SignSpec {
+            method: Method::GET,
+            host: &host,
+            uri_path: &uri,
+            query: &[("tagging", None)],
+            content_type: None,
+            content_md5: None,
+            cos_headers: &[],
+            body: None,
+        })?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(cloud_core::CoreError::from)?;
+        parse_tagging(&body)
+    }
+
+    /// 覆盖对象标签:`PUT /{key}?tagging`,请求体为整套 TagSet(空列表即清空)。
+    pub async fn set_object_tags(
+        &self,
+        bucket: &str,
+        key: &str,
+        tags: &[(String, String)],
+    ) -> Result<()> {
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let body = build_tagging_xml(tags);
+        let request = self.build_signed(SignSpec {
+            method: Method::PUT,
+            host: &host,
+            uri_path: &uri,
+            query: &[("tagging", None)],
+            content_type: Some("application/xml"),
+            content_md5: None,
+            cos_headers: &[],
+            body: Some(Bytes::from(body)),
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 生成一个 GET 预签名 URL,`expires_in` 秒后失效。纯本地签名,不发请求。
     pub fn presign_get(&self, bucket: &str, key: &str, expires_in: u64) -> Result<String> {
         Ok(self.build_presigned_url("get", bucket, key, expires_in, now_unix()))
@@ -367,6 +410,69 @@ fn fallback_code(status: StatusCode) -> String {
         .canonical_reason()
         .unwrap_or("UnknownError")
         .replace(' ', "")
+}
+
+/// `GetObjectTagging` 响应体(XML)。
+#[derive(Debug, Deserialize)]
+struct Tagging {
+    #[serde(rename = "TagSet", default)]
+    tag_set: TagSet,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct TagSet {
+    #[serde(rename = "Tag", default)]
+    tags: Vec<TagEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TagEntry {
+    #[serde(rename = "Key")]
+    key: String,
+    #[serde(rename = "Value", default)]
+    value: String,
+}
+
+/// 解析对象标签的 XML 响应为键值对(无标签时为空)。
+fn parse_tagging(xml: &str) -> Result<Vec<(String, String)>> {
+    let doc: Tagging = quick_xml::de::from_str(xml)
+        .map_err(|e| CosError::Core(cloud_core::CoreError::InvalidResponse(e.to_string())))?;
+    Ok(doc
+        .tag_set
+        .tags
+        .into_iter()
+        .map(|t| (t.key, t.value))
+        .collect())
+}
+
+/// 生成 PutObjectTagging 的请求体 XML(空列表 → 空 TagSet)。
+fn build_tagging_xml(tags: &[(String, String)]) -> String {
+    let mut body = String::from("<Tagging><TagSet>");
+    for (k, v) in tags {
+        body.push_str("<Tag><Key>");
+        body.push_str(&xml_escape(k));
+        body.push_str("</Key><Value>");
+        body.push_str(&xml_escape(v));
+        body.push_str("</Value></Tag>");
+    }
+    body.push_str("</TagSet></Tagging>");
+    body
+}
+
+/// 转义 XML 文本中的保留字符,避免键 / 值里的 `&<>"'` 破坏文档。
+fn xml_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
