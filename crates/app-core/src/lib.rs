@@ -11,6 +11,7 @@ mod cancel;
 mod error;
 mod integrity;
 mod limits;
+mod preview;
 mod secret;
 mod settings;
 mod store;
@@ -33,6 +34,7 @@ pub use error::{AppError, Result};
 pub use integrity::{verify_bytes, Integrity};
 pub use limits::TransferLimits;
 pub use nebula_provider::{ByteStream, Capabilities, EntryKind, Page, ProgressFn};
+pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
 pub use store::{AccountRecord, AccountStore};
@@ -572,6 +574,31 @@ impl App {
         offset: u64,
     ) -> Result<(Option<u64>, ByteStream)> {
         Ok(self.provider(account)?.read_range(path, offset).await?)
+    }
+
+    /// 读取对象前若干字节并按 UTF-8 (lossy) 解码,用于文本 / 代码 / 配置文件预览。
+    /// 至多读取 `max_bytes` 字节,超出即在 [`TextPreview::truncated`] 标记。
+    pub async fn read_preview(
+        &self,
+        account: &str,
+        path: &str,
+        max_bytes: usize,
+    ) -> Result<TextPreview> {
+        use futures::StreamExt;
+        let (_, mut stream) = self.provider(account)?.read_stream(path).await?;
+        let mut buf: Vec<u8> = Vec::new();
+        let mut truncated = false;
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            if preview::accumulate(&mut buf, &chunk, max_bytes) {
+                truncated = true;
+                break;
+            }
+        }
+        Ok(TextPreview {
+            text: preview::decode(&buf),
+            truncated,
+        })
     }
 
     /// 上传 / 覆盖对象。
