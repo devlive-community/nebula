@@ -104,13 +104,19 @@ export const setStorageClassFolder = (
 export const restoreFolder = (account: string, path: string, days: number) =>
   invoke<void>("restore_folder", { account, path, days });
 
+/** 下载整个文件夹;返回因本地已存在且一致而被跳过的文件数。 */
 export const downloadFolder = (
   account: string,
   remoteRoot: string,
   localDir: string,
   transferId: string,
 ) =>
-  invoke<void>("download_folder", { account, remoteRoot, localDir, transferId });
+  invoke<number>("download_folder", {
+    account,
+    remoteRoot,
+    localDir,
+    transferId,
+  });
 
 /** 请求取消一个进行中的传输(以传输面板的 id 为键)。 */
 export const cancelTransfer = (id: string) =>
@@ -186,12 +192,19 @@ export const uploadFile = (
     contentType: contentType ?? null,
   });
 
+/** 下载一个文件;返回 true 表示本地已存在且一致、已跳过下载。 */
 export const downloadFile = (
   account: string,
   remotePath: string,
   localPath: string,
   transferId: string,
-) => invoke<void>("download_file", { account, remotePath, localPath, transferId });
+) =>
+  invoke<boolean>("download_file", {
+    account,
+    remotePath,
+    localPath,
+    transferId,
+  });
 
 /** 修改对象的内容类型(Content-Type)。 */
 export const setContentType = (

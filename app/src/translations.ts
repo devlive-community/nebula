@@ -46,6 +46,10 @@ export const EN: Record<string, string> = {
   // 预览
   "内容较大,仅预览前 256 KB。": "Large file — previewing the first 256 KB only.",
 
+  // 秒传
+  "✓ {name} 下载完成({n} 个未改动已跳过)":
+    "✓ Downloaded {name} ({n} unchanged file(s) skipped)",
+
   // 对象标签
   对象标签: "Object tags",
   标签: "Tags",

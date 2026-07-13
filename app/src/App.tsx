@@ -256,7 +256,7 @@ export default function App() {
       let skipped = false;
       if (t.kind === "上传")
         skipped = await api.uploadFile(t.account, t.remote, t.local, t.id);
-      else await api.downloadFile(t.account, t.remote, t.local, t.id);
+      else skipped = await api.downloadFile(t.account, t.remote, t.local, t.id);
       setTransfers((prev) =>
         prev[t.id]
           ? {
@@ -850,12 +850,18 @@ export default function App() {
       },
     }));
     try {
-      await api.downloadFolder(account, remote, dir, id);
+      const skipped = await api.downloadFolder(account, remote, dir, id);
       setTransfers((prev) =>
         prev[id]
           ? { ...prev, [id]: { ...prev[id], status: "done", done: prev[id].total } }
           : prev,
       );
+      if (skipped > 0) {
+        setNotice({
+          tone: "ok",
+          text: t("✓ {name} 下载完成({n} 个未改动已跳过)", { name, n: skipped }),
+        });
+      }
     } catch (e) {
       const msg = String(e);
       const cancelled = msg === "已取消";
