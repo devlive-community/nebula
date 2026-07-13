@@ -22,6 +22,26 @@ export function formatBytes(size: number): string {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** 各家云常见存储类型 → 友好中文标签;未收录的原样显示。 */
+const STORAGE_LABELS: Record<string, string> = {
+  STANDARD: "标准",
+  IA: "低频访问",
+  STANDARD_IA: "低频访问",
+  WARM: "低频 (WARM)",
+  ARCHIVE: "归档",
+  COLD: "归档 (COLD)",
+  GLACIER: "归档 (Glacier)",
+  DEEP_ARCHIVE: "深度归档",
+  COLD_ARCHIVE: "冷归档",
+  INTELLIGENT_TIERING: "智能分层",
+  REDUCED_REDUNDANCY: "低冗余",
+};
+
+/** 存储类型 → 友好标签;null / 未知回退。 */
+export function storageLabel(sc: string | null): string {
+  return sc ? (STORAGE_LABELS[sc.toUpperCase()] ?? sc) : "标准";
+}
+
 /** 人类可读的时长(秒),用于传输 ETA。非有限 / 负数返回空串。 */
 export function formatDuration(secs: number): string {
   if (!Number.isFinite(secs) || secs < 0) return "";

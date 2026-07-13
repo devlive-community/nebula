@@ -10,6 +10,7 @@ import type {
   Entry,
   FolderProgress,
   Settings,
+  StorageBreakdown,
   TransferItem,
   TransferProgress,
   UploadProgress,
@@ -42,6 +43,7 @@ import {
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
+import { StatsDialog } from "./components/StatsDialog";
 import { TransferPanel } from "./components/TransferPanel";
 import { SearchResults } from "./components/SearchResults";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -96,6 +98,8 @@ export default function App() {
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [editTypeTarget, setEditTypeTarget] = useState<Entry | null>(null);
   const [tagsTarget, setTagsTarget] = useState<Entry | null>(null);
+  const [statsTarget, setStatsTarget] = useState<Entry | null>(null);
+  const [statsData, setStatsData] = useState<StorageBreakdown | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewBucket, setShowNewBucket] = useState(false);
   const [settings, setSettings] = useState<Settings>({
@@ -1294,18 +1298,13 @@ export default function App() {
   const showFolderStats = async (entry: Entry) => {
     if (!current) return;
     setError(null);
-    const label = isBucket(entry) ? "Bucket" : "文件夹";
-    setNotice({ tone: "info", text: `正在统计${label} ${entry.name}…` });
+    setStatsTarget(entry); // 先开弹窗显示"统计中…"
+    setStatsData(null);
     try {
-      const s = await api.folderStats(current, entry.path);
-      setNotice({
-        tone: s.truncated ? "warn" : "ok",
-        text: `${entry.name}:${s.files} 个文件,共 ${formatBytes(s.bytes)}${
-          s.truncated ? "(超大目录,统计可能偏小)" : ""
-        }`,
-      });
+      const s = await api.storageBreakdown(current, entry.path);
+      setStatsData(s);
     } catch (e) {
-      setNotice(null);
+      setStatsTarget(null);
       setError(String(e));
     }
   };
@@ -1409,6 +1408,7 @@ export default function App() {
     showNewBucket ||
     !!editTypeTarget ||
     !!tagsTarget ||
+    !!statsTarget ||
     pendingBatchDelete ||
     showSettings;
 
@@ -1431,7 +1431,10 @@ export default function App() {
       else if (showNewBucket) setShowNewBucket(false);
       else if (editTypeTarget) setEditTypeTarget(null);
       else if (tagsTarget) setTagsTarget(null);
-      else if (showForm) setShowForm(false);
+      else if (statsTarget) {
+        setStatsTarget(null);
+        setStatsData(null);
+      } else if (showForm) setShowForm(false);
       else if (pendingBatchDelete) setPendingBatchDelete(false);
       else if (pendingDelete) setPendingDelete(null);
       else if (detailsEntry) setDetailsEntry(null);
@@ -1726,6 +1729,17 @@ export default function App() {
           onError={(msg) => {
             setTagsTarget(null);
             setError(msg);
+          }}
+        />
+      )}
+
+      {statsTarget && (
+        <StatsDialog
+          name={statsTarget.name}
+          data={statsData}
+          onClose={() => {
+            setStatsTarget(null);
+            setStatsData(null);
           }}
         />
       )}

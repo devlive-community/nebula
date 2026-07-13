@@ -8,7 +8,7 @@ import {
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
-import { formatBytes, formatDate, guessType } from "../util";
+import { formatBytes, formatDate, guessType, storageLabel } from "../util";
 
 interface Props {
   entry: Entry;
@@ -20,24 +20,6 @@ interface Props {
 }
 
 /** 右侧对象详情抽屉。 */
-/** 各家云常见存储类型 → 友好中文标签;未收录的原样显示。 */
-const STORAGE_LABELS: Record<string, string> = {
-  STANDARD: "标准",
-  IA: "低频访问",
-  STANDARD_IA: "低频访问",
-  WARM: "低频 (WARM)",
-  ARCHIVE: "归档",
-  COLD: "归档 (COLD)",
-  GLACIER: "归档 (Glacier)",
-  DEEP_ARCHIVE: "深度归档",
-  COLD_ARCHIVE: "冷归档",
-  INTELLIGENT_TIERING: "智能分层",
-  REDUCED_REDUNDANCY: "低冗余",
-};
-
-const storageLabel = (sc: string | null): string =>
-  sc ? (STORAGE_LABELS[sc.toUpperCase()] ?? sc) : "标准";
-
 export function FileDetails({
   entry,
   onClose,

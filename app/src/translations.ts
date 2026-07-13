@@ -43,6 +43,14 @@ export const EN: Record<string, string> = {
   "过滤当前目录 / 回车递归搜索…": "Filter here / Enter to search…",
   "处理中…": "Working…",
 
+  // 统计
+  "统计中…": "Calculating…",
+  存储类型: "Storage class",
+  文件数: "Files",
+  占比: "Share",
+  "共 {files} 个文件 · {size}": "{files} files · {size}",
+  "(超大目录,统计可能偏小)": "(very large — count may be low)",
+
   // 预览
   "内容较大,仅预览前 256 KB。": "Large file — previewing the first 256 KB only.",
 
