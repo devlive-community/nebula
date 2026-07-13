@@ -111,6 +111,21 @@ export interface FolderStats {
   truncated: boolean;
 }
 
+/** 单个存储类型的小计(与 Rust 端 app_core::ClassStat 对应)。 */
+export interface ClassStat {
+  class: string;
+  files: number;
+  bytes: number;
+}
+
+/** 存储类型分布(与 Rust 端 app_core::StorageBreakdown 对应)。 */
+export interface StorageBreakdown {
+  files: number;
+  bytes: number;
+  classes: ClassStat[];
+  truncated: boolean;
+}
+
 /** 递归搜索结果(与 Rust 端 app_core::SearchResult 对应)。 */
 export interface SearchResult {
   entries: Entry[];

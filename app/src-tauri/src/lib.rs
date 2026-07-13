@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, FolderStats, Integrity, Page, SearchResult, Settings, TextPreview,
-    TransferRecord,
+    AccountInfo, App, FolderStats, Integrity, Page, SearchResult, Settings, StorageBreakdown,
+    TextPreview, TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -537,6 +537,19 @@ async fn folder_stats(
 ) -> Result<FolderStats, String> {
     let app = state.inner().clone();
     app.folder_stats(&account, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 统计文件夹 / Bucket 下对象按存储类型的分布。
+#[tauri::command]
+async fn storage_breakdown(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<StorageBreakdown, String> {
+    let app = state.inner().clone();
+    app.storage_breakdown(&account, &path)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1201,6 +1214,7 @@ pub fn run() {
             set_object_tags,
             read_preview,
             folder_stats,
+            storage_breakdown,
             rename,
             copy,
             set_storage_class,
