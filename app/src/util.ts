@@ -65,11 +65,16 @@ const TEXT_EXTS = new Set([
 ]);
 
 /** 判断文件是否可预览,返回预览类型或 null。SVG 归为图片(可渲染)。 */
-export function previewKind(name: string): "image" | "video" | "text" | null {
+export function previewKind(
+  name: string,
+): "image" | "video" | "audio" | "pdf" | "text" | null {
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"].includes(ext))
     return "image";
   if (["mp4", "webm", "mov", "m4v", "ogg"].includes(ext)) return "video";
+  if (["mp3", "wav", "flac", "m4a", "aac", "opus", "oga", "wma"].includes(ext))
+    return "audio";
+  if (ext === "pdf") return "pdf";
   // 无扩展名时按常见文件名兜底(Dockerfile / Makefile 等)。
   const base = name.toLowerCase();
   if (TEXT_EXTS.has(ext) || TEXT_EXTS.has(base)) return "text";

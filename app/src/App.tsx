@@ -112,7 +112,7 @@ export default function App() {
   );
   const [preview, setPreview] = useState<{
     name: string;
-    kind: "image" | "video" | "text";
+    kind: "image" | "video" | "audio" | "pdf" | "text";
     url?: string;
     text?: string;
     truncated?: boolean;

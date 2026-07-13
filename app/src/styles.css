@@ -732,6 +732,32 @@ body.resizing {
   width: min(860px, 90vw);
 }
 
+/* PDF 预览:占满可用空间 */
+.preview--pdf {
+  width: min(1000px, 92vw);
+  height: 90vh;
+}
+
+.preview__pdf {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
+}
+
+/* 音频预览:紧凑居中的播放条 */
+.preview--audio {
+  width: min(460px, 90vw);
+}
+
+.preview__audio {
+  padding: 22px 18px;
+}
+
+.preview__audio audio {
+  width: 100%;
+}
+
 .preview__textwrap {
   overflow: auto;
   max-height: calc(90vh - 44px);

@@ -4,14 +4,14 @@ import { useI18n } from "../i18n";
 
 interface Props {
   name: string;
-  kind: "image" | "video" | "text";
+  kind: "image" | "video" | "audio" | "pdf" | "text";
   url?: string;
   text?: string;
   truncated?: boolean;
   onClose: () => void;
 }
 
-/** 对象预览弹窗:图片 / 视频用预签名链接加载,文本类展示后端读回的内容。 */
+/** 对象预览弹窗:图片 / 视频 / 音频 / PDF 用预签名链接加载,文本类展示后端读回的内容。 */
 export function PreviewModal({
   name,
   kind,
@@ -24,7 +24,15 @@ export function PreviewModal({
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className={`preview ${kind === "text" ? "preview--text" : ""}`}
+        className={`preview ${
+          kind === "text"
+            ? "preview--text"
+            : kind === "pdf"
+              ? "preview--pdf"
+              : kind === "audio"
+                ? "preview--audio"
+                : ""
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="preview__bar">
@@ -37,6 +45,12 @@ export function PreviewModal({
           <img className="preview__media" src={url} alt={name} />
         ) : kind === "video" ? (
           <video className="preview__media" src={url} controls autoPlay />
+        ) : kind === "audio" ? (
+          <div className="preview__audio">
+            <audio src={url} controls autoPlay />
+          </div>
+        ) : kind === "pdf" ? (
+          <iframe className="preview__pdf" src={url} title={name} />
         ) : (
           <div className="preview__textwrap">
             <pre className="preview__text">{text}</pre>
