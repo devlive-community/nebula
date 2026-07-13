@@ -908,6 +908,38 @@ impl App {
         Ok(())
     }
 
+    /// 把整个文件夹 `src_root` 复制到 `dst_root`(同账号,保留源)。逐个文件服务端复制到新前缀;
+    /// `progress(已处理, 总数)`,可取消。目标不得为源自身或其子目录(否则无限自我复制)。
+    pub async fn copy_folder(
+        &self,
+        account: &str,
+        src_root: &str,
+        dst_root: &str,
+        cancel: Arc<AtomicBool>,
+        progress: ProgressFn<'_>,
+    ) -> Result<()> {
+        let src_base = ensure_trailing_slash(src_root);
+        let dst_base = ensure_trailing_slash(dst_root);
+        if is_within(&src_base, &dst_base) {
+            return Err(AppError::InvalidInput(
+                "目标目录不能是源目录自身或其子目录".into(),
+            ));
+        }
+        let provider = self.provider(account)?;
+        let files = walk_dir(&provider, src_root).await?.0;
+        let total = files.len() as u64;
+        for (i, file) in files.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(AppError::Cancelled);
+            }
+            let rel = file.path.strip_prefix(&src_base).unwrap_or(&file.path);
+            let dst_path = format!("{dst_base}{rel}");
+            provider.copy(&file.path, &dst_path).await?;
+            progress((i + 1) as u64, total);
+        }
+        Ok(())
+    }
+
     /// 递归删除 `root` 下所有对象(文件 + 目录占位对象)。`progress(已删数, 总数)`。
     ///
     /// 对象存储的 DELETE 是幂等的,合成前缀(无实体占位对象)删除也安全,故一并清理目录占位,
@@ -1470,6 +1502,35 @@ mod tests {
         assert!(deleted.contains(&"b/photos/cat.jpg".to_string()));
         assert!(deleted.contains(&"b/photos/dog.png".to_string()));
         assert!(deleted.contains(&"b/photos/".to_string())); // 源目录占位也清掉
+    }
+
+    #[tokio::test]
+    async fn copy_folder_duplicates_to_new_prefix_without_deleting() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+
+        app.copy_folder(
+            "rec",
+            "b/photos",
+            "b/photos-copy",
+            Arc::new(AtomicBool::new(false)),
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
+
+        let mut copied = rec.copied.lock().unwrap().clone();
+        copied.sort();
+        assert_eq!(
+            copied,
+            [
+                ("b/photos/cat.jpg".into(), "b/photos-copy/cat.jpg".into()),
+                ("b/photos/dog.png".into(), "b/photos-copy/dog.png".into()),
+            ]
+        );
+        // 复制不删除源。
+        assert!(rec.deleted.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
