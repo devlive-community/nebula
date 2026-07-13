@@ -7,6 +7,7 @@
 //! Tauri 外壳(`app/src-tauri`)只是把这里的方法包成 `#[tauri::command]`,因此这些
 //! 逻辑可以完全用 `cargo test` 覆盖,无需启动 GUI。
 
+mod breakdown;
 mod cancel;
 mod dedup;
 mod error;
@@ -31,6 +32,7 @@ use provider_qiniu::QiniuProvider;
 use provider_r2::R2Provider;
 use provider_tencent::TencentProvider;
 
+pub use breakdown::{ClassStat, StorageBreakdown};
 pub use error::{AppError, Result};
 pub use integrity::{verify_bytes, Integrity};
 pub use limits::TransferLimits;
@@ -811,6 +813,43 @@ impl App {
             }
         }
         Ok(stats)
+    }
+
+    /// 统计 `root` 下对象按存储类型的分布(标准 / 低频 / 归档各多少个、多大),
+    /// 与 [`folder_stats`](Self::folder_stats) 同源遍历,`SEARCH_SCAN_LIMIT` 兜底。
+    pub async fn storage_breakdown(&self, account: &str, root: &str) -> Result<StorageBreakdown> {
+        let provider = self.provider(account)?;
+        let mut result = StorageBreakdown::default();
+        let mut tally = breakdown::ClassTally::default();
+        let mut scanned = 0usize;
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(root.to_string());
+        'walk: while let Some(dir) = queue.pop_front() {
+            let mut cursor = None;
+            loop {
+                let page = provider.list_page(&dir, cursor).await?;
+                for entry in page.entries {
+                    scanned += 1;
+                    if entry.is_dir() {
+                        queue.push_back(entry.path);
+                    } else {
+                        result.files += 1;
+                        result.bytes += entry.size;
+                        tally.add(entry.storage_class.as_deref(), entry.size);
+                    }
+                }
+                if scanned >= SEARCH_SCAN_LIMIT {
+                    result.truncated = true;
+                    break 'walk;
+                }
+                match page.cursor {
+                    Some(next) => cursor = Some(next),
+                    None => break,
+                }
+            }
+        }
+        result.classes = tally.into_sorted();
+        Ok(result)
     }
 
     /// 递归列出 `root`(桶 / 前缀)下的所有文件(不含目录占位)。
