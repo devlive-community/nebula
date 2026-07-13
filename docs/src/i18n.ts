@@ -24,7 +24,7 @@ const messages = {
       title: '一个应用,搞定云上文件',
       items: {
         multicloud: {title: '多云统一', desc: '一套界面管理多云对象存储,连 Bucket 的新建 / 删除都统一;新增厂商实现一个接口即可,界面零改动。'},
-        browse: {title: '高效浏览', desc: '目录逐层展开、列表 / 网格视图、排序过滤、图片视频预览、文件夹 / Bucket 大小统计;对象详情含存储类型、真实 Content-Type(可改)与可读写的对象标签,单个对象或整个文件夹都能转换存储层、取回归档。'},
+        browse: {title: '高效浏览', desc: '目录逐层展开、列表 / 网格视图、排序过滤、图片视频与文本 / 代码 / 配置文件预览、文件夹 / Bucket 大小统计;对象详情含存储类型、真实 Content-Type(可改)与可读写的对象标签,单个对象或整个文件夹都能转换存储层、取回归档。'},
         upload: {title: '上传无忧', desc: '拖拽文件或整个文件夹、多选上传;大文件并发分片、断点续传,可随时取消,进度、并发、失败重试尽在掌握。'},
         download: {title: '流式下载', desc: '边下边写,大文件不占内存;支持断点续传、整文件夹递归下载,每个任务独立进度(含速度与剩余时间),可设全局带宽限速。'},
         migrate: {title: '跨云迁移', desc: '把对象或整个文件夹从一个账号搬到另一个账号,任意云到任意云;同账号走服务端复制,跨账号自动中转。'},
@@ -77,7 +77,7 @@ const messages = {
       title: 'One app for your cloud files',
       items: {
         multicloud: {title: 'Multi-cloud', desc: 'Manage object storage from one UI, down to creating and deleting buckets; add a vendor by implementing a single trait — no UI changes.'},
-        browse: {title: 'Fast browsing', desc: 'Drill into folders, list / grid views, sort and filter, image & video preview, folder / bucket size stats; object details incl. storage class, the real Content-Type (editable) and read/write object tags, with tier transition and archive restore for a single object or a whole folder.'},
+        browse: {title: 'Fast browsing', desc: 'Drill into folders, list / grid views, sort and filter, image / video and text / code / config previews, folder / bucket size stats; object details incl. storage class, the real Content-Type (editable) and read/write object tags, with tier transition and archive restore for a single object or a whole folder.'},
         upload: {title: 'Effortless upload', desc: 'Drag files or whole folders, multi-select; large files upload in concurrent chunks, resume after interruption, cancel anytime, with progress and retries.'},
         download: {title: 'Streaming download', desc: 'Stream to disk without buffering huge files; resumable downloads, whole-folder recursive download, per-task progress (with speed and ETA), and an optional global bandwidth cap.'},
         migrate: {title: 'Cross-cloud migration', desc: 'Move objects or entire folders from one account to another, any cloud to any cloud; same-account uses server-side copy, cross-account relays automatically.'},
