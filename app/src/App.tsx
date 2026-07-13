@@ -41,6 +41,7 @@ import {
 } from "./components/StorageClassDialog";
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
+import { TagsDialog } from "./components/TagsDialog";
 import { TransferPanel } from "./components/TransferPanel";
 import { SearchResults } from "./components/SearchResults";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -94,6 +95,7 @@ export default function App() {
   } | null>(null);
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [editTypeTarget, setEditTypeTarget] = useState<Entry | null>(null);
+  const [tagsTarget, setTagsTarget] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewBucket, setShowNewBucket] = useState(false);
   const [settings, setSettings] = useState<Settings>({
@@ -1288,6 +1290,7 @@ export default function App() {
     showNewFolder ||
     showNewBucket ||
     !!editTypeTarget ||
+    !!tagsTarget ||
     pendingBatchDelete ||
     showSettings;
 
@@ -1309,6 +1312,7 @@ export default function App() {
       else if (showNewFolder) setShowNewFolder(false);
       else if (showNewBucket) setShowNewBucket(false);
       else if (editTypeTarget) setEditTypeTarget(null);
+      else if (tagsTarget) setTagsTarget(null);
       else if (showForm) setShowForm(false);
       else if (pendingBatchDelete) setPendingBatchDelete(false);
       else if (pendingDelete) setPendingDelete(null);
@@ -1475,6 +1479,7 @@ export default function App() {
                 onDownload={download}
                 onShare={share}
                 onEditType={setEditTypeTarget}
+                onEditTags={setTagsTarget}
               />
             )}
 
@@ -1581,6 +1586,29 @@ export default function App() {
           submitLabel={t("保存")}
           onSubmit={doSetContentType}
           onCancel={() => setEditTypeTarget(null)}
+        />
+      )}
+
+      {tagsTarget && current && (
+        <TagsDialog
+          account={current}
+          path={tagsTarget.path}
+          name={tagsTarget.name}
+          onSaved={(tags) => {
+            setTagsTarget(null);
+            setNotice({
+              tone: "ok",
+              text: t("✓ {name} 标签已保存({n})", {
+                name: tagsTarget.name,
+                n: tags.length,
+              }),
+            });
+          }}
+          onCancel={() => setTagsTarget(null)}
+          onError={(msg) => {
+            setTagsTarget(null);
+            setError(msg);
+          }}
         />
       )}
 

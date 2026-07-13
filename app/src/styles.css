@@ -1295,6 +1295,65 @@ body.resizing {
   border-color: var(--primary);
 }
 
+/* 对象标签编辑器 */
+.tags__hint {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 4px 0 10px;
+}
+
+.tags__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tags__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tags__key {
+  flex: 0 0 38%;
+}
+
+.tags__val {
+  flex: 1;
+}
+
+.tags__remove {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.tags__remove:hover {
+  color: var(--danger);
+  background: var(--bg);
+}
+
+.tags__add {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 7px 11px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.tags__add:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
 .btn--danger {
   background: var(--danger);
   border-color: var(--danger);

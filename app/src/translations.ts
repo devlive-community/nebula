@@ -43,6 +43,16 @@ export const EN: Record<string, string> = {
   "过滤当前目录 / 回车递归搜索…": "Filter here / Enter to search…",
   "处理中…": "Working…",
 
+  // 对象标签
+  对象标签: "Object tags",
+  标签: "Tags",
+  "暂无标签,点下方添加。": "No tags yet — add one below.",
+  键: "Key",
+  值: "Value",
+  移除: "Remove",
+  添加标签: "Add tag",
+  "✓ {name} 标签已保存({n})": "✓ Saved {n} tag(s) on {name}",
+
   // 列表 / 状态栏
   名称: "Name",
   大小: "Size",

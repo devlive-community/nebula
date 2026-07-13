@@ -4,6 +4,7 @@ import {
   faFile,
   faLink,
   faPen,
+  faTags,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
@@ -15,6 +16,7 @@ interface Props {
   onDownload: (entry: Entry) => void;
   onShare: (entry: Entry) => void;
   onEditType: (entry: Entry) => void;
+  onEditTags: (entry: Entry) => void;
 }
 
 /** 右侧对象详情抽屉。 */
@@ -42,6 +44,7 @@ export function FileDetails({
   onDownload,
   onShare,
   onEditType,
+  onEditTags,
 }: Props) {
   // 有真实 Content-Type 就显示它,否则按文件名推测。
   const contentType = entry.content_type ?? guessType(entry.name);
@@ -102,6 +105,9 @@ export function FileDetails({
         </button>
         <button className="btn" onClick={() => onShare(entry)}>
           <FontAwesomeIcon icon={faLink} /> 分享链接
+        </button>
+        <button className="btn" onClick={() => onEditTags(entry)}>
+          <FontAwesomeIcon icon={faTags} /> 标签
         </button>
       </div>
     </div>
