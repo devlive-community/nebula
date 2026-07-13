@@ -43,8 +43,11 @@ where
 
 /// OSS 签名中被视为"子资源"、需计入 CanonicalizedResource 的参数键。
 ///
-/// 只列当前用到的项(分片上传相关);后续需要 `acl`、`lifecycle` 等再扩充。
-const SUBRESOURCE_KEYS: &[&str] = &["uploads", "uploadId", "partNumber"];
+/// 必须涵盖所有我们会发出的子资源:分片上传(`uploads`/`uploadId`/`partNumber`)、
+/// 对象标签(`tagging`)、归档取回(`restore`)。漏掉任何一个都会导致我们签名时把它从
+/// CanonicalizedResource 里过滤掉,而请求 URL 仍带着它 → 服务端算出不同签名 → 签名不匹配。
+/// 后续需要 `acl`、`lifecycle` 等再补。
+const SUBRESOURCE_KEYS: &[&str] = &["uploads", "uploadId", "partNumber", "tagging", "restore"];
 
 /// 构造带子资源的 CanonicalizedResource,如 `/bucket/key?partNumber=1&uploadId=xxx`。
 ///
@@ -175,6 +178,19 @@ mod tests {
     fn canonicalized_resource_without_subresources() {
         let got = canonicalized_resource("b", "k", &[("prefix", Some("x"))]);
         assert_eq!(got, "/b/k");
+    }
+
+    #[test]
+    fn canonicalized_resource_signs_tagging_and_restore() {
+        // 回归:标签 / 归档取回的子资源必须计入签名,否则签名不匹配。
+        assert_eq!(
+            canonicalized_resource("b", "k", &[("tagging", None)]),
+            "/b/k?tagging"
+        );
+        assert_eq!(
+            canonicalized_resource("b", "k", &[("restore", None)]),
+            "/b/k?restore"
+        );
     }
 
     #[test]
