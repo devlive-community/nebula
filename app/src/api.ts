@@ -142,6 +142,14 @@ export const migrateFolder = (
     transferId,
   });
 
+/** 移动 / 重命名整个文件夹到新的完整路径(同账号)。 */
+export const moveFolder = (
+  account: string,
+  srcRoot: string,
+  dstRoot: string,
+  transferId: string,
+) => invoke<void>("move_folder", { account, srcRoot, dstRoot, transferId });
+
 export const deleteFolder = (account: string, path: string) =>
   invoke<void>("delete_folder", { account, path });
 
