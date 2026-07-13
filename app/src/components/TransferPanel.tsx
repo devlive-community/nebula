@@ -67,7 +67,9 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
                 : i.status === "interrupted"
                   ? t("已中断")
                   : i.status === "done"
-                    ? t("完成")
+                    ? i.skipped
+                      ? t("已跳过")
+                      : t("完成")
                     : active;
           return (
             <div className="transfers__item" key={i.id}>

@@ -170,6 +170,7 @@ export const search = (
     maxResults,
   });
 
+/** 上传一个文件;返回 true 表示远端内容一致、已秒传跳过。 */
 export const uploadFile = (
   account: string,
   remotePath: string,
@@ -177,7 +178,7 @@ export const uploadFile = (
   transferId: string,
   contentType?: string,
 ) =>
-  invoke<void>("upload_file", {
+  invoke<boolean>("upload_file", {
     account,
     remotePath,
     localPath,

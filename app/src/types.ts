@@ -77,6 +77,8 @@ export interface TransferItem {
   /** 迁移的源端账号 / 路径,供面板内重试再次发起(仅本会话;不持久化,重启后为空)。 */
   srcAccount?: string;
   srcPath?: string;
+  /** 上传因远端内容一致而被秒传跳过。 */
+  skipped?: boolean;
 }
 
 /** 文本预览结果(与 Rust 端 app_core::TextPreview 对应)。 */

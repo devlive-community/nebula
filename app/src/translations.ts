@@ -88,6 +88,7 @@ export const EN: Record<string, string> = {
   已取消: "Cancelled",
   已中断: "Interrupted",
   完成: "Done",
+  已跳过: "Skipped",
   迁移: "Migrate",
   迁移文件夹: "Migrate folder",
   重命名文件夹: "Rename folder",

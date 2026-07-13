@@ -313,13 +313,22 @@ async fn upload_file(
     remote_path: String,
     local_path: String,
     content_type: Option<String>,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let core = state.inner().clone();
     let cancel = transfers.begin(&transfer_id);
     let _guard = CancelGuard {
         transfers: transfers.inner(),
         id: transfer_id.clone(),
     };
+
+    // 秒传:远端已存在且内容与本地一致(ETag = 本地 MD5)则跳过上传,返回 skipped=true。
+    if core
+        .is_unchanged(&account, &remote_path, &local_path)
+        .await
+        .unwrap_or(false)
+    {
+        return Ok(true);
+    }
 
     let event_path = remote_path.clone();
     let progress = move |uploaded: u64, total: u64| {
@@ -346,7 +355,8 @@ async fn upload_file(
     .map_err(|e| match e {
         app_core::AppError::Cancelled => "已取消".to_string(),
         other => other.to_string(),
-    })
+    })?;
+    Ok(false)
 }
 
 /// 流式下载远端对象到本地路径,边写边发 `download-progress` 事件。

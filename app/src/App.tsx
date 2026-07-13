@@ -253,12 +253,21 @@ export default function App() {
       [t.id]: { ...t, done: 0, total: 0, status: "active" },
     }));
     try {
+      let skipped = false;
       if (t.kind === "上传")
-        await api.uploadFile(t.account, t.remote, t.local, t.id);
+        skipped = await api.uploadFile(t.account, t.remote, t.local, t.id);
       else await api.downloadFile(t.account, t.remote, t.local, t.id);
       setTransfers((prev) =>
         prev[t.id]
-          ? { ...prev, [t.id]: { ...prev[t.id], status: "done", done: prev[t.id].total } }
+          ? {
+              ...prev,
+              [t.id]: {
+                ...prev[t.id],
+                status: "done",
+                done: prev[t.id].total,
+                skipped,
+              },
+            }
           : prev,
       );
     } catch (e) {
