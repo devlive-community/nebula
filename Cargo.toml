@@ -58,7 +58,7 @@ bytes = "1"
 futures = "0.3"
 
 [workspace.package]
-version = "1.6.0"
+version = "1.7.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/devlive-community/nebula"
