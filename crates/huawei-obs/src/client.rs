@@ -26,6 +26,9 @@ pub struct ObsClient {
     secret_key: String,
     /// 区域 endpoint,如 `obs.cn-north-4.myhuaweicloud.com`(不含协议与 bucket)。
     endpoint: String,
+    /// 每个桶实际所在区域的 endpoint(OBS 各桶按区域分 endpoint)。列举桶时从 Location 填充,
+    /// 之后该桶请求路由到正确 endpoint。V2 签名与 endpoint 无关,故只需改 URL host。
+    bucket_endpoints: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
     http: HttpClient,
 }
 
@@ -43,7 +46,18 @@ impl ObsClient {
             access_key: access_key.into(),
             secret_key: secret_key.into(),
             endpoint: normalize_endpoint(&endpoint.into()),
+            bucket_endpoints: Default::default(),
             http: HttpClient::new(),
+        }
+    }
+
+    /// 记录某个桶的真实 endpoint(列举桶时调用),之后该桶请求路由到此 endpoint。
+    pub(crate) fn cache_bucket_endpoint(&self, bucket: &str, endpoint: &str) {
+        if !endpoint.is_empty() {
+            self.bucket_endpoints
+                .lock()
+                .unwrap()
+                .insert(bucket.to_string(), normalize_endpoint(endpoint));
         }
     }
 
@@ -86,7 +100,14 @@ impl ObsClient {
     /// 拼出某个 bucket 的虚拟托管域名根 URL,如
     /// `https://my-bucket.obs.cn-north-4.myhuaweicloud.com`。
     pub fn bucket_base_url(&self, bucket: &str) -> String {
-        format!("https://{bucket}.{}", self.endpoint)
+        let endpoint = self
+            .bucket_endpoints
+            .lock()
+            .unwrap()
+            .get(bucket)
+            .cloned()
+            .unwrap_or_else(|| self.endpoint.clone());
+        format!("https://{bucket}.{endpoint}")
     }
 }
 
@@ -140,6 +161,16 @@ mod tests {
         assert_eq!(
             c.bucket_base_url("my-bucket"),
             "https://my-bucket.obs.cn-north-4.myhuaweicloud.com"
+        );
+    }
+
+    #[test]
+    fn bucket_base_url_uses_cached_region_endpoint() {
+        let c = ObsClient::new("id", "secret", "obs.cn-north-4.myhuaweicloud.com");
+        c.cache_bucket_endpoint("b", "obs.cn-east-3.myhuaweicloud.com");
+        assert_eq!(
+            c.bucket_base_url("b"),
+            "https://b.obs.cn-east-3.myhuaweicloud.com"
         );
     }
 }

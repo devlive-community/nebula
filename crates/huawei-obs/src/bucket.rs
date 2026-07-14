@@ -284,10 +284,21 @@ impl ObsClient {
             .buckets
             .bucket
             .into_iter()
-            .map(|b| BucketSummary {
-                name: b.name,
-                location: b.location,
-                creation_date: b.creation_date,
+            .map(|b| {
+                // 缓存桶 → 区域 endpoint(据 Location 推导),之后访问该桶自动路由到正确区域。
+                if !b.location.is_empty() {
+                    let endpoint = if b.location.contains(".myhuaweicloud.com") {
+                        b.location.clone()
+                    } else {
+                        format!("obs.{}.myhuaweicloud.com", b.location)
+                    };
+                    self.cache_bucket_endpoint(&b.name, &endpoint);
+                }
+                BucketSummary {
+                    name: b.name,
+                    location: b.location,
+                    creation_date: b.creation_date,
+                }
             })
             .collect())
     }

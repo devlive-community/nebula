@@ -47,6 +47,9 @@ pub struct CosClient {
     secret_key: String,
     /// 区域 endpoint,如 `cos.ap-beijing.myqcloud.com`(不含协议与 bucket)。
     endpoint: String,
+    /// 每个桶实际所在区域的 endpoint(COS 各桶按区域分 endpoint)。列举桶时从 Location 填充,
+    /// 之后该桶请求路由到正确区域(q-sign 会对所用 host 签名,故 host 一致即签名一致)。
+    bucket_endpoints: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
     http: HttpClient,
 }
 
@@ -61,7 +64,18 @@ impl CosClient {
             secret_id: secret_id.into(),
             secret_key: secret_key.into(),
             endpoint: normalize_endpoint(&endpoint.into()),
+            bucket_endpoints: Default::default(),
             http: HttpClient::new(),
+        }
+    }
+
+    /// 记录某个桶的真实 endpoint(列举桶时调用),之后该桶请求路由到此 endpoint。
+    pub(crate) fn cache_bucket_endpoint(&self, bucket: &str, endpoint: &str) {
+        if !endpoint.is_empty() {
+            self.bucket_endpoints
+                .lock()
+                .unwrap()
+                .insert(bucket.to_string(), normalize_endpoint(endpoint));
         }
     }
 
@@ -85,9 +99,16 @@ impl CosClient {
     }
 
     /// 某个 bucket 的虚拟托管主机名,如 `bkt-123.cos.ap-beijing.myqcloud.com`。
-    /// COS 的 bucket 名自带 appid(`{name}-{appid}`)。
+    /// COS 的 bucket 名自带 appid(`{name}-{appid}`)。有缓存则用桶自己的区域 endpoint。
     pub fn bucket_host(&self, bucket: &str) -> String {
-        format!("{bucket}.{}", self.endpoint)
+        let endpoint = self
+            .bucket_endpoints
+            .lock()
+            .unwrap()
+            .get(bucket)
+            .cloned()
+            .unwrap_or_else(|| self.endpoint.clone());
+        format!("{bucket}.{endpoint}")
     }
 
     /// 列桶的 service 主机名。
@@ -210,6 +231,16 @@ mod tests {
         assert_eq!(
             c.bucket_host("bkt-123"),
             "bkt-123.cos.ap-beijing.myqcloud.com"
+        );
+    }
+
+    #[test]
+    fn bucket_host_uses_cached_region_endpoint() {
+        let c = CosClient::new("i", "k", "cos.ap-beijing.myqcloud.com");
+        c.cache_bucket_endpoint("bkt-123", "cos.ap-guangzhou.myqcloud.com");
+        assert_eq!(
+            c.bucket_host("bkt-123"),
+            "bkt-123.cos.ap-guangzhou.myqcloud.com"
         );
     }
 
