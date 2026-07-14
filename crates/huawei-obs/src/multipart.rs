@@ -643,6 +643,48 @@ mod tests {
     }
 
     #[test]
+    fn tagging_request_signs_the_tagging_subresource() {
+        // 回归:GET ?tagging 的 URL 与签名的 CanonicalizedResource 都应带 `?tagging`,
+        // 且对象名按编码后路径签名。
+        let client = test_client();
+        let date = "Thu, 17 Nov 2005 18:49:58 GMT";
+        let req = client
+            .build_part_request(
+                "examplebucket",
+                PartRequest {
+                    method: Method::GET,
+                    key: "dir/照片 1.jpg",
+                    subresources: &[("tagging", None)],
+                    content_type: None,
+                    content_md5: None,
+                    body: None,
+                },
+                date,
+            )
+            .unwrap();
+
+        // URL 路径编码,查询保留 ?tagging。
+        assert!(req.url().as_str().ends_with("?tagging"));
+        assert!(req
+            .url()
+            .as_str()
+            .contains("/dir/%E7%85%A7%E7%89%87%201.jpg?tagging"));
+        // 签名针对编码后的资源路径 + tagging 子资源。
+        let sts = sign::string_to_sign(
+            "GET",
+            "",
+            "",
+            date,
+            "",
+            "/examplebucket/dir/%E7%85%A7%E7%89%87%201.jpg?tagging",
+        );
+        assert_eq!(
+            req.headers().get(AUTHORIZATION).unwrap().to_str().unwrap(),
+            sign::authorization(client.access_key(), client.secret_key(), &sts)
+        );
+    }
+
+    #[test]
     fn complete_body_is_sorted_xml() {
         let parts = vec![
             (2, "\"E2\"".to_string()),
