@@ -159,7 +159,7 @@ impl OssClient {
             ("x-oss-metadata-directive", "COPY"),
             ("x-oss-storage-class", class),
         ]);
-        let canonical = format!("/{bucket}/{key}");
+        let canonical = format!("/{bucket}/{}", encode_key(key));
         let sts = sign::string_to_sign("PUT", "", "", &date, &oss_headers, &canonical);
         let authorization =
             sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
@@ -193,7 +193,7 @@ impl OssClient {
             ("x-oss-copy-source", copy_source.as_str()),
             ("x-oss-metadata-directive", "REPLACE"),
         ]);
-        let canonical = format!("/{bucket}/{key}");
+        let canonical = format!("/{bucket}/{}", encode_key(key));
         // Content-Type 计入 StringToSign 的 Content-Type 行。
         let sts = sign::string_to_sign("PUT", "", content_type, &date, &oss_headers, &canonical);
         let authorization =
@@ -229,7 +229,7 @@ impl OssClient {
         // x-oss-copy-source 属于 x-oss- 头,需计入 CanonicalizedOSSHeaders。
         let oss_headers =
             sign::canonicalized_oss_headers([("x-oss-copy-source", copy_source.as_str())]);
-        let canonical = format!("/{dst_bucket}/{dst_key}");
+        let canonical = format!("/{dst_bucket}/{}", encode_key(dst_key));
         let sts = sign::string_to_sign("PUT", "", "", date, &oss_headers, &canonical);
         let authorization =
             sign::authorization(self.access_key_id(), self.access_key_secret(), &sts);
@@ -277,7 +277,7 @@ impl OssClient {
         expiration: u64,
     ) -> Result<String> {
         // 预签名的 StringToSign 用 Expires 顶替 Date 那一行。
-        let canonical = format!("/{bucket}/{key}");
+        let canonical = format!("/{bucket}/{}", encode_key(key));
         let sts = sign::string_to_sign(method, "", "", &expiration.to_string(), "", &canonical);
         let signature = sign::signature(self.access_key_secret(), &sts);
 
@@ -325,7 +325,7 @@ impl OssClient {
         payload: Payload<'_>,
         date: &str,
     ) -> Result<Request> {
-        let canonical_resource = format!("/{bucket}/{key}");
+        let canonical_resource = format!("/{bucket}/{}", encode_key(key));
         let sts = sign::string_to_sign(
             method.as_str(),
             payload.content_md5.unwrap_or(""),
@@ -548,6 +548,30 @@ mod tests {
 
         // 独立按预签名规则算出期望签名(Expires 顶替 Date)。
         let sts = sign::string_to_sign("GET", "", "", "1234567890", "", "/oss-example/nelson");
+        let expected = sign::signature(client.access_key_secret(), &sts);
+        assert_eq!(params.get("Signature").unwrap(), &expected);
+    }
+
+    #[test]
+    fn presign_signs_the_percent_encoded_object_path() {
+        // 回归:含空格 / 特殊字符的 key,CanonicalizedResource 必须用编码后的路径,
+        // 否则签名与服务端(按未解码的 URL 路径计算)不匹配 → SignatureDoesNotMatch。
+        let client = test_client();
+        let url = client
+            .build_presigned_url("GET", "oss-example", "dir/a b.txt", 1_234_567_890)
+            .unwrap();
+        let parsed = Url::parse(&url).unwrap();
+        let params: std::collections::HashMap<_, _> = parsed.query_pairs().into_owned().collect();
+
+        // 期望签名针对**编码后**的资源路径 /oss-example/dir/a%20b.txt 计算。
+        let sts = sign::string_to_sign(
+            "GET",
+            "",
+            "",
+            "1234567890",
+            "",
+            "/oss-example/dir/a%20b.txt",
+        );
         let expected = sign::signature(client.access_key_secret(), &sts);
         assert_eq!(params.get("Signature").unwrap(), &expected);
     }
