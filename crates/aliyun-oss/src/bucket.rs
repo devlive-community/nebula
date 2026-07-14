@@ -297,12 +297,24 @@ impl OssClient {
             .buckets
             .bucket
             .into_iter()
-            .map(|b| BucketSummary {
-                name: b.name,
-                location: b.location,
-                creation_date: b.creation_date,
-                storage_class: b.storage_class,
-                endpoint: b.extranet_endpoint,
+            .map(|b| {
+                // 缓存桶 → 区域 endpoint(优先外网 endpoint,否则据 Location 推导),
+                // 之后访问该桶自动路由到正确区域,避免「必须用指定 endpoint 访问」的错误。
+                let endpoint = if !b.extranet_endpoint.is_empty() {
+                    b.extranet_endpoint.clone()
+                } else if !b.location.is_empty() {
+                    format!("{}.aliyuncs.com", b.location)
+                } else {
+                    String::new()
+                };
+                self.cache_bucket_endpoint(&b.name, &endpoint);
+                BucketSummary {
+                    name: b.name,
+                    location: b.location,
+                    creation_date: b.creation_date,
+                    storage_class: b.storage_class,
+                    endpoint: b.extranet_endpoint,
+                }
             })
             .collect();
         Ok(Page { items, next })

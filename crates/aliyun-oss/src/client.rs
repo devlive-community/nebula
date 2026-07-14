@@ -26,6 +26,10 @@ pub struct OssClient {
     access_key_secret: String,
     /// 区域 endpoint,如 `oss-cn-hangzhou.aliyuncs.com`(不含协议与 bucket)。
     endpoint: String,
+    /// 每个桶实际所在区域的 endpoint(OSS 各桶按区域分 endpoint,访问必须用对应 endpoint)。
+    /// 列举桶时从响应的 ExtranetEndpoint / Location 填充,之后该桶请求路由到正确 endpoint。
+    /// V2 签名与 endpoint 无关,故只需改 URL host、无需重新签名。
+    bucket_endpoints: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
     http: HttpClient,
 }
 
@@ -43,7 +47,18 @@ impl OssClient {
             access_key_id: access_key_id.into(),
             access_key_secret: access_key_secret.into(),
             endpoint: normalize_endpoint(&endpoint.into()),
+            bucket_endpoints: Default::default(),
             http: HttpClient::new(),
+        }
+    }
+
+    /// 记录某个桶的真实 endpoint(列举桶时调用),之后该桶请求路由到此 endpoint。
+    pub(crate) fn cache_bucket_endpoint(&self, bucket: &str, endpoint: &str) {
+        if !endpoint.is_empty() {
+            self.bucket_endpoints
+                .lock()
+                .unwrap()
+                .insert(bucket.to_string(), normalize_endpoint(endpoint));
         }
     }
 
@@ -74,9 +89,16 @@ impl OssClient {
     }
 
     /// 拼出某个 bucket 的虚拟托管域名根 URL,如
-    /// `https://my-bucket.oss-cn-hangzhou.aliyuncs.com`。
+    /// `https://my-bucket.oss-cn-hangzhou.aliyuncs.com`。有缓存则用桶自己的区域 endpoint。
     pub fn bucket_base_url(&self, bucket: &str) -> String {
-        format!("https://{bucket}.{}", self.endpoint)
+        let endpoint = self
+            .bucket_endpoints
+            .lock()
+            .unwrap()
+            .get(bucket)
+            .cloned()
+            .unwrap_or_else(|| self.endpoint.clone());
+        format!("https://{bucket}.{endpoint}")
     }
 }
 
@@ -120,6 +142,22 @@ mod tests {
         assert_eq!(
             c.bucket_base_url("my-bucket"),
             "https://my-bucket.oss-cn-hangzhou.aliyuncs.com"
+        );
+    }
+
+    #[test]
+    fn bucket_base_url_uses_cached_region_endpoint() {
+        let c = OssClient::new("id", "secret", "oss-cn-hangzhou.aliyuncs.com");
+        // 未缓存 → 账号默认 endpoint。
+        assert_eq!(
+            c.bucket_base_url("b"),
+            "https://b.oss-cn-hangzhou.aliyuncs.com"
+        );
+        // 缓存桶所在区域后 → 路由到该区域 endpoint(去协议前缀)。
+        c.cache_bucket_endpoint("b", "https://oss-cn-beijing.aliyuncs.com");
+        assert_eq!(
+            c.bucket_base_url("b"),
+            "https://b.oss-cn-beijing.aliyuncs.com"
         );
     }
 }
