@@ -190,7 +190,12 @@ impl OssClient {
             },
             &date,
         )?;
-        let resp = check_status(self.http().execute(request).await?).await?;
+        let resp = match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => resp,
+            // 对象尚无标签时部分实现返回 404 NoSuchTagSet(而非空 TagSet),视为空标签集。
+            Err(OssError::Api { code, .. }) if code == "NoSuchTagSet" => return Ok(Vec::new()),
+            Err(e) => return Err(e),
+        };
         let body = resp.text().await.map_err(cloud_core::CoreError::from)?;
         parse_tagging(&body)
     }
