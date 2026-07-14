@@ -3,10 +3,12 @@
 //! SigV4 签名与请求组装复用共享的 [`s3_sigv4`] crate;本文件只做 endpoint 规整、
 //! region 解析,以及把签名委托给 `s3_sigv4`。
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use cloud_core::HttpClient;
-use reqwest::Request;
+use reqwest::{Request, Response};
 use s3_sigv4::{RequestSpec, SigningParams};
 
 use crate::error::{Result, S3Error};
@@ -22,6 +24,9 @@ pub struct S3Client {
     endpoint: String,
     /// 从 endpoint 解析出的 region,如 `cn-east-1`。
     region: String,
+    /// 每个桶实际所在 region 的缓存(AWS 各桶按 region 分 endpoint)。首次访问跨区域桶时
+    /// 从 `x-amz-bucket-region` 响应头学习并缓存,之后该桶的请求路由 + 签名到正确区域。
+    bucket_regions: Arc<Mutex<HashMap<String, String>>>,
     http: HttpClient,
 }
 
@@ -43,6 +48,7 @@ impl S3Client {
             scheme,
             endpoint,
             region,
+            bucket_regions: Arc::new(Mutex::new(HashMap::new())),
             http: HttpClient::new(),
         }
     }
@@ -78,19 +84,32 @@ impl S3Client {
         &self.http
     }
 
-    /// 构造签名参数(S3 service)。
-    pub(crate) fn params(&self) -> SigningParams<'_> {
+    /// 用给定 endpoint / region 构造签名参数(S3 service)。
+    pub(crate) fn params_with<'a>(
+        &'a self,
+        endpoint: &'a str,
+        region: &'a str,
+    ) -> SigningParams<'a> {
         SigningParams {
             access_key: &self.access_key,
             secret_key: &self.secret_key,
             scheme: &self.scheme,
-            endpoint: &self.endpoint,
-            region: &self.region,
+            endpoint,
+            region,
             service: s3_sigv4::sign::S3,
         }
     }
 
-    /// 组装并做 SigV4 签名,返回可直接发送的 [`Request`]。用当前时间。
+    /// 某个 canonical URI(路径风格,首段是桶名)应路由到的 `(endpoint, region)`:
+    /// 有缓存用缓存的桶区域并据此推导区域化 endpoint,否则用账号默认区域。
+    pub(crate) fn route(&self, canonical_uri: &str) -> (String, String) {
+        let region = bucket_from_uri(canonical_uri)
+            .and_then(|b| self.bucket_regions.lock().unwrap().get(b).cloned())
+            .unwrap_or_else(|| self.region.clone());
+        (regional_endpoint(&self.endpoint, &region), region)
+    }
+
+    /// 组装并做 SigV4 签名(按桶路由到其区域)。用当前时间。
     pub(crate) fn build_signed(&self, spec: RequestSpec<'_>) -> Result<Request> {
         self.build_signed_at(spec, SystemTime::now())
     }
@@ -101,8 +120,73 @@ impl S3Client {
         spec: RequestSpec<'_>,
         now: SystemTime,
     ) -> Result<Request> {
-        s3_sigv4::build_signed_request(self.http(), &self.params(), spec, now)
-            .map_err(S3Error::from)
+        let (endpoint, region) = self.route(spec.canonical_uri);
+        let params = self.params_with(&endpoint, &region);
+        s3_sigv4::build_signed_request(self.http(), &params, spec, now).map_err(S3Error::from)
+    }
+
+    /// 发送一个按桶路由的请求;若响应表明该桶在别的区域(`x-amz-bucket-region` 头),
+    /// 缓存正确区域后重试一次。用于列举等「首次访问某桶」的操作,以自举区域缓存,
+    /// 之后该桶的其它操作经 [`build_signed`](Self::build_signed) 自动路由到正确区域。
+    pub(crate) async fn send(&self, spec: RequestSpec<'_>) -> Result<Response> {
+        let (_, used_region) = self.route(spec.canonical_uri);
+        let request = self.build_signed(spec.clone())?;
+        let resp = self.http().execute(request).await?;
+        if let (Some(bucket), Some(correct)) = (
+            bucket_from_uri(spec.canonical_uri),
+            wrong_bucket_region(&resp, &used_region),
+        ) {
+            self.bucket_regions
+                .lock()
+                .unwrap()
+                .insert(bucket.to_string(), correct);
+            let retry = self.build_signed(spec)?;
+            return Ok(self.http().execute(retry).await?);
+        }
+        Ok(resp)
+    }
+}
+
+/// 取路径风格 canonical URI 的首段作为桶名(`/bucket/key` → `bucket`;`/` → None)。
+fn bucket_from_uri(canonical_uri: &str) -> Option<&str> {
+    let seg = canonical_uri.trim_start_matches('/');
+    let seg = seg.split('/').next().unwrap_or("");
+    let seg = seg.split('?').next().unwrap_or("");
+    if seg.is_empty() {
+        None
+    } else {
+        Some(seg)
+    }
+}
+
+/// 据桶所在 region 推导应使用的 endpoint。仅对 AWS(`*.amazonaws.com`)按
+/// `s3.{region}.amazonaws.com` 改写;其它厂商(单一 endpoint)原样返回。
+fn regional_endpoint(base: &str, region: &str) -> String {
+    if region.is_empty() || !base.ends_with(".amazonaws.com") {
+        base.to_string()
+    } else {
+        format!("s3.{region}.amazonaws.com")
+    }
+}
+
+/// 若响应表明桶在别的区域,返回正确区域,用于跨区域重定向的自动纠正。
+///
+/// 只在跨区域会出现的两种状态才判断(避免对普通 404/403 误重试):
+/// `301 PermanentRedirect`(endpoint 不对)与 `400 AuthorizationHeaderMalformed`(签名区域不对),
+/// 且响应头 `x-amz-bucket-region` 指向了与本次所用不同的区域。
+fn wrong_bucket_region(resp: &Response, used_region: &str) -> Option<String> {
+    let status = resp.status().as_u16();
+    if status != 301 && status != 400 {
+        return None;
+    }
+    let region = resp
+        .headers()
+        .get("x-amz-bucket-region")
+        .and_then(|v| v.to_str().ok())?;
+    if region.is_empty() || region == used_region {
+        None
+    } else {
+        Some(region.to_string())
     }
 }
 
@@ -154,6 +238,40 @@ mod tests {
         let c = S3Client::new("a", "b", "files.example.com");
         assert_eq!(c.region(), "");
         assert_eq!(c.with_region("cn-east-1").region(), "cn-east-1");
+    }
+
+    #[test]
+    fn bucket_from_uri_extracts_first_segment() {
+        assert_eq!(bucket_from_uri("/mybucket/dir/a.txt"), Some("mybucket"));
+        assert_eq!(bucket_from_uri("/mybucket"), Some("mybucket"));
+        assert_eq!(bucket_from_uri("/"), None);
+        assert_eq!(bucket_from_uri(""), None);
+    }
+
+    #[test]
+    fn regional_endpoint_only_remaps_aws_hosts() {
+        // AWS:按桶区域改写。
+        assert_eq!(
+            regional_endpoint("s3.us-east-1.amazonaws.com", "eu-west-1"),
+            "s3.eu-west-1.amazonaws.com"
+        );
+        assert_eq!(
+            regional_endpoint("s3.amazonaws.com", "ap-southeast-2"),
+            "s3.ap-southeast-2.amazonaws.com"
+        );
+        // 非 AWS(MinIO / R2 / 七牛)与空 region:原样返回。
+        assert_eq!(
+            regional_endpoint("minio.local:9000", "us-east-1"),
+            "minio.local:9000"
+        );
+        assert_eq!(
+            regional_endpoint("s3.cn-east-1.qiniucs.com", "cn-north-1"),
+            "s3.cn-east-1.qiniucs.com"
+        );
+        assert_eq!(
+            regional_endpoint("s3.us-east-1.amazonaws.com", ""),
+            "s3.us-east-1.amazonaws.com"
+        );
     }
 
     #[test]

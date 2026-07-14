@@ -201,15 +201,19 @@ impl S3Client {
 
     /// 读取对象元信息(HEAD)。
     pub async fn head_object(&self, bucket: &str, key: &str) -> Result<ObjectMeta> {
-        let request = self.build_signed(RequestSpec {
-            method: Method::HEAD,
-            canonical_uri: &object_uri(bucket, key),
-            query: &[],
-            content_type: None,
-            amz_headers: &[],
-            body: None,
-        })?;
-        let resp = check_status(self.http().execute(request).await?).await?;
+        // 用 send:stat 常是访问某桶的首个操作,借此自举区域缓存(HEAD 无响应体,重试安全)。
+        let resp = check_status(
+            self.send(RequestSpec {
+                method: Method::HEAD,
+                canonical_uri: &object_uri(bucket, key),
+                query: &[],
+                content_type: None,
+                amz_headers: &[],
+                body: None,
+            })
+            .await?,
+        )
+        .await?;
         let headers = resp.headers();
         let content_length = headers
             .get(CONTENT_LENGTH)
@@ -354,6 +358,7 @@ impl S3Client {
     }
 
     /// 用固定时间与方法构造预签名 URL,便于确定性测试。委托给共享 SigV4 实现。
+    /// 按桶路由到其区域(区域来自缓存,通常已被首次浏览该桶时填充)。
     fn build_presigned_url(
         &self,
         method: &str,
@@ -362,10 +367,12 @@ impl S3Client {
         expires_in: u64,
         now: SystemTime,
     ) -> String {
+        let uri = object_uri(bucket, key);
+        let (endpoint, region) = self.route(&uri);
         s3_sigv4::presigned_url(
-            &self.params(),
+            &self.params_with(&endpoint, &region),
             method,
-            &object_uri(bucket, key),
+            &uri,
             expires_in,
             now,
         )

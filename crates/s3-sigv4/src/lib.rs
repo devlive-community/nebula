@@ -102,6 +102,7 @@ pub struct SigningParams<'a> {
 }
 
 /// 一次待签名请求的描述(路径风格)。
+#[derive(Clone)]
 pub struct RequestSpec<'a> {
     pub method: Method,
     /// 路径风格的 canonical URI(已对 key 做路径编码),如 `/bucket/dir/a.txt`、`/bucket`、`/`。

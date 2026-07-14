@@ -175,15 +175,20 @@ impl S3Client {
         token: &str,
     ) -> Result<ListBucketResult> {
         let query = list_query(prefix, delimiter, token);
-        let request = self.build_signed(RequestSpec {
-            method: Method::GET,
-            canonical_uri: &format!("/{bucket}"),
-            query: &query,
-            content_type: None,
-            amz_headers: &[],
-            body: None,
-        })?;
-        let resp = check_status(self.http().execute(request).await?).await?;
+        // 用 send:首次列举跨区域桶时会从 x-amz-bucket-region 学到正确区域并缓存,
+        // 之后该桶的其它操作经 build_signed 自动路由。
+        let resp = check_status(
+            self.send(RequestSpec {
+                method: Method::GET,
+                canonical_uri: &format!("/{bucket}"),
+                query: &query,
+                content_type: None,
+                amz_headers: &[],
+                body: None,
+            })
+            .await?,
+        )
+        .await?;
         let body = resp.text().await.map_err(CoreError::from)?;
         quick_xml::de::from_str(&body)
             .map_err(|e| S3Error::Core(CoreError::InvalidResponse(e.to_string())))
