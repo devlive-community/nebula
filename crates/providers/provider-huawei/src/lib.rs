@@ -458,6 +458,7 @@ mod tests {
             code: "NoSuchKey".into(),
             message: "missing".into(),
             request_id: None,
+            endpoint: None,
         });
         assert!(matches!(not_found, ProviderError::NotFound(_)));
 
@@ -466,6 +467,7 @@ mod tests {
             code: "AccessDenied".into(),
             message: "nope".into(),
             request_id: None,
+            endpoint: None,
         });
         assert!(matches!(denied, ProviderError::AccessDenied(_)));
 
@@ -474,6 +476,7 @@ mod tests {
             code: "InvalidArgument".into(),
             message: "bad".into(),
             request_id: None,
+            endpoint: None,
         });
         assert!(matches!(other, ProviderError::Backend(_)));
     }

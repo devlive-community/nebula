@@ -21,6 +21,8 @@ pub enum CosError {
         message: String,
         /// 便于排查的服务端请求 id。
         request_id: Option<String>,
+        /// 跨区域错误里服务端给出的正确 endpoint(若有,用于自动纠正)。
+        endpoint: Option<String>,
     },
 }
 

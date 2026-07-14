@@ -8,7 +8,7 @@
 use cloud_core::{paginate, CoreError, Page};
 use futures::Stream;
 use reqwest::header::{AUTHORIZATION, DATE};
-use reqwest::{Method, Request, Url};
+use reqwest::{Method, Request, Response, Url};
 use serde::Deserialize;
 
 use crate::client::OssClient;
@@ -145,8 +145,7 @@ impl OssClient {
         marker: String,
     ) -> Result<Page<ObjectSummary, String>> {
         let date = now_gmt();
-        let request = self.build_list_request(bucket, prefix, &marker, None, &date)?;
-        let resp = check_status(self.http().execute(request).await?).await?;
+        let resp = self.send_list(bucket, prefix, &marker, None, &date).await?;
         let body = resp.text().await.map_err(CoreError::from)?;
 
         let parsed: ListBucketResult = quick_xml::de::from_str(&body)
@@ -186,8 +185,9 @@ impl OssClient {
         marker: String,
     ) -> Result<Page<ListEntry, String>> {
         let date = now_gmt();
-        let request = self.build_list_request(bucket, prefix, &marker, Some("/"), &date)?;
-        let resp = check_status(self.http().execute(request).await?).await?;
+        let resp = self
+            .send_list(bucket, prefix, &marker, Some("/"), &date)
+            .await?;
         let body = resp.text().await.map_err(CoreError::from)?;
 
         let parsed: ListBucketResult = quick_xml::de::from_str(&body)
@@ -205,6 +205,31 @@ impl OssClient {
             ListEntry::Object(o)
         }));
         Ok(Page { items, next })
+    }
+
+    /// 发送一次列举请求;若被服务端要求换 endpoint(跨区域「must be addressed using the
+    /// specified endpoint」),从错误里学到正确 endpoint、缓存后重试一次,自举区域缓存——
+    /// 即便本会话没先列过桶列表,首次进某桶也能自动纠正到正确区域。
+    async fn send_list(
+        &self,
+        bucket: &str,
+        prefix: Option<&str>,
+        marker: &str,
+        delimiter: Option<&str>,
+        date: &str,
+    ) -> Result<Response> {
+        let request = self.build_list_request(bucket, prefix, marker, delimiter, date)?;
+        match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => Ok(resp),
+            Err(e) => match redirect_endpoint(&e, bucket) {
+                Some(endpoint) => {
+                    self.cache_bucket_endpoint(bucket, &endpoint);
+                    let retry = self.build_list_request(bucket, prefix, marker, delimiter, date)?;
+                    check_status(self.http().execute(retry).await?).await
+                }
+                None => Err(e),
+            },
+        }
     }
 
     /// 组装并签名一次 GET Bucket 请求。抽出 `date` 便于确定性测试。
@@ -374,6 +399,20 @@ fn url_decode(s: &str) -> String {
         .into_owned()
 }
 
+/// 从「必须用指定 endpoint 访问」的错误里取出正确的区域 endpoint(去掉可能的 `{bucket}.`
+/// 前缀,得到不含桶名的区域 endpoint)。非该类错误返回 None。
+fn redirect_endpoint(err: &OssError, bucket: &str) -> Option<String> {
+    match err {
+        OssError::Api {
+            endpoint: Some(ep), ..
+        } if !ep.is_empty() => {
+            let prefix = format!("{bucket}.");
+            Some(ep.strip_prefix(&prefix).unwrap_or(ep).to_string())
+        }
+        _ => None,
+    }
+}
+
 /// 下一页游标:未截断则无;截断时优先用 `NextMarker`,否则退回本页最后一个 Key。
 fn next_marker(result: &ListBucketResult) -> Option<String> {
     if !result.is_truncated {
@@ -389,6 +428,29 @@ fn next_marker(result: &ListBucketResult) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn redirect_endpoint_strips_bucket_prefix() {
+        let api = |endpoint: Option<&str>| OssError::Api {
+            status: 403,
+            code: "AccessDenied".into(),
+            message: String::new(),
+            request_id: None,
+            endpoint: endpoint.map(str::to_string),
+        };
+        // 带桶前缀 → 去掉,得区域 endpoint。
+        assert_eq!(
+            redirect_endpoint(&api(Some("bkt.oss-cn-beijing.aliyuncs.com")), "bkt").as_deref(),
+            Some("oss-cn-beijing.aliyuncs.com")
+        );
+        // 不含桶前缀 → 原样。
+        assert_eq!(
+            redirect_endpoint(&api(Some("oss-cn-beijing.aliyuncs.com")), "bkt").as_deref(),
+            Some("oss-cn-beijing.aliyuncs.com")
+        );
+        // 无 endpoint → None。
+        assert_eq!(redirect_endpoint(&api(None), "bkt"), None);
+    }
 
     fn test_client() -> OssClient {
         OssClient::new(

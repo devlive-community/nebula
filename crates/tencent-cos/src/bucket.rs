@@ -5,7 +5,7 @@
 
 use cloud_core::{paginate, CoreError, Page};
 use futures::Stream;
-use reqwest::Method;
+use reqwest::{Method, Response};
 use serde::Deserialize;
 
 use crate::client::{CosClient, SignSpec};
@@ -175,7 +175,6 @@ impl CosClient {
         delimiter: Option<&str>,
         marker: &str,
     ) -> Result<ListBucketResult> {
-        let host = self.bucket_host(bucket);
         let mut query: Vec<(&str, Option<&str>)> = vec![("max-keys", Some(MAX_KEYS))];
         if let Some(p) = prefix.filter(|p| !p.is_empty()) {
             query.push(("prefix", Some(p)));
@@ -186,20 +185,51 @@ impl CosClient {
         if let Some(d) = delimiter {
             query.push(("delimiter", Some(d)));
         }
+        let resp = self.send_bucket_get(bucket, &query).await?;
+        let body = resp.text().await.map_err(CoreError::from)?;
+        quick_xml::de::from_str(&body)
+            .map_err(|e| CosError::Core(CoreError::InvalidResponse(e.to_string())))
+    }
+
+    /// 对某桶发一次 `GET /`(列举);若跨区域被拒且服务端给了正确 endpoint,缓存后重试一次。
+    /// 自举区域缓存(即便本会话没先列过桶列表)。
+    async fn send_bucket_get(
+        &self,
+        bucket: &str,
+        query: &[(&str, Option<&str>)],
+    ) -> Result<Response> {
+        let host = self.bucket_host(bucket);
         let request = self.build_signed(SignSpec {
             method: Method::GET,
             host: &host,
             uri_path: "/",
-            query: &query,
+            query,
             content_type: None,
             content_md5: None,
             cos_headers: &[],
             body: None,
         })?;
-        let resp = check_status(self.http().execute(request).await?).await?;
-        let body = resp.text().await.map_err(CoreError::from)?;
-        quick_xml::de::from_str(&body)
-            .map_err(|e| CosError::Core(CoreError::InvalidResponse(e.to_string())))
+        match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => Ok(resp),
+            Err(e) => match redirect_endpoint(&e, bucket) {
+                Some(endpoint) => {
+                    self.cache_bucket_endpoint(bucket, &endpoint);
+                    let host = self.bucket_host(bucket);
+                    let retry = self.build_signed(SignSpec {
+                        method: Method::GET,
+                        host: &host,
+                        uri_path: "/",
+                        query,
+                        content_type: None,
+                        content_md5: None,
+                        cos_headers: &[],
+                        body: None,
+                    })?;
+                    check_status(self.http().execute(retry).await?).await
+                }
+                None => Err(e),
+            },
+        }
     }
 
     /// 列举当前账号下的所有 bucket(GET Service,单次返回)。
@@ -292,6 +322,19 @@ fn next_marker(result: &ListBucketResult) -> Option<String> {
         .clone()
         .filter(|m| !m.is_empty())
         .or_else(|| result.contents.last().map(|c| c.key.clone()))
+}
+
+/// 从跨区域错误里取出正确的区域 endpoint(去掉可能的 `{bucket}.` 前缀)。非该类错误返回 None。
+fn redirect_endpoint(err: &CosError, bucket: &str) -> Option<String> {
+    match err {
+        CosError::Api {
+            endpoint: Some(ep), ..
+        } if !ep.is_empty() => {
+            let prefix = format!("{bucket}.");
+            Some(ep.strip_prefix(&prefix).unwrap_or(ep).to_string())
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]

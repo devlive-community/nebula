@@ -442,6 +442,7 @@ mod tests {
                 code: "NoSuchKey".into(),
                 message: "m".into(),
                 request_id: None,
+                endpoint: None,
             }),
             ProviderError::NotFound(_)
         ));

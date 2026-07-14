@@ -21,6 +21,8 @@ pub enum OssError {
         message: String,
         /// 便于排查的服务端请求 id。
         request_id: Option<String>,
+        /// 「必须用指定 endpoint 访问」错误里服务端给出的正确 endpoint(用于跨区域自动纠正)。
+        endpoint: Option<String>,
     },
 }
 

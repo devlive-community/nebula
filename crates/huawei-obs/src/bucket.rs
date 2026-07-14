@@ -10,7 +10,7 @@
 use cloud_core::{paginate, CoreError, Page};
 use futures::Stream;
 use reqwest::header::{AUTHORIZATION, DATE};
-use reqwest::{Method, Request, Url};
+use reqwest::{Method, Request, Response, Url};
 use serde::Deserialize;
 
 use crate::client::ObsClient;
@@ -134,8 +134,7 @@ impl ObsClient {
         marker: String,
     ) -> Result<Page<ObjectSummary, String>> {
         let date = now_gmt();
-        let request = self.build_list_request(bucket, prefix, &marker, None, &date)?;
-        let resp = check_status(self.http().execute(request).await?).await?;
+        let resp = self.send_list(bucket, prefix, &marker, None, &date).await?;
         let body = resp.text().await.map_err(CoreError::from)?;
 
         let parsed: ListBucketResult = quick_xml::de::from_str(&body)
@@ -173,8 +172,9 @@ impl ObsClient {
         marker: String,
     ) -> Result<Page<ListEntry, String>> {
         let date = now_gmt();
-        let request = self.build_list_request(bucket, prefix, &marker, Some("/"), &date)?;
-        let resp = check_status(self.http().execute(request).await?).await?;
+        let resp = self
+            .send_list(bucket, prefix, &marker, Some("/"), &date)
+            .await?;
         let body = resp.text().await.map_err(CoreError::from)?;
 
         let parsed: ListBucketResult = quick_xml::de::from_str(&body)
@@ -192,6 +192,30 @@ impl ObsClient {
             ListEntry::Object(o)
         }));
         Ok(Page { items, next })
+    }
+
+    /// 发送一次列举请求;若被服务端要求换 endpoint(跨区域),从错误里学到正确 endpoint、
+    /// 缓存后重试一次,自举区域缓存(即便本会话没先列过桶列表)。
+    async fn send_list(
+        &self,
+        bucket: &str,
+        prefix: Option<&str>,
+        marker: &str,
+        delimiter: Option<&str>,
+        date: &str,
+    ) -> Result<Response> {
+        let request = self.build_list_request(bucket, prefix, marker, delimiter, date)?;
+        match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => Ok(resp),
+            Err(e) => match redirect_endpoint(&e, bucket) {
+                Some(endpoint) => {
+                    self.cache_bucket_endpoint(bucket, &endpoint);
+                    let retry = self.build_list_request(bucket, prefix, marker, delimiter, date)?;
+                    check_status(self.http().execute(retry).await?).await
+                }
+                None => Err(e),
+            },
+        }
     }
 
     /// 组装并签名一次 GET Bucket 请求。抽出 `date` 便于确定性测试。
@@ -370,6 +394,19 @@ fn url_decode(s: &str) -> String {
     percent_encoding::percent_decode_str(s)
         .decode_utf8_lossy()
         .into_owned()
+}
+
+/// 从跨区域错误里取出正确的区域 endpoint(去掉可能的 `{bucket}.` 前缀)。非该类错误返回 None。
+fn redirect_endpoint(err: &ObsError, bucket: &str) -> Option<String> {
+    match err {
+        ObsError::Api {
+            endpoint: Some(ep), ..
+        } if !ep.is_empty() => {
+            let prefix = format!("{bucket}.");
+            Some(ep.strip_prefix(&prefix).unwrap_or(ep).to_string())
+        }
+        _ => None,
+    }
 }
 
 /// 下一页游标:未截断则无;截断时优先用 `NextMarker`,否则退回本页最后一个 Key。

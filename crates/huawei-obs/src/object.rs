@@ -41,6 +41,9 @@ struct ErrorBody {
     message: String,
     #[serde(rename = "RequestId")]
     request_id: Option<String>,
+    /// 跨区域访问时服务端给出的正确 endpoint。
+    #[serde(rename = "Endpoint")]
+    endpoint: Option<String>,
 }
 
 impl ObsClient {
@@ -398,6 +401,7 @@ pub(crate) async fn check_status(resp: Response) -> Result<Response> {
             code: err.code,
             message: err.message,
             request_id: err.request_id,
+            endpoint: err.endpoint,
         }),
         Err(_) => Err(ObsError::Api {
             status: code,
@@ -408,6 +412,7 @@ pub(crate) async fn check_status(resp: Response) -> Result<Response> {
                 body
             },
             request_id: None,
+            endpoint: None,
         }),
     }
 }
