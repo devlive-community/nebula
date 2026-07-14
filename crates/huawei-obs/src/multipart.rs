@@ -159,6 +159,8 @@ impl ObsClient {
         let body = Bytes::from(format!(
             "<RestoreRequest><Days>{days}</Days></RestoreRequest>"
         ));
+        // 带请求体的子资源操作,OBS 通常要求 Content-MD5(会计入签名)。
+        let content_md5 = cloud_core::crypto::content_md5(&body);
         let request = self.build_part_request(
             bucket,
             PartRequest {
@@ -166,7 +168,7 @@ impl ObsClient {
                 key,
                 subresources: &[("restore", None)],
                 content_type: Some("application/xml"),
-                content_md5: None,
+                content_md5: Some(&content_md5),
                 body: Some(body),
             },
             &date,
@@ -209,6 +211,8 @@ impl ObsClient {
     ) -> Result<()> {
         let date = now_gmt();
         let body = Bytes::from(build_tagging_xml(tags));
+        // OBS 的 PutObjectTagging 要求带 Content-MD5(会计入签名)。
+        let content_md5 = cloud_core::crypto::content_md5(&body);
         let request = self.build_part_request(
             bucket,
             PartRequest {
@@ -216,7 +220,7 @@ impl ObsClient {
                 key,
                 subresources: &[("tagging", None)],
                 content_type: Some("application/xml"),
-                content_md5: None,
+                content_md5: Some(&content_md5),
                 body: Some(body),
             },
             &date,
