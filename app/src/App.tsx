@@ -663,6 +663,7 @@ export default function App() {
     ak: string,
     sk: string,
     endpoint: string,
+    customDomain: string,
   ) => {
     setShowForm(false);
     setEditInfo(null);
@@ -678,6 +679,7 @@ export default function App() {
         tencent: api.addTencentAccount,
       };
       await adders[vendor](id, ak, sk, endpoint);
+      await api.setAccountDomain(id, customDomain.trim());
       await refreshAccounts();
       setCurrent(id);
       setPath("");
@@ -1708,6 +1710,7 @@ export default function App() {
                   vendor: editInfo.vendor,
                   accessKeyId: editInfo.access_key_id,
                   endpoint: editInfo.endpoint,
+                  customDomain: editInfo.custom_domain,
                 }
               : undefined
           }

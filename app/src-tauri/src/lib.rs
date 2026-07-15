@@ -234,6 +234,14 @@ fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
     state.remove_account(&id).map_err(|e| e.to_string())
 }
 
+/// 设置某账号的自定义公共域名(CDN / CNAME);空串清除。
+#[tauri::command]
+fn set_account_domain(state: State<'_, App>, id: String, domain: String) -> Result<(), String> {
+    state
+        .set_account_domain(&id, &domain)
+        .map_err(|e| e.to_string())
+}
+
 /// 读取账号非敏感信息(编辑回填用)。
 #[tauri::command]
 fn get_account(state: State<'_, App>, id: String) -> Option<AccountInfo> {
@@ -1236,6 +1244,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_accounts,
             list_account_infos,
+            set_account_domain,
             add_aliyun_account,
             add_huawei_account,
             add_qiniu_account,

@@ -6,13 +6,20 @@ import { VENDORS, type Vendor } from "../vendors";
 
 interface Props {
   /** 编辑模式的回填值;不传为新增。 */
-  initial?: { id: string; vendor: string; accessKeyId: string; endpoint: string };
+  initial?: {
+    id: string;
+    vendor: string;
+    accessKeyId: string;
+    endpoint: string;
+    customDomain?: string;
+  };
   onSubmit: (
     vendor: Vendor,
     id: string,
     accessKeyId: string,
     accessKeySecret: string,
     endpoint: string,
+    customDomain: string,
   ) => void;
   onClose: () => void;
 }
@@ -30,6 +37,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
     initial?.endpoint ?? VENDORS[vendor].endpoint,
   );
   const [endpointTouched, setEndpointTouched] = useState(editing);
+  const [domain, setDomain] = useState(initial?.customDomain ?? "");
 
   const meta = VENDORS[vendor];
 
@@ -104,6 +112,14 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
               placeholder={meta.endpoint}
             />
           </label>
+          <label className="field">
+            <span>公共域名(可选)</span>
+            <input
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              placeholder="cdn.example.com — 设为公开读后用它拼永久直链"
+            />
+          </label>
         </div>
 
         <div className="modal__footer">
@@ -113,7 +129,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           <button
             className="btn btn--primary"
             disabled={!valid}
-            onClick={() => onSubmit(vendor, id, ak, sk, endpoint)}
+            onClick={() => onSubmit(vendor, id, ak, sk, endpoint, domain)}
           >
             {editing ? "保存" : "添加"}
           </button>

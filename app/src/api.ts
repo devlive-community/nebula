@@ -59,6 +59,10 @@ export const addTencentAccount = (
 
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
+/** 设置某账号的自定义公共域名(CDN / CNAME);空串清除。 */
+export const setAccountDomain = (id: string, domain: string) =>
+  invoke<void>("set_account_domain", { id, domain });
+
 export const getAccount = (id: string) =>
   invoke<AccountInfo | null>("get_account", { id });
 

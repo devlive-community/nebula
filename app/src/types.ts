@@ -37,6 +37,8 @@ export interface AccountInfo {
   vendor: string;
   access_key_id: string;
   endpoint: string;
+  /** 自定义公共域名(CDN / CNAME);空表示未配置。 */
+  custom_domain: string;
 }
 
 /** 展开后待上传的一项:本地路径 + 相对(远端)路径。 */
