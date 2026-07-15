@@ -31,6 +31,38 @@ struct InitiateResult {
     upload_id: String,
 }
 
+/// 一个未完成(残留)的分片上传——已初始化但未 complete / abort,已上传的分片仍在计费。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncompleteUpload {
+    pub key: String,
+    pub upload_id: String,
+    /// 发起时间(ISO 8601);服务端未给出时为空。
+    pub initiated: String,
+}
+
+/// `ListMultipartUploads` 的 XML 响应体。
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ListMultipartUploadsResult {
+    #[serde(default)]
+    is_truncated: bool,
+    #[serde(default)]
+    next_key_marker: Option<String>,
+    #[serde(default)]
+    next_upload_id_marker: Option<String>,
+    #[serde(default, rename = "Upload")]
+    upload: Vec<UploadXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct UploadXml {
+    key: String,
+    upload_id: String,
+    #[serde(default)]
+    initiated: String,
+}
+
 impl S3Client {
     /// 初始化一次分片上传,返回 `UploadId`。
     pub async fn initiate_multipart_upload(
@@ -123,6 +155,50 @@ impl S3Client {
         })?;
         check_status(self.http().execute(request).await?).await?;
         Ok(())
+    }
+
+    /// 列举某个 bucket 下所有未完成的分片上传(自动翻页)。用于清理残留分片、回收存储费。
+    pub async fn list_multipart_uploads(&self, bucket: &str) -> Result<Vec<IncompleteUpload>> {
+        let mut out = Vec::new();
+        let mut key_marker = String::new();
+        let mut id_marker = String::new();
+        loop {
+            let mut query: Vec<(String, String)> = vec![("uploads".to_string(), String::new())];
+            if !key_marker.is_empty() {
+                query.push(("key-marker".to_string(), key_marker.clone()));
+            }
+            if !id_marker.is_empty() {
+                query.push(("upload-id-marker".to_string(), id_marker.clone()));
+            }
+            let request = self.build_signed(RequestSpec {
+                method: Method::GET,
+                canonical_uri: &format!("/{bucket}"),
+                query: &query,
+                content_type: None,
+                amz_headers: &[],
+                body: None,
+            })?;
+            let resp = check_status(self.http().execute(request).await?).await?;
+            let body = resp.text().await.map_err(cloud_core::CoreError::from)?;
+            let parsed: ListMultipartUploadsResult =
+                quick_xml::de::from_str(&body).map_err(|e| {
+                    S3Error::Core(cloud_core::CoreError::InvalidResponse(e.to_string()))
+                })?;
+            out.extend(parsed.upload.into_iter().map(|u| IncompleteUpload {
+                key: u.key,
+                upload_id: u.upload_id,
+                initiated: u.initiated,
+            }));
+            if !parsed.is_truncated {
+                break;
+            }
+            key_marker = parsed.next_key_marker.unwrap_or_default();
+            id_marker = parsed.next_upload_id_marker.unwrap_or_default();
+            if key_marker.is_empty() {
+                break;
+            }
+        }
+        Ok(out)
     }
 
     /// 高层封装:按 `part_size` 切分整块数据并完成分片上传;任一步失败自动 abort。
@@ -360,6 +436,46 @@ fn complete_body(parts: &[(u32, String)]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_incomplete_uploads() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<ListMultipartUploadsResult>
+  <IsTruncated>false</IsTruncated>
+  <Upload>
+    <Key>videos/big.mp4</Key>
+    <UploadId>UP1</UploadId>
+    <Initiated>2026-07-01T00:00:00.000Z</Initiated>
+  </Upload>
+  <Upload>
+    <Key>logs/a.log</Key>
+    <UploadId>UP2</UploadId>
+    <Initiated>2026-07-02T00:00:00.000Z</Initiated>
+  </Upload>
+</ListMultipartUploadsResult>"#;
+        let parsed: ListMultipartUploadsResult = quick_xml::de::from_str(xml).unwrap();
+        assert!(!parsed.is_truncated);
+        let uploads: Vec<IncompleteUpload> = parsed
+            .upload
+            .into_iter()
+            .map(|u| IncompleteUpload {
+                key: u.key,
+                upload_id: u.upload_id,
+                initiated: u.initiated,
+            })
+            .collect();
+        assert_eq!(uploads.len(), 2);
+        assert_eq!(uploads[0].key, "videos/big.mp4");
+        assert_eq!(uploads[0].upload_id, "UP1");
+        assert_eq!(uploads[1].initiated, "2026-07-02T00:00:00.000Z");
+    }
+
+    #[test]
+    fn empty_uploads_list_parses_to_nothing() {
+        let xml = "<ListMultipartUploadsResult><IsTruncated>false</IsTruncated></ListMultipartUploadsResult>";
+        let parsed: ListMultipartUploadsResult = quick_xml::de::from_str(xml).unwrap();
+        assert!(parsed.upload.is_empty());
+    }
 
     #[test]
     fn complete_body_is_sorted_xml() {

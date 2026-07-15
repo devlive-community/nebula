@@ -153,6 +153,37 @@ impl OssClient {
         Ok(())
     }
 
+    /// 列举 bucket 下未完成的分片上传(`GET /?uploads`,单页,默认至多 1000 条)。
+    /// 用于清理残留分片、回收存储费。
+    pub async fn list_multipart_uploads(&self, bucket: &str) -> Result<Vec<IncompleteUpload>> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::GET,
+                key: "",
+                subresources: &[("uploads", None)],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(cloud_core::CoreError::from)?;
+        let parsed: ListMultipartUploadsResult = quick_xml::de::from_str(&body)
+            .map_err(|e| OssError::Core(cloud_core::CoreError::InvalidResponse(e.to_string())))?;
+        Ok(parsed
+            .upload
+            .into_iter()
+            .map(|u| IncompleteUpload {
+                key: u.key,
+                upload_id: u.upload_id,
+                initiated: u.initiated,
+            })
+            .collect())
+    }
+
     /// 取回归档对象:`POST /{key}?restore`,复用子资源签名(`restore` 为受签名子资源)。
     pub async fn restore_object(&self, bucket: &str, key: &str, days: u32) -> Result<()> {
         let date = now_gmt();
@@ -566,6 +597,32 @@ fn xml_escape(s: &str) -> String {
         }
     }
     out
+}
+
+/// 一个未完成(残留)的分片上传。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncompleteUpload {
+    pub key: String,
+    pub upload_id: String,
+    /// 发起时间(ISO 8601);服务端未给出时为空。
+    pub initiated: String,
+}
+
+/// `ListMultipartUploads` 的 XML 响应体。
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ListMultipartUploadsResult {
+    #[serde(default, rename = "Upload")]
+    upload: Vec<UploadXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct UploadXml {
+    key: String,
+    upload_id: String,
+    #[serde(default)]
+    initiated: String,
 }
 
 /// 生成 CompleteMultipartUpload 的请求体 XML(按 part number 升序)。
