@@ -214,6 +214,34 @@ impl ObsClient {
         Ok(())
     }
 
+    /// 设置对象预置 ACL(`public-read` / `private`):`PUT /{key}?acl` + `x-obs-acl` 头。
+    pub async fn set_object_acl(&self, bucket: &str, key: &str, acl: &str) -> Result<()> {
+        let date = now_gmt();
+        let obs_headers = sign::canonicalized_obs_headers([("x-obs-acl", acl)]);
+        // ?acl 是受签名子资源;对象名按 URL 编码(与 URL 一致)。
+        let canonical = format!("/{bucket}/{}?acl", encode_key(key));
+        let sts = sign::string_to_sign("PUT", "", "", &date, &obs_headers, &canonical);
+        let authorization = sign::authorization(self.access_key(), self.secret_key(), &sts);
+        let url = format!("{}/{}?acl", self.bucket_base_url(bucket), encode_key(key));
+        let request = self
+            .http()
+            .inner()
+            .request(Method::PUT, &url)
+            .header(DATE, &date)
+            .header(AUTHORIZATION, authorization)
+            .header("x-obs-acl", acl)
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(ObsError::from)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 对象的永久公共直链(不签名),虚拟托管风格。仅当对象为公开读时可访问。
+    pub fn public_url(&self, bucket: &str, key: &str) -> String {
+        format!("{}/{}", self.bucket_base_url(bucket), encode_key(key))
+    }
+
     /// 组装并签名一次 CopyObject 请求。抽出 `date` 便于确定性测试。
     fn build_copy_request(
         &self,

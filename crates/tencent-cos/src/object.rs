@@ -253,6 +253,29 @@ impl CosClient {
         Ok(())
     }
 
+    /// 设置对象预置 ACL(`public-read` / `private`):`PUT /{key}?acl` + `x-cos-acl` 头。
+    pub async fn set_object_acl(&self, bucket: &str, key: &str, acl: &str) -> Result<()> {
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let request = self.build_signed(SignSpec {
+            method: Method::PUT,
+            host: &host,
+            uri_path: &uri,
+            query: &[("acl", None)],
+            content_type: None,
+            content_md5: None,
+            cos_headers: &[("x-cos-acl", acl.to_string())],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 对象的永久公共直链(不签名),虚拟托管风格。仅当对象为公开读时可访问。
+    pub fn public_url(&self, bucket: &str, key: &str) -> String {
+        format!("https://{}/{}", self.bucket_host(bucket), encode_key(key))
+    }
+
     /// 取回归档对象:`POST /{key}?restore`,请求体指定保持天数与取回层级。
     pub async fn restore_object(&self, bucket: &str, key: &str, days: u32) -> Result<()> {
         let host = self.bucket_host(bucket);

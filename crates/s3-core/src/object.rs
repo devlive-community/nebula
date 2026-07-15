@@ -292,6 +292,33 @@ impl S3Client {
         Ok(())
     }
 
+    /// 设置对象的预置 ACL(`public-read` 公开读 / `private` 私有):`PUT /{key}?acl` +
+    /// `x-amz-acl` 头。设为 `public-read` 后可用 [`public_url`](Self::public_url) 拿永久直链。
+    pub async fn set_object_acl(&self, bucket: &str, key: &str, acl: &str) -> Result<()> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::PUT,
+            canonical_uri: &object_uri(bucket, key),
+            query: &[("acl".to_string(), String::new())],
+            content_type: None,
+            amz_headers: &[("x-amz-acl", acl.to_string())],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 对象的永久公共直链(不签名)。仅当对象为公开读时可访问。路径风格:
+    /// `{scheme}://{endpoint}/{bucket}/{encoded_key}`,按桶路由到其区域 endpoint。
+    pub fn public_url(&self, bucket: &str, key: &str) -> String {
+        let (endpoint, _) = self.route(&object_uri(bucket, key));
+        format!(
+            "{}://{}{}",
+            self.scheme(),
+            endpoint,
+            object_uri(bucket, key)
+        )
+    }
+
     /// 读取对象标签:`GET /{bucket}/{key}?tagging`,解析 TagSet 为键值对。
     pub async fn get_object_tags(&self, bucket: &str, key: &str) -> Result<Vec<(String, String)>> {
         let request = self.build_signed(RequestSpec {
@@ -465,6 +492,15 @@ mod tests {
     fn object_uri_is_path_style_and_encoded() {
         assert_eq!(object_uri("b", "dir/a.txt"), "/b/dir/a.txt");
         assert_eq!(object_uri("b", "dir/ x.txt"), "/b/dir/%20x.txt");
+    }
+
+    #[test]
+    fn public_url_is_unsigned_path_style_encoded() {
+        let c = client();
+        assert_eq!(
+            c.public_url("mybucket", "dir/a b.txt"),
+            "https://s3.cn-east-1.qiniucs.com/mybucket/dir/a%20b.txt"
+        );
     }
 
     #[test]
