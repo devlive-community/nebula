@@ -4,6 +4,7 @@ import { faFile, faXmark } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { formatBytes } from "../util";
 import { useIncremental } from "../hooks";
+import { Select } from "./Select";
 import { useI18n } from "../i18n";
 
 interface Props {
@@ -73,16 +74,14 @@ export function SearchResults({
       </div>
 
       <div className="search-results__filters">
-        <select
-          value={minSize}
-          onChange={(e) => onFilter(Number(e.target.value), extInput)}
-        >
-          {SIZE_PRESETS.map(([label, v]) => (
-            <option key={v} value={v}>
-              {t(label)}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={String(minSize)}
+          options={SIZE_PRESETS.map(([label, v]) => ({
+            value: String(v),
+            label: t(label),
+          }))}
+          onChange={(v) => onFilter(Number(v), extInput)}
+        />
         <input
           className="search-results__ext"
           placeholder={t("扩展名,如 jpg(回车应用)")}

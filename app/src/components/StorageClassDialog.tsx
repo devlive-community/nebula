@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Select } from "./Select";
 import { useI18n } from "../i18n";
 
 /** 各厂商可选的存储类型(value 为发给后端的原始字符串)。新增厂商在此追加。 */
@@ -71,13 +72,14 @@ export function StorageClassDialog({ vendor, name, current, onConfirm, onCancel 
           </label>
           <label className="field">
             <span>{t("目标存储类型")}</span>
-            <select value={sel} onChange={(e) => setSel(e.target.value)}>
-              {options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {t(o.label)}({o.value})
-                </option>
-              ))}
-            </select>
+            <Select
+              value={sel}
+              options={options.map((o) => ({
+                value: o.value,
+                label: `${t(o.label)}(${o.value})`,
+              }))}
+              onChange={setSel}
+            />
           </label>
           <p className="field__hint">
             {t("转换到归档 / 冷归档层后,对象需先「取回」解冻才能下载。")}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Settings } from "../types";
+import { Select } from "./Select";
 import { useI18n } from "../i18n";
 
 interface Props {
@@ -29,13 +30,14 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
         <div className="modal__body">
           <label className="field">
             <span>{t("语言")}</span>
-            <select
+            <Select
               value={locale}
-              onChange={(e) => setLocale(e.target.value as "zh" | "en")}
-            >
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
+              options={[
+                { value: "zh", label: "中文" },
+                { value: "en", label: "English" },
+              ]}
+              onChange={(v) => setLocale(v as "zh" | "en")}
+            />
           </label>
           <label className="field">
             <span>{t("分享链接有效期(分钟)")}</span>
