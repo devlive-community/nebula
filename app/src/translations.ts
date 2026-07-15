@@ -95,6 +95,7 @@ export const EN: Record<string, string> = {
   "下滑加载更多 · 已显示 {shown} / {total}":
     "Scroll for more · {shown} / {total} shown",
   全部选择: "Select all",
+  全选: "Select all",
   "{n} 个目录": "{n} folders",
   "{n} 个文件": "{n} files",
   "共 {size}": "{size} total",

@@ -14,8 +14,11 @@ interface Props {
   truncated: boolean;
   minSize: number;
   ext: string;
+  selected: Set<string>;
   onFilter: (minSize: number, ext: string) => void;
   onOpen: (entry: Entry) => void;
+  onToggleSelect: (path: string) => void;
+  onToggleSelectAll: () => void;
   onClear: () => void;
 }
 
@@ -37,14 +40,19 @@ export function SearchResults({
   truncated,
   minSize,
   ext,
+  selected,
   onFilter,
   onOpen,
+  onToggleSelect,
+  onToggleSelectAll,
   onClear,
 }: Props) {
   const { t } = useI18n();
   const { shown, onScroll } = useIncremental(results);
   const [extInput, setExtInput] = useState(ext);
   useEffect(() => setExtInput(ext), [ext]);
+  const allSelected =
+    results.length > 0 && results.every((r) => selected.has(r.path));
 
   return (
     <div className="search-results">
@@ -87,6 +95,16 @@ export function SearchResults({
             if (extInput.trim() !== ext.trim()) onFilter(minSize, extInput);
           }}
         />
+        {!loading && results.length > 0 && (
+          <label className="search-results__selall">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={onToggleSelectAll}
+            />
+            {t("全选")}
+          </label>
+        )}
       </div>
 
       <div className="search-results__body" onScroll={onScroll}>
@@ -96,16 +114,34 @@ export function SearchResults({
           <div className="filelist__state">{t("没有匹配的文件")}</div>
         ) : (
           shown.map((entry) => (
-            <button
+            <div
               key={entry.path}
-              className="search-results__row"
-              onClick={() => onOpen(entry)}
-              title={t("打开所在目录")}
+              className={`search-results__row ${
+                selected.has(entry.path) ? "search-results__row--selected" : ""
+              }`}
             >
-              <FontAwesomeIcon icon={faFile} className="search-results__icon" />
-              <span className="search-results__path">{entry.path}</span>
-              <span className="search-results__size">{formatBytes(entry.size)}</span>
-            </button>
+              <input
+                type="checkbox"
+                className="search-results__check"
+                checked={selected.has(entry.path)}
+                onChange={() => onToggleSelect(entry.path)}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <button
+                className="search-results__open"
+                onClick={() => onOpen(entry)}
+                title={t("打开所在目录")}
+              >
+                <FontAwesomeIcon
+                  icon={faFile}
+                  className="search-results__icon"
+                />
+                <span className="search-results__path">{entry.path}</span>
+                <span className="search-results__size">
+                  {formatBytes(entry.size)}
+                </span>
+              </button>
+            </div>
           ))
         )}
       </div>

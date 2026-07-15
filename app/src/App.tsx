@@ -419,6 +419,20 @@ export default function App() {
 
   const clearSelection = () => setSelected(new Set());
 
+  // 搜索结果的全选 / 取消全选(作用于当前搜索命中,而非目录列表)。
+  const toggleSelectAllSearch = () =>
+    setSelected((prev) => {
+      const results = search?.results ?? [];
+      const allSel =
+        results.length > 0 && results.every((r) => prev.has(r.path));
+      const next = new Set(prev);
+      for (const r of results) {
+        if (allSel) next.delete(r.path);
+        else next.add(r.path);
+      }
+      return next;
+    });
+
   useEffect(() => {
     const unUpload = listen<UploadProgress>("upload-progress", (e) => {
       updateProgress(e.payload.path, e.payload.uploaded, e.payload.total);
@@ -522,6 +536,7 @@ export default function App() {
   const runSearch = useCallback(
     async (query: string, filter: { minSize: number; ext: string }) => {
       if (!current || path === "") return;
+      setSelected(new Set()); // 选择按视图隔离:进入搜索先清空目录里的选中
       setSearch({ query, results: [], loading: true, truncated: false });
       try {
         const res = await api.search(
@@ -695,9 +710,14 @@ export default function App() {
     if (!current || selected.size === 0) return;
     setBusy(true);
     setError(null);
+    const deleted = new Set(selected);
     try {
-      for (const p of selected) await api.deletePath(current, p);
+      for (const p of deleted) await api.deletePath(current, p);
       clearSelection();
+      // 搜索视图里把已删的命中去掉,避免残留。
+      setSearch((s) =>
+        s ? { ...s, results: s.results.filter((r) => !deleted.has(r.path)) } : s,
+      );
       await load();
     } catch (e) {
       setError(String(e));
@@ -1592,9 +1612,15 @@ export default function App() {
                 truncated={search.truncated}
                 minSize={searchFilter.minSize}
                 ext={searchFilter.ext}
+                selected={selected}
                 onFilter={applySearchFilter}
                 onOpen={openSearchResult}
-                onClear={() => setSearch(null)}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAllSearch}
+                onClear={() => {
+                  setSearch(null);
+                  clearSelection();
+                }}
               />
             ) : view === "list" ? (
               <FileList
