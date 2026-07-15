@@ -36,7 +36,9 @@ pub use breakdown::{ClassStat, StorageBreakdown};
 pub use error::{AppError, Result};
 pub use integrity::{verify_bytes, Integrity};
 pub use limits::TransferLimits;
-pub use nebula_provider::{ByteStream, Capabilities, EntryKind, Page, ProgressFn};
+pub use nebula_provider::{
+    ByteStream, Capabilities, EntryKind, IncompleteUpload, Page, ProgressFn,
+};
 pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
@@ -698,6 +700,31 @@ impl App {
     /// 读取对象标签(键值对)。
     pub async fn object_tags(&self, account: &str, path: &str) -> Result<Vec<(String, String)>> {
         Ok(self.provider(account)?.object_tags(path).await?)
+    }
+
+    /// 列举某桶下未完成(残留)的分片上传。
+    pub async fn incomplete_uploads(
+        &self,
+        account: &str,
+        bucket: &str,
+    ) -> Result<Vec<IncompleteUpload>> {
+        Ok(self
+            .provider(account)?
+            .list_incomplete_uploads(bucket)
+            .await?)
+    }
+
+    /// 清理某桶下所有未完成的分片上传(逐个 abort),返回清理数量。
+    pub async fn clean_incomplete_uploads(&self, account: &str, bucket: &str) -> Result<u64> {
+        let provider = self.provider(account)?;
+        let uploads = provider.list_incomplete_uploads(bucket).await?;
+        let mut cleaned = 0u64;
+        for u in &uploads {
+            let path = format!("{bucket}/{}", u.key);
+            provider.abort_multipart(&path, &u.upload_id).await?;
+            cleaned += 1;
+        }
+        Ok(cleaned)
     }
 
     /// 覆盖对象标签(整套替换;空列表即清空)。

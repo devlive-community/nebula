@@ -9,7 +9,8 @@ use futures::StreamExt;
 
 use minio_s3::{ListEntry, S3Client, S3Error};
 use nebula_provider::{
-    path, ByteStream, Capabilities, Entry, ProgressFn, ProviderError, Result, StorageProvider,
+    path, ByteStream, Capabilities, Entry, IncompleteUpload, ProgressFn, ProviderError, Result,
+    StorageProvider,
 };
 
 const MULTIPART_THRESHOLD: usize = 16 * 1024 * 1024;
@@ -82,6 +83,7 @@ impl StorageProvider for MinioProvider {
             bucket_ops: true,
             metadata_ops: true,
             object_tagging: true,
+            multipart_cleanup: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -383,6 +385,22 @@ impl StorageProvider for MinioProvider {
             .set_object_tags(bucket, key, tags)
             .await
             .map_err(map_err)
+    }
+
+    async fn list_incomplete_uploads(&self, bucket: &str) -> Result<Vec<IncompleteUpload>> {
+        let uploads = self
+            .client
+            .list_multipart_uploads(bucket)
+            .await
+            .map_err(map_err)?;
+        Ok(uploads
+            .into_iter()
+            .map(|u| IncompleteUpload {
+                key: u.key,
+                upload_id: u.upload_id,
+                initiated: u.initiated,
+            })
+            .collect())
     }
 
     async fn delete(&self, path: &str) -> Result<()> {

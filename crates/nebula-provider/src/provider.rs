@@ -35,6 +35,16 @@ pub struct Page {
     pub cursor: Option<String>,
 }
 
+/// 一个未完成(残留)的分片上传:已初始化但未完成 / 中止,分片仍在计费。可 serde 供前端消费。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct IncompleteUpload {
+    /// 对象 key(桶内相对路径)。
+    pub key: String,
+    pub upload_id: String,
+    /// 发起时间(ISO 8601);未知为空串。
+    pub initiated: String,
+}
+
 /// 一个存储 provider 实例(通常 = 一个云账号)。
 ///
 /// # 路径约定
@@ -174,6 +184,14 @@ pub trait StorageProvider: Send + Sync {
     /// 放弃分片上传,清理服务端已上传的分片。默认无操作。
     async fn abort_multipart(&self, _path: &str, _upload_id: &str) -> Result<()> {
         Ok(())
+    }
+
+    /// 列举某个 bucket 下所有未完成(残留)的分片上传——已初始化但未完成 / 中止,
+    /// 其分片仍在计费。默认 [`ProviderError::Unsupported`];支持的适配层覆盖并置
+    /// [`capabilities`](Self::capabilities) 的 `multipart_cleanup = true`。清理时对每项
+    /// 调 [`abort_multipart`](Self::abort_multipart)。
+    async fn list_incomplete_uploads(&self, _bucket: &str) -> Result<Vec<IncompleteUpload>> {
+        Err(ProviderError::Unsupported("list incomplete uploads".into()))
     }
 
     /// 转换对象的存储类型 / 归档层(如标准 → 低频 / 归档)。`class` 为厂商的存储类型字符串。

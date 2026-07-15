@@ -12,7 +12,8 @@ use futures::StreamExt;
 
 use aliyun_oss::{ListEntry, OssClient, OssError};
 use nebula_provider::{
-    path, ByteStream, Capabilities, Entry, ProgressFn, ProviderError, Result, StorageProvider,
+    path, ByteStream, Capabilities, Entry, IncompleteUpload, ProgressFn, ProviderError, Result,
+    StorageProvider,
 };
 
 /// 超过该大小的上传自动改用分片上传。
@@ -92,6 +93,7 @@ impl StorageProvider for AliyunProvider {
             bucket_ops: true,
             metadata_ops: true,
             object_tagging: true,
+            multipart_cleanup: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -396,6 +398,22 @@ impl StorageProvider for AliyunProvider {
             .set_object_tags(bucket, key, tags)
             .await
             .map_err(map_err)
+    }
+
+    async fn list_incomplete_uploads(&self, bucket: &str) -> Result<Vec<IncompleteUpload>> {
+        let uploads = self
+            .client
+            .list_multipart_uploads(bucket)
+            .await
+            .map_err(map_err)?;
+        Ok(uploads
+            .into_iter()
+            .map(|u| IncompleteUpload {
+                key: u.key,
+                upload_id: u.upload_id,
+                initiated: u.initiated,
+            })
+            .collect())
     }
 
     async fn delete(&self, path: &str) -> Result<()> {

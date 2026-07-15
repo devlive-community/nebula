@@ -17,6 +17,8 @@ pub struct Capabilities {
     pub metadata_ops: bool,
     /// 支持读写对象标签(object_tags / set_object_tags 已实现)。
     pub object_tagging: bool,
+    /// 支持列举 / 清理未完成的分片上传(list_incomplete_uploads 已实现)。
+    pub multipart_cleanup: bool,
     /// 支持生成预签名临时链接。
     pub presign: bool,
     /// 支持服务端复制(跨对象 / 跨桶免中转)。
