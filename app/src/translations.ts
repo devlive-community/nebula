@@ -43,6 +43,15 @@ export const EN: Record<string, string> = {
   "过滤当前目录 / 回车递归搜索…": "Filter here / Enter to search…",
   "处理中…": "Working…",
 
+  // 对象 ACL / 公共直链
+  复制公共链接: "Copy public link",
+  设为公开读: "Make public",
+  设为私有: "Make private",
+  "✓ {name} 已设为公开读": "✓ {name} is now public",
+  "✓ {name} 已设为私有": "✓ {name} is now private",
+  "✓ 已复制公共链接": "✓ Public link copied",
+  该云暂不支持公共直链: "This cloud doesn't support public links",
+
   // 残留分片清理
   清理未完成上传: "Clean up incomplete uploads",
   "没有残留的分片上传,一切干净。": "No incomplete uploads — all clean.",

@@ -513,6 +513,31 @@ async fn clean_incomplete_uploads(
         .map_err(|e| e.to_string())
 }
 
+/// 设置对象为公开读 / 私有。
+#[tauri::command]
+async fn set_object_acl(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    public: bool,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_object_acl(&account, &path, public)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 对象的永久公共直链(不签名);未支持返回 null。
+#[tauri::command]
+async fn public_url(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<Option<String>, String> {
+    let app = state.inner().clone();
+    app.public_url(&account, &path).map_err(|e| e.to_string())
+}
+
 /// 读取对象标签(键值对)。
 #[tauri::command]
 async fn object_tags(
@@ -1238,6 +1263,8 @@ pub fn run() {
             set_content_type,
             object_tags,
             set_object_tags,
+            set_object_acl,
+            public_url,
             incomplete_uploads,
             clean_incomplete_uploads,
             read_preview,

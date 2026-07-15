@@ -1187,6 +1187,40 @@ export default function App() {
     }
   };
 
+  // 设为公开读 / 私有(预置 ACL)。
+  const setAcl = async (entry: Entry, isPublic: boolean) => {
+    if (!current) return;
+    setError(null);
+    try {
+      await api.setObjectAcl(current, entry.path, isPublic);
+      setNotice({
+        tone: "ok",
+        text: isPublic
+          ? t("✓ {name} 已设为公开读", { name: entry.name })
+          : t("✓ {name} 已设为私有", { name: entry.name }),
+      });
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  // 复制对象的永久公共直链(需对象为公开读)。
+  const copyPublicUrl = async (entry: Entry) => {
+    if (!current) return;
+    setError(null);
+    try {
+      const url = await api.publicUrl(current, entry.path);
+      if (!url) {
+        setError(t("该云暂不支持公共直链"));
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setNotice({ tone: "ok", text: t("✓ 已复制公共链接") });
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const shareUpload = async (entry: Entry) => {
     if (!current) return;
     setError(null);
@@ -1959,6 +1993,9 @@ export default function App() {
     items.push(
       { label: t("分享链接"), onClick: () => share(entry) },
       { label: t("上传链接"), onClick: () => shareUpload(entry) },
+      { label: t("复制公共链接"), onClick: () => copyPublicUrl(entry) },
+      { label: t("设为公开读"), onClick: () => setAcl(entry, true) },
+      { label: t("设为私有"), onClick: () => setAcl(entry, false) },
       { label: t("删除"), danger: true, onClick: () => setPendingDelete(entry) },
     );
     return items;

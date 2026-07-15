@@ -225,6 +225,14 @@ export const setContentType = (
 export const readPreview = (account: string, path: string, maxBytes: number) =>
   invoke<TextPreview>("read_preview", { account, path, maxBytes });
 
+/** 设置对象为公开读 / 私有。 */
+export const setObjectAcl = (account: string, path: string, isPublic: boolean) =>
+  invoke<void>("set_object_acl", { account, path, public: isPublic });
+
+/** 取对象的永久公共直链(不签名);未支持返回 null。 */
+export const publicUrl = (account: string, path: string) =>
+  invoke<string | null>("public_url", { account, path });
+
 /** 列举某桶下未完成(残留)的分片上传。 */
 export const incompleteUploads = (account: string, bucket: string) =>
   invoke<IncompleteUpload[]>("incomplete_uploads", { account, bucket });
