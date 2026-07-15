@@ -103,6 +103,8 @@ pub struct AccountInfo {
     pub vendor: String,
     pub access_key_id: String,
     pub endpoint: String,
+    /// 自定义公共域名(CDN / CNAME);空表示未配置。
+    pub custom_domain: String,
 }
 
 /// 传输面板任务的持久化记录,用于跨重启恢复列表。字段与前端 TransferItem 对应;
@@ -264,6 +266,7 @@ impl App {
             access_key_id: access_key_id.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
+            custom_domain: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -291,6 +294,7 @@ impl App {
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
+            custom_domain: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -317,6 +321,7 @@ impl App {
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
+            custom_domain: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -343,6 +348,7 @@ impl App {
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
+            custom_domain: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -369,6 +375,7 @@ impl App {
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
+            custom_domain: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -395,6 +402,7 @@ impl App {
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
+            custom_domain: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -422,6 +430,7 @@ impl App {
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
+            custom_domain: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -467,7 +476,16 @@ impl App {
                 vendor: r.vendor,
                 access_key_id: r.access_key_id,
                 endpoint: r.endpoint,
+                custom_domain: r.custom_domain,
             })
+    }
+
+    /// 设置某账号的自定义公共域名(CDN / CNAME);空串清除。
+    pub fn set_account_domain(&self, account: &str, domain: &str) -> Result<()> {
+        if let Some(store) = &self.store {
+            store.set_custom_domain(account, domain.trim())?;
+        }
+        Ok(())
     }
 
     /// 浏览某账号下某路径(桶 / 前缀)的条目。
@@ -690,7 +708,24 @@ impl App {
     }
 
     /// 对象的永久公共直链(不签名);未支持返回 `None`。
+    ///
+    /// 若该账号配了自定义公共域名(CDN / CNAME),用它拼直链 `https://{域名}/{key}`
+    /// (域名绑定到桶,故去掉路径里的桶名段);否则用 provider 的默认直链。
     pub fn public_url(&self, account: &str, path: &str) -> Result<Option<String>> {
+        if let Some(store) = &self.store {
+            if let Ok(Some(rec)) = store.get(account) {
+                if !rec.custom_domain.is_empty() {
+                    let key = path.split_once('/').map(|(_, k)| k).unwrap_or("");
+                    let domain = rec
+                        .custom_domain
+                        .trim()
+                        .trim_end_matches('/')
+                        .trim_start_matches("https://")
+                        .trim_start_matches("http://");
+                    return Ok(Some(format!("https://{domain}/{}", encode_url_path(key))));
+                }
+            }
+        }
         Ok(self.provider(account)?.public_url(path))
     }
 
@@ -1227,6 +1262,21 @@ async fn walk_dir(
     Ok((files, dirs))
 }
 
+/// 把对象 key 编码进 URL path:保留 `/` 与 RFC3986 unreserved 字符,其余(空格 / 中文 /
+/// 特殊字符,按 UTF-8 字节)百分号编码。用于自定义域名的公共直链。
+fn encode_url_path(key: &str) -> String {
+    let mut out = String::with_capacity(key.len());
+    for b in key.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
 /// 保证路径以 `/` 结尾(桶 / 前缀作为目录前缀使用)。
 fn ensure_trailing_slash(p: &str) -> String {
     if p.ends_with('/') {
@@ -1637,6 +1687,13 @@ mod tests {
         assert!(is_within("a/b/", "a/b/c/")); // 子目录
         assert!(!is_within("a/b/", "a/bc/")); // 仅前缀相似,不算
         assert!(!is_within("a/b/", "a/c/")); // 无关
+    }
+
+    #[test]
+    fn encode_url_path_keeps_slash_and_encodes_specials() {
+        assert_eq!(encode_url_path("dir/a.jpg"), "dir/a.jpg");
+        assert_eq!(encode_url_path("dir/a b.txt"), "dir/a%20b.txt");
+        assert_eq!(encode_url_path("图片.png"), "%E5%9B%BE%E7%89%87.png");
     }
 
     #[tokio::test]

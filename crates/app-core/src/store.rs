@@ -14,6 +14,8 @@ pub struct AccountRecord {
     pub access_key_id: String,
     pub access_key_secret: String,
     pub endpoint: String,
+    /// 可选的自定义公共域名(CDN / CNAME);设了就用它拼永久公共直链。空表示未配置。
+    pub custom_domain: String,
 }
 
 /// 基于 SQLite 的账号存储。跨命令线程共享,内部用 Mutex 串行化访问。
@@ -31,7 +33,8 @@ impl AccountStore {
                 vendor            TEXT NOT NULL,
                 access_key_id     TEXT NOT NULL,
                 access_key_secret TEXT NOT NULL,
-                endpoint          TEXT NOT NULL
+                endpoint          TEXT NOT NULL,
+                custom_domain     TEXT NOT NULL DEFAULT ''
             );
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
@@ -57,6 +60,11 @@ impl AccountStore {
                 status  TEXT NOT NULL
             );",
         )?;
+        // 对已有库补列(1.6.0 及更早没有 custom_domain);已存在则忽略错误。
+        let _ = conn.execute(
+            "ALTER TABLE accounts ADD COLUMN custom_domain TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -66,7 +74,7 @@ impl AccountStore {
     pub fn list(&self) -> rusqlite::Result<Vec<AccountRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, vendor, access_key_id, access_key_secret, endpoint
+            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain
              FROM accounts ORDER BY id",
         )?;
         let rows = stmt.query_map([], |r| {
@@ -76,6 +84,7 @@ impl AccountStore {
                 access_key_id: r.get(2)?,
                 access_key_secret: r.get(3)?,
                 endpoint: r.get(4)?,
+                custom_domain: r.get(5)?,
             })
         })?;
         rows.collect()
@@ -84,9 +93,10 @@ impl AccountStore {
     /// 新增或更新一条账号(按 id 覆盖)。
     pub fn upsert(&self, rec: &AccountRecord) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
+        // custom_domain 不在这里覆盖(编辑账号凭证时保留已配置的域名),改用 set_custom_domain。
         conn.execute(
-            "INSERT INTO accounts (id, vendor, access_key_id, access_key_secret, endpoint)
-             VALUES (?1, ?2, ?3, ?4, ?5)
+            "INSERT INTO accounts (id, vendor, access_key_id, access_key_secret, endpoint, custom_domain)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
              ON CONFLICT(id) DO UPDATE SET
                 vendor = ?2, access_key_id = ?3, access_key_secret = ?4, endpoint = ?5",
             params![
@@ -94,10 +104,42 @@ impl AccountStore {
                 rec.vendor,
                 rec.access_key_id,
                 rec.access_key_secret,
-                rec.endpoint
+                rec.endpoint,
+                rec.custom_domain
             ],
         )?;
         Ok(())
+    }
+
+    /// 单独更新某账号的自定义公共域名(不动凭证)。
+    pub fn set_custom_domain(&self, id: &str, domain: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE accounts SET custom_domain = ?2 WHERE id = ?1",
+            params![id, domain],
+        )?;
+        Ok(())
+    }
+
+    /// 按 id 读取一条账号(用于取自定义域名等)。
+    pub fn get(&self, id: &str) -> rusqlite::Result<Option<AccountRecord>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain
+             FROM accounts WHERE id = ?1",
+            params![id],
+            |r| {
+                Ok(AccountRecord {
+                    id: r.get(0)?,
+                    vendor: r.get(1)?,
+                    access_key_id: r.get(2)?,
+                    access_key_secret: r.get(3)?,
+                    endpoint: r.get(4)?,
+                    custom_domain: r.get(5)?,
+                })
+            },
+        )
+        .optional()
     }
 
     /// 删除一条账号。
@@ -255,6 +297,7 @@ mod tests {
             access_key_id: "ak".into(),
             access_key_secret: "sk".into(),
             endpoint: "oss-cn-hangzhou.aliyuncs.com".into(),
+            custom_domain: String::new(),
         }
     }
 
