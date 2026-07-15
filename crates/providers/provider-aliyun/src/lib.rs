@@ -94,6 +94,7 @@ impl StorageProvider for AliyunProvider {
             metadata_ops: true,
             object_tagging: true,
             multipart_cleanup: true,
+            object_acl: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -414,6 +415,20 @@ impl StorageProvider for AliyunProvider {
                 initiated: u.initiated,
             })
             .collect())
+    }
+
+    async fn set_object_acl(&self, path: &str, public: bool) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        let acl = if public { "public-read" } else { "private" };
+        self.client
+            .set_object_acl(bucket, key, acl)
+            .await
+            .map_err(map_err)
+    }
+
+    fn public_url(&self, path: &str) -> Option<String> {
+        let (bucket, key) = require_object(path).ok()?;
+        Some(self.client.public_url(bucket, key))
     }
 
     async fn delete(&self, path: &str) -> Result<()> {

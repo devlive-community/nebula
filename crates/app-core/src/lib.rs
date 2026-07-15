@@ -684,6 +684,16 @@ impl App {
         Ok(self.provider(account)?.restore(path, days).await?)
     }
 
+    /// 设置对象为公开读(`public = true`)或私有。
+    pub async fn set_object_acl(&self, account: &str, path: &str, public: bool) -> Result<()> {
+        Ok(self.provider(account)?.set_object_acl(path, public).await?)
+    }
+
+    /// 对象的永久公共直链(不签名);未支持返回 `None`。
+    pub fn public_url(&self, account: &str, path: &str) -> Result<Option<String>> {
+        Ok(self.provider(account)?.public_url(path))
+    }
+
     /// 修改对象的内容类型(`Content-Type`)。
     pub async fn set_content_type(
         &self,

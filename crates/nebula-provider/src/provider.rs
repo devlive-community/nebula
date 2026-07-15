@@ -208,6 +208,19 @@ pub trait StorageProvider: Send + Sync {
         Err(ProviderError::Unsupported("restore archived object".into()))
     }
 
+    /// 设置对象为公开读(`public = true`)或私有(通过预置 ACL)。设为公开读后可用
+    /// [`public_url`](Self::public_url) 拿永久直链。默认 [`ProviderError::Unsupported`];
+    /// 支持的适配层覆盖并置 [`capabilities`](Self::capabilities) 的 `object_acl = true`。
+    async fn set_object_acl(&self, _path: &str, _public: bool) -> Result<()> {
+        Err(ProviderError::Unsupported("object acl".into()))
+    }
+
+    /// 对象的永久公共直链(不签名);仅当对象为公开读时可访问。默认 `None`,支持的适配层返回
+    /// `Some(url)`。同步方法(纯 URL 拼接,不发请求)。
+    fn public_url(&self, _path: &str) -> Option<String> {
+        None
+    }
+
     /// 修改对象的内容类型(`Content-Type`)。通常通过"带新 Content-Type 且元数据指令为
     /// REPLACE 的自我复制"实现。默认 [`ProviderError::Unsupported`];支持的适配层覆盖并在
     /// [`capabilities`](Self::capabilities) 置 `metadata_ops = true`。

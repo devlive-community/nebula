@@ -19,6 +19,8 @@ pub struct Capabilities {
     pub object_tagging: bool,
     /// 支持列举 / 清理未完成的分片上传(list_incomplete_uploads 已实现)。
     pub multipart_cleanup: bool,
+    /// 支持设置对象 ACL(公开读 / 私有)与公共直链(set_object_acl / public_url 已实现)。
+    pub object_acl: bool,
     /// 支持生成预签名临时链接。
     pub presign: bool,
     /// 支持服务端复制(跨对象 / 跨桶免中转)。
