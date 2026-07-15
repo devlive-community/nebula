@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, FolderStats, Integrity, Page, SearchResult, Settings, StorageBreakdown,
-    TextPreview, TransferRecord,
+    AccountInfo, App, FolderStats, IncompleteUpload, Integrity, Page, SearchResult, Settings,
+    StorageBreakdown, TextPreview, TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -483,6 +483,32 @@ async fn set_content_type(
 ) -> Result<(), String> {
     let app = state.inner().clone();
     app.set_content_type(&account, &path, &content_type)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 列举某桶下未完成(残留)的分片上传。
+#[tauri::command]
+async fn incomplete_uploads(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+) -> Result<Vec<IncompleteUpload>, String> {
+    let app = state.inner().clone();
+    app.incomplete_uploads(&account, &bucket)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 清理某桶下所有未完成的分片上传,返回清理数量。
+#[tauri::command]
+async fn clean_incomplete_uploads(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+) -> Result<u64, String> {
+    let app = state.inner().clone();
+    app.clean_incomplete_uploads(&account, &bucket)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1212,6 +1238,8 @@ pub fn run() {
             set_content_type,
             object_tags,
             set_object_tags,
+            incomplete_uploads,
+            clean_incomplete_uploads,
             read_preview,
             folder_stats,
             storage_breakdown,

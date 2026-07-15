@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Entry, FolderStats, Integrity, Page, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Entry, FolderStats, IncompleteUpload, Integrity, Page, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -224,6 +224,14 @@ export const setContentType = (
 /** 读取对象前若干字节并解码为文本,用于预览。 */
 export const readPreview = (account: string, path: string, maxBytes: number) =>
   invoke<TextPreview>("read_preview", { account, path, maxBytes });
+
+/** 列举某桶下未完成(残留)的分片上传。 */
+export const incompleteUploads = (account: string, bucket: string) =>
+  invoke<IncompleteUpload[]>("incomplete_uploads", { account, bucket });
+
+/** 清理某桶下所有未完成的分片上传,返回清理数量。 */
+export const cleanIncompleteUploads = (account: string, bucket: string) =>
+  invoke<number>("clean_incomplete_uploads", { account, bucket });
 
 /** 读取对象标签(键值对数组)。 */
 export const objectTags = (account: string, path: string) =>

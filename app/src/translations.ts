@@ -43,6 +43,14 @@ export const EN: Record<string, string> = {
   "过滤当前目录 / 回车递归搜索…": "Filter here / Enter to search…",
   "处理中…": "Working…",
 
+  // 残留分片清理
+  清理未完成上传: "Clean up incomplete uploads",
+  "没有残留的分片上传,一切干净。": "No incomplete uploads — all clean.",
+  "发现 {n} 个未完成的分片上传(仍在计费):":
+    "{n} incomplete multipart upload(s) (still billed):",
+  全部清理: "Clean up all",
+  "✓ 已清理 {n} 个残留分片上传": "✓ Cleaned up {n} incomplete upload(s)",
+
   // 统计
   "统计中…": "Calculating…",
   存储类型: "Storage class",

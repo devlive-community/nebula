@@ -90,6 +90,14 @@ export interface TextPreview {
   truncated: boolean;
 }
 
+/** 未完成(残留)的分片上传(与 Rust 端 nebula_provider::IncompleteUpload 对应)。 */
+export interface IncompleteUpload {
+  key: string;
+  upload_id: string;
+  /** 发起时间(ISO 8601);未知为空。 */
+  initiated: string;
+}
+
 /** 分页列举的一页(与 Rust 端 nebula_provider::Page 对应)。 */
 export interface Page {
   entries: Entry[];

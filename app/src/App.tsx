@@ -44,6 +44,7 @@ import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
 import { StatsDialog } from "./components/StatsDialog";
+import { CleanupDialog } from "./components/CleanupDialog";
 import { TransferPanel } from "./components/TransferPanel";
 import { SearchResults } from "./components/SearchResults";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -100,6 +101,7 @@ export default function App() {
   const [tagsTarget, setTagsTarget] = useState<Entry | null>(null);
   const [statsTarget, setStatsTarget] = useState<Entry | null>(null);
   const [statsData, setStatsData] = useState<StorageBreakdown | null>(null);
+  const [cleanupTarget, setCleanupTarget] = useState<Entry | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewBucket, setShowNewBucket] = useState(false);
   const [settings, setSettings] = useState<Settings>({
@@ -1409,6 +1411,7 @@ export default function App() {
     !!editTypeTarget ||
     !!tagsTarget ||
     !!statsTarget ||
+    !!cleanupTarget ||
     pendingBatchDelete ||
     showSettings;
 
@@ -1434,7 +1437,8 @@ export default function App() {
       else if (statsTarget) {
         setStatsTarget(null);
         setStatsData(null);
-      } else if (showForm) setShowForm(false);
+      } else if (cleanupTarget) setCleanupTarget(null);
+      else if (showForm) setShowForm(false);
       else if (pendingBatchDelete) setPendingBatchDelete(false);
       else if (pendingDelete) setPendingDelete(null);
       else if (detailsEntry) setDetailsEntry(null);
@@ -1744,6 +1748,28 @@ export default function App() {
         />
       )}
 
+      {cleanupTarget && current && (
+        <CleanupDialog
+          account={current}
+          bucket={cleanupTarget.path.replace(/\/+$/, "")}
+          onClose={() => setCleanupTarget(null)}
+          onCleaned={(n) => {
+            setCleanupTarget(null);
+            setNotice({
+              tone: "ok",
+              text:
+                n > 0
+                  ? t("✓ 已清理 {n} 个残留分片上传", { n })
+                  : t("没有残留的分片上传,一切干净。"),
+            });
+          }}
+          onError={(msg) => {
+            setCleanupTarget(null);
+            setError(msg);
+          }}
+        />
+      )}
+
       {renameTarget && (
         <PromptDialog
           title={t("重命名")}
@@ -1878,6 +1904,7 @@ export default function App() {
       return [
         { label: t("打开"), onClick: () => openDir(entry) },
         { label: t("统计信息"), onClick: () => showFolderStats(entry) },
+        { label: t("清理未完成上传"), onClick: () => setCleanupTarget(entry) },
         {
           label: t("删除 Bucket"),
           danger: true,

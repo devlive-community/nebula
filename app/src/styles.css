@@ -1353,6 +1353,43 @@ body.resizing {
   border-color: var(--primary);
 }
 
+/* 残留分片清理弹窗 */
+.cleanup__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.cleanup__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cleanup__item:last-child {
+  border-bottom: none;
+}
+
+.cleanup__key {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cleanup__time {
+  flex: none;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 /* 统计弹窗 */
 .stats__total {
   margin: 0 0 12px;
