@@ -29,7 +29,7 @@ const messages = {
         download: {title: '流式下载', desc: '边下边写,大文件不占内存;支持断点续传、整文件夹递归下载,本地已有且一致的文件自动跳过,每个任务独立进度(含速度与剩余时间),可设全局带宽限速。'},
         migrate: {title: '跨云迁移', desc: '把对象或整个文件夹从一个账号搬到另一个账号,任意云到任意云;同账号走服务端复制,跨账号自动中转;同账号内还能整目录复制 / 移动 / 重命名到任意目录。'},
         integrity: {title: '完整性校验', desc: '下载内容算 MD5 与远端 ETag 比对,一键确认文件是否在传输中损坏;逻辑只依赖 ETag,对每家云通用。'},
-        share: {title: '一键分享', desc: '为对象生成预签名临时链接,有效期可配置,复制即分享;还能生成预签名上传链接,别人无需密钥凭链接直接 PUT 上传;或把对象设为公开读,拿一个不会过期的永久公共直链。'},
+        share: {title: '一键分享', desc: '为对象生成预签名临时链接,有效期可配置,复制即分享;还能生成预签名上传链接,别人无需密钥凭链接直接 PUT 上传;或把对象设为公开读,拿一个不会过期的永久公共直链(还可给账号配自定义域名 / CDN,直链走你自己的域名)。'},
         secure: {title: '安全省心', desc: '密钥存入系统钥匙串,元信息、设置与传输列表存本地 SQLite(重启后未完成的传输可续),中英双语、明暗主题、快捷键、右键菜单俱全。'},
         update: {title: '自动更新', desc: '应用内检测新版本,一键下载安装并校验更新签名,始终用上最新特性。'}
       }
@@ -82,7 +82,7 @@ const messages = {
         download: {title: 'Streaming download', desc: 'Stream to disk without buffering huge files; resumable downloads, whole-folder recursive download, files already present and identical are skipped, per-task progress (with speed and ETA), and an optional global bandwidth cap.'},
         migrate: {title: 'Cross-cloud migration', desc: 'Move objects or entire folders from one account to another, any cloud to any cloud; same-account uses server-side copy, cross-account relays automatically, and a whole folder can be copied / moved / renamed to any directory within an account.'},
         integrity: {title: 'Integrity check', desc: 'Hash the downloaded bytes and compare against the remote ETag to confirm a file survived transfer intact; keyed only on ETag, so it works for every cloud.'},
-        share: {title: 'One-click share', desc: 'Generate presigned temporary links with a configurable expiry — copy and share; also generate presigned upload links so others can PUT a file with no credentials; or make an object public and copy a permanent, non-expiring direct link.'},
+        share: {title: 'One-click share', desc: 'Generate presigned temporary links with a configurable expiry — copy and share; also generate presigned upload links so others can PUT a file with no credentials; or make an object public and copy a permanent, non-expiring direct link — optionally through a custom domain / CDN configured per account.'},
         secure: {title: 'Secure by design', desc: 'Secrets in the system keyring; metadata, settings and the transfer list in local SQLite (unfinished transfers resume after a restart); English / Chinese UI, theming, shortcuts and context menus included.'},
         update: {title: 'Auto-update', desc: 'Detect new versions in-app and install with one click, verified by update signatures — always on the latest.'}
       }
