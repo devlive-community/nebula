@@ -47,6 +47,30 @@ export interface Bookmark {
   path: string;
 }
 
+/** Rust 渲染好的一张图(内联 data URL + 尺寸),与 app_core::ImageData 对应。 */
+export interface ImageData {
+  data_url: string;
+  width: number;
+  height: number;
+  orig_width: number;
+  orig_height: number;
+}
+
+/** EXIF 摘要(字段全部可选),与 nebula_image::ExifInfo 对应。 */
+export interface ExifInfo {
+  make?: string | null;
+  model?: string | null;
+  lens?: string | null;
+  taken_at?: string | null;
+  exposure?: string | null;
+  aperture?: string | null;
+  iso?: string | null;
+  focal_length?: string | null;
+  orientation?: number | null;
+  gps_lat?: number | null;
+  gps_lon?: number | null;
+}
+
 /** 批量重命名规则(与 Rust 端 app_core::RenameRule 对应)。 */
 export interface RenameRule {
   /** "prefix" | "suffix" | "replace" */

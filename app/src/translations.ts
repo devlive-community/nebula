@@ -55,6 +55,24 @@ export const EN: Record<string, string> = {
   命令: "Command",
   切换主题: "Toggle theme",
 
+  // 图片浏览器
+  放大: "Zoom in",
+  缩小: "Zoom out",
+  旋转: "Rotate",
+  信息: "Info",
+  全屏: "Fullscreen",
+  上一张: "Previous",
+  下一张: "Next",
+  无法加载该图片: "Can't load this image",
+  尺寸: "Dimensions",
+  相机: "Camera",
+  镜头: "Lens",
+  拍摄时间: "Taken at",
+  光圈: "Aperture",
+  快门: "Shutter",
+  焦距: "Focal length",
+  在地图上查看: "View on map",
+
   // 对象 ACL / 公共直链
   复制公共链接: "Copy public link",
   设为公开读: "Make public",

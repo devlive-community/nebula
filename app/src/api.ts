@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Bookmark, Entry, FolderStats, IncompleteUpload, Integrity, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Bookmark, Entry, ExifInfo, FolderStats, ImageData, IncompleteUpload, Integrity, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -281,6 +281,24 @@ export const rename = (account: string, from: string, to: string) =>
 
 export const planBatchRename = (paths: string[], rule: RenameRule) =>
   invoke<RenamePlan[]>("plan_batch_rename", { paths, rule });
+
+// 图片加速:Rust 侧解码 / 缩放 / EXIF,返回内联 data URL(带 ETag 缓存)
+export const imageView = (
+  account: string,
+  path: string,
+  etag: string | null,
+  maxEdge: number,
+) => invoke<ImageData>("image_view", { account, path, etag, maxEdge });
+
+export const imageThumb = (
+  account: string,
+  path: string,
+  etag: string | null,
+  size: number,
+) => invoke<ImageData>("image_thumb", { account, path, etag, size });
+
+export const imageExif = (account: string, path: string, etag: string | null) =>
+  invoke<ExifInfo>("image_exif", { account, path, etag });
 
 export const copy = (account: string, from: string, to: string) =>
   invoke<void>("copy", { account, from, to });

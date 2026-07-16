@@ -37,6 +37,7 @@ import {
   type PaletteCommand,
 } from "./components/CommandPalette";
 import { BatchRenameDialog } from "./components/BatchRenameDialog";
+import { ImageViewer, type ImageItem } from "./components/ImageViewer";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
 import { FileGrid } from "./components/FileGrid";
@@ -182,6 +183,10 @@ export default function App() {
   } | null>(null);
   const [view, setView] = useState<"list" | "grid">("list");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [imageViewer, setImageViewer] = useState<{
+    images: ImageItem[];
+    index: number;
+  } | null>(null);
 
   useEffect(() => {
     if (prefsHydrated.current) api.setPref("view", view).catch(() => {});
@@ -196,6 +201,34 @@ export default function App() {
     const kind = previewKind(entry.name);
     if (!current || !kind) {
       setDetailsEntry(entry);
+      return;
+    }
+    // 图片走加速浏览器:Rust 解码/缩放,并可在当前目录的图片间前后翻页。
+    if (kind === "image") {
+      const list: ImageItem[] = visibleEntries
+        .filter((e) => e.kind === "file" && previewKind(e.name) === "image")
+        .map((e) => ({
+          path: e.path,
+          name: e.name,
+          etag: e.etag,
+          size: e.size,
+        }));
+      const i = list.findIndex((it) => it.path === entry.path);
+      setImageViewer(
+        i >= 0
+          ? { images: list, index: i }
+          : {
+              images: [
+                {
+                  path: entry.path,
+                  name: entry.name,
+                  etag: entry.etag,
+                  size: entry.size,
+                },
+              ],
+              index: 0,
+            },
+      );
       return;
     }
     setError(null);
@@ -428,26 +461,28 @@ export default function App() {
   const dirCount = visibleEntries.length - visibleFiles.length;
   const totalSize = visibleFiles.reduce((sum, e) => sum + e.size, 0);
 
-  // 网格视图下,为可见图片批量生成缩略图预签名链接。
+  // 网格视图下,为可见图片生成缩略图。走 Rust 侧缩略图(只下载一次、只回传小图,
+  // 并按 ETag 缓存),不再让浏览器为每张缩略图拉取整张原图。并发上限保护。
   useEffect(() => {
     if (view !== "grid" || !current) return;
-    const imgs = visibleEntries
-      .filter((e) => e.kind === "file" && previewKind(e.name) === "image")
-      .map((e) => e.path);
+    const imgs = visibleEntries.filter(
+      (e) => e.kind === "file" && previewKind(e.name) === "image",
+    );
     if (imgs.length === 0) {
       setThumbs({});
       return;
     }
     let cancelled = false;
-    api
-      .presignBatch(current, imgs, 600)
-      .then((urls) => {
-        if (cancelled) return;
-        const map: Record<string, string> = {};
-        imgs.forEach((p, i) => (map[p] = urls[i]));
-        setThumbs(map);
-      })
-      .catch(() => {});
+    setThumbs({});
+    void runPool(imgs, 6, async (e) => {
+      if (cancelled) return;
+      try {
+        const d = await api.imageThumb(current, e.path, e.etag, 160);
+        if (!cancelled) setThumbs((m) => ({ ...m, [e.path]: d.data_url }));
+      } catch {
+        // 单张失败忽略,不影响其它缩略图
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -1573,6 +1608,7 @@ export default function App() {
     !!cleanupTarget ||
     pendingBatchDelete ||
     showPalette ||
+    !!imageViewer ||
     showSettings;
 
   onKeyRef.current = (e: KeyboardEvent) => {
@@ -2153,6 +2189,15 @@ export default function App() {
           name={preview.name}
           kind={preview.kind}
           onClose={() => setPreview(null)}
+        />
+      )}
+
+      {imageViewer && current && (
+        <ImageViewer
+          account={current}
+          images={imageViewer.images}
+          index={imageViewer.index}
+          onClose={() => setImageViewer(null)}
         />
       )}
     </div>
