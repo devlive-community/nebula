@@ -41,6 +41,12 @@ export interface AccountInfo {
   custom_domain: string;
 }
 
+/** 一个收藏的位置(账号 + 路径),与 Rust 端 app_core::Bookmark 对应。 */
+export interface Bookmark {
+  account: string;
+  path: string;
+}
+
 /** 展开后待上传的一项:本地路径 + 相对(远端)路径。 */
 export interface UploadEntry {
   local: string;

@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, FolderStats, IncompleteUpload, Integrity, Page, SearchResult, Settings,
-    StorageBreakdown, TextPreview, TransferRecord,
+    AccountInfo, App, Bookmark, FolderStats, IncompleteUpload, Integrity, Page, SearchResult,
+    Settings, StorageBreakdown, TextPreview, TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -1159,6 +1159,40 @@ fn save_settings(state: State<'_, App>, settings: Settings) -> Result<(), String
     state.save_settings(&settings).map_err(|e| e.to_string())
 }
 
+/// 列出所有收藏(最近的在前)。
+#[tauri::command]
+fn bookmarks(state: State<'_, App>) -> Vec<Bookmark> {
+    state.bookmarks()
+}
+
+/// 收藏一个位置(账号 + 路径)。
+#[tauri::command]
+fn add_bookmark(state: State<'_, App>, account: String, path: String) -> Result<(), String> {
+    state
+        .add_bookmark(&account, &path)
+        .map_err(|e| e.to_string())
+}
+
+/// 取消收藏一个位置。
+#[tauri::command]
+fn remove_bookmark(state: State<'_, App>, account: String, path: String) -> Result<(), String> {
+    state
+        .remove_bookmark(&account, &path)
+        .map_err(|e| e.to_string())
+}
+
+/// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度)。
+#[tauri::command]
+fn get_pref(state: State<'_, App>, key: String) -> Option<String> {
+    state.get_pref(&key)
+}
+
+/// 写入一个界面偏好。
+#[tauri::command]
+fn set_pref(state: State<'_, App>, key: String, value: String) -> Result<(), String> {
+    state.set_pref(&key, &value).map_err(|e| e.to_string())
+}
+
 /// 构建并设置应用的自定义原生菜单,替换 Tauri 默认菜单。
 ///
 /// 自定义项(设置 / 添加账号 / 刷新 / 切换主题)点击后经 `menu-action` 事件发往前端;
@@ -1297,6 +1331,11 @@ pub fn run() {
             expand_upload_paths,
             get_settings,
             save_settings,
+            bookmarks,
+            add_bookmark,
+            remove_bookmark,
+            get_pref,
+            set_pref,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

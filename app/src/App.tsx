@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-icons";
 import type {
   AccountInfo,
+  Bookmark,
   DownloadProgress,
   Entry,
   FolderProgress,
@@ -29,7 +30,7 @@ import { useI18n } from "./i18n";
 import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
-import { Bookmarks, type Bookmark } from "./components/Bookmarks";
+import { Bookmarks } from "./components/Bookmarks";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
 import { FileGrid } from "./components/FileGrid";
@@ -60,10 +61,10 @@ export default function App() {
   const { t } = useI18n();
   const [accounts, setAccounts] = useState<AccountInfo[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const v = Number(localStorage.getItem("nebula.sidebarWidth"));
-    return v >= 180 && v <= 480 ? v : 240;
-  });
+  // 界面偏好(侧栏宽 / 视图 / 主题)持久化在 SQLite(ui_prefs 表)。先用默认值渲染,
+  // 挂载后从后端加载并回填;prefsHydrated 为真前不回写,避免用默认值覆盖已存的偏好。
+  const prefsHydrated = useRef(false);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(240);
   const [path, setPath] = useState("");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -103,30 +104,31 @@ export default function App() {
   const [statsTarget, setStatsTarget] = useState<Entry | null>(null);
   const [statsData, setStatsData] = useState<StorageBreakdown | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<Entry | null>(null);
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("nebula-bookmarks") ?? "[]");
-    } catch {
-      return [];
-    }
-  });
+  // 收藏夹持久化在 SQLite(bookmarks 表);启动时加载,增删即时写回。
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   useEffect(() => {
-    localStorage.setItem("nebula-bookmarks", JSON.stringify(bookmarks));
-  }, [bookmarks]);
+    api.getBookmarks().then(setBookmarks).catch(() => {});
+  }, []);
   const isBookmarked =
     !!current && bookmarks.some((b) => b.account === current && b.path === path);
-  const toggleBookmark = () => {
+  const toggleBookmark = async () => {
     if (!current) return;
-    setBookmarks((bm) =>
-      isBookmarked
-        ? bm.filter((b) => !(b.account === current && b.path === path))
-        : [...bm, { account: current, path }],
-    );
+    if (isBookmarked) {
+      await api.removeBookmark(current, path);
+      setBookmarks((bm) =>
+        bm.filter((b) => !(b.account === current && b.path === path)),
+      );
+    } else {
+      await api.addBookmark(current, path);
+      setBookmarks((bm) => [{ account: current, path }, ...bm]);
+    }
   };
-  const removeBookmark = (account: string, p: string) =>
+  const removeBookmark = async (account: string, p: string) => {
+    await api.removeBookmark(account, p);
     setBookmarks((bm) =>
       bm.filter((b) => !(b.account === account && b.path === p)),
     );
+  };
   const jumpBookmark = (account: string, p: string) => {
     setCurrent(account);
     setPath(p);
@@ -152,13 +154,11 @@ export default function App() {
     text?: string;
     truncated?: boolean;
   } | null>(null);
-  const [view, setView] = useState<"list" | "grid">(
-    () => (localStorage.getItem("nebula-view") as "list" | "grid") || "list",
-  );
+  const [view, setView] = useState<"list" | "grid">("list");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    localStorage.setItem("nebula-view", view);
+    if (prefsHydrated.current) api.setPref("view", view).catch(() => {});
   }, [view]);
 
   const openDir = (entry: Entry) =>
@@ -208,13 +208,11 @@ export default function App() {
   const [batchStorageClass, setBatchStorageClass] = useState(false);
   const [batchRestore, setBatchRestore] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">(
-    () => (localStorage.getItem("nebula-theme") as "dark" | "light") || "dark",
-  );
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("nebula-theme", theme);
+    if (prefsHydrated.current) api.setPref("theme", theme).catch(() => {});
   }, [theme]);
   const [transfers, setTransfers] = useState<Record<string, TransferItem>>({});
 
@@ -502,8 +500,30 @@ export default function App() {
   }, [refreshAccounts]);
 
   useEffect(() => {
-    localStorage.setItem("nebula.sidebarWidth", String(sidebarWidth));
+    if (prefsHydrated.current)
+      api.setPref("sidebar_width", String(sidebarWidth)).catch(() => {});
   }, [sidebarWidth]);
+
+  // 挂载后一次性从 SQLite 加载界面偏好并回填,完成后才允许上面的 effect 回写。
+  useEffect(() => {
+    (async () => {
+      try {
+        const [sw, v, th] = await Promise.all([
+          api.getPref("sidebar_width"),
+          api.getPref("view"),
+          api.getPref("theme"),
+        ]);
+        const n = Number(sw);
+        if (n >= 180 && n <= 480) setSidebarWidth(n);
+        if (v === "list" || v === "grid") setView(v);
+        if (th === "dark" || th === "light") setTheme(th);
+      } catch {
+        // 忽略:无存储时保持默认值
+      } finally {
+        prefsHydrated.current = true;
+      }
+    })();
+  }, []);
 
   // 拖拽侧栏右边缘调整宽度(限制在 180–480px)。
   const startResize = (e: React.MouseEvent) => {

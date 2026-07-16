@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Entry, FolderStats, IncompleteUpload, Integrity, Page, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Bookmark, Entry, FolderStats, IncompleteUpload, Integrity, Page, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -317,3 +317,18 @@ export const getSettings = () => invoke<Settings>("get_settings");
 
 export const saveSettings = (settings: Settings) =>
   invoke<void>("save_settings", { settings });
+
+// 收藏夹(持久化到 SQLite 的 bookmarks 表)
+export const getBookmarks = () => invoke<Bookmark[]>("bookmarks");
+
+export const addBookmark = (account: string, path: string) =>
+  invoke<void>("add_bookmark", { account, path });
+
+export const removeBookmark = (account: string, path: string) =>
+  invoke<void>("remove_bookmark", { account, path });
+
+// 界面偏好(持久化到 SQLite 的 ui_prefs 表)
+export const getPref = (key: string) => invoke<string | null>("get_pref", { key });
+
+export const setPref = (key: string, value: string) =>
+  invoke<void>("set_pref", { key, value });

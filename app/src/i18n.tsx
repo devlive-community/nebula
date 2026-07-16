@@ -2,10 +2,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { EN } from "./translations";
+import { getPref, setPref } from "./api";
 
 export type Locale = "zh" | "en";
 
@@ -21,16 +24,29 @@ interface I18nCtx {
 
 const LocaleContext = createContext<I18nCtx | null>(null);
 
-const storedLocale = (): Locale =>
-  localStorage.getItem("nebula-locale") === "en" ? "en" : "zh";
-
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(storedLocale);
+  // 语言偏好持久化在 SQLite(ui_prefs 表);先以中文渲染,挂载后加载并回填。
+  const [locale, setLocaleState] = useState<Locale>("zh");
+  const hydrated = useRef(false);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
-    localStorage.setItem("nebula-locale", l);
+    if (hydrated.current) setPref("locale", l).catch(() => {});
     document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
+  }, []);
+
+  useEffect(() => {
+    getPref("locale")
+      .then((v) => {
+        if (v === "en" || v === "zh") {
+          setLocaleState(v);
+          document.documentElement.lang = v === "zh" ? "zh-CN" : "en";
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        hydrated.current = true;
+      });
   }, []);
 
   const t = useCallback(

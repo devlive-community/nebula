@@ -121,6 +121,13 @@ pub struct TransferRecord {
     pub total: u64,
     pub status: String,
 }
+/// 一个收藏的位置(账号 + 路径),供前端「收藏夹」快速跳转。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Bookmark {
+    pub account: String,
+    pub path: String,
+}
+
 /// 钥匙串里存储密钥用的服务名。
 const KEYRING_SERVICE: &str = "org.devlive.nebula";
 
@@ -1188,6 +1195,53 @@ impl App {
             )?;
         }
         self.limits.set_kib_per_sec(settings.rate_limit_kib_per_sec);
+        Ok(())
+    }
+
+    /// 列出所有收藏(最近的在前)。无存储时返回空。
+    pub fn bookmarks(&self) -> Vec<Bookmark> {
+        self.store
+            .as_ref()
+            .and_then(|s| s.list_bookmarks().ok())
+            .map(|rows| {
+                rows.into_iter()
+                    .map(|r| Bookmark {
+                        account: r.account,
+                        path: r.path,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// 收藏一个位置(账号 + 路径)。无存储时无操作。
+    pub fn add_bookmark(&self, account: &str, path: &str) -> Result<()> {
+        if let Some(store) = &self.store {
+            store.add_bookmark(account, path)?;
+        }
+        Ok(())
+    }
+
+    /// 取消收藏一个位置。无存储时无操作。
+    pub fn remove_bookmark(&self, account: &str, path: &str) -> Result<()> {
+        if let Some(store) = &self.store {
+            store.remove_bookmark(account, path)?;
+        }
+        Ok(())
+    }
+
+    /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度)。无存储或未设置时返回 `None`。
+    pub fn get_pref(&self, key: &str) -> Option<String> {
+        self.store
+            .as_ref()
+            .and_then(|s| s.get_pref(key).ok().flatten())
+    }
+
+    /// 写入一个界面偏好。无存储时无操作。
+    pub fn set_pref(&self, key: &str, value: &str) -> Result<()> {
+        if let Some(store) = &self.store {
+            store.set_pref(key, value)?;
+        }
         Ok(())
     }
 

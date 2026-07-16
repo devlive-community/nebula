@@ -58,6 +58,16 @@ impl AccountStore {
                 done    INTEGER NOT NULL,
                 total   INTEGER NOT NULL,
                 status  TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS bookmarks (
+                account    TEXT NOT NULL,
+                path       TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY (account, path)
+            );
+            CREATE TABLE IF NOT EXISTS ui_prefs (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             );",
         )?;
         // 对已有库补列(1.6.0 及更早没有 custom_domain);已存在则忽略错误。
@@ -273,6 +283,74 @@ impl AccountStore {
         conn.execute("DELETE FROM transfers WHERE id = ?1", params![id])?;
         Ok(())
     }
+
+    /// 列出所有收藏(最近收藏的在前)。
+    pub fn list_bookmarks(&self) -> rusqlite::Result<Vec<BookmarkRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt =
+            conn.prepare("SELECT account, path FROM bookmarks ORDER BY created_at DESC")?;
+        let rows = stmt.query_map([], |r| {
+            Ok(BookmarkRow {
+                account: r.get(0)?,
+                path: r.get(1)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// 收藏一个位置(账号 + 路径);已存在则忽略。
+    pub fn add_bookmark(&self, account: &str, path: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
+        conn.execute(
+            "INSERT INTO bookmarks (account, path, created_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(account, path) DO NOTHING",
+            params![account, path, now],
+        )?;
+        Ok(())
+    }
+
+    /// 取消收藏一个位置。
+    pub fn remove_bookmark(&self, account: &str, path: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM bookmarks WHERE account = ?1 AND path = ?2",
+            params![account, path],
+        )?;
+        Ok(())
+    }
+
+    /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度等)。
+    pub fn get_pref(&self, key: &str) -> rusqlite::Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT value FROM ui_prefs WHERE key = ?1",
+            params![key],
+            |r| r.get(0),
+        )
+        .optional()
+    }
+
+    /// 写入(或覆盖)一个界面偏好。
+    pub fn set_pref(&self, key: &str, value: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO ui_prefs (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = ?2",
+            params![key, value],
+        )?;
+        Ok(())
+    }
+}
+
+/// 一条收藏记录(账号 + 路径)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BookmarkRow {
+    pub account: String,
+    pub path: String,
 }
 
 /// 一条断点续传上传会话记录。`parts` 是 `[(分片号, ETag)]` 的 JSON。
@@ -353,6 +431,32 @@ mod tests {
 
         store.delete_transfer(&rec.id).unwrap();
         assert!(store.list_transfers().unwrap().is_empty());
+    }
+
+    #[test]
+    fn bookmark_crud_roundtrip() {
+        let store = AccountStore::open(":memory:").unwrap();
+        assert!(store.list_bookmarks().unwrap().is_empty());
+
+        store.add_bookmark("oss", "bucket/photos/").unwrap();
+        store.add_bookmark("s3", "logs/").unwrap();
+        // 重复收藏不新增。
+        store.add_bookmark("oss", "bucket/photos/").unwrap();
+        assert_eq!(store.list_bookmarks().unwrap().len(), 2);
+
+        store.remove_bookmark("oss", "bucket/photos/").unwrap();
+        let listed = store.list_bookmarks().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].account, "s3");
+    }
+
+    #[test]
+    fn ui_pref_roundtrip() {
+        let store = AccountStore::open(":memory:").unwrap();
+        assert!(store.get_pref("theme").unwrap().is_none());
+        store.set_pref("theme", "light").unwrap();
+        store.set_pref("theme", "dark").unwrap();
+        assert_eq!(store.get_pref("theme").unwrap().as_deref(), Some("dark"));
     }
 
     #[test]

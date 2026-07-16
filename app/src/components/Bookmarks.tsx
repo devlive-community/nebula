@@ -2,11 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBookmark, faStar, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { useI18n } from "../i18n";
-
-export interface Bookmark {
-  account: string;
-  path: string;
-}
+import type { Bookmark } from "../types";
 
 interface Props {
   bookmarks: Bookmark[];
