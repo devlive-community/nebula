@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faBolt,
   faCloud,
   faBookmark,
   faClockRotateLeft,
@@ -9,21 +10,30 @@ import {
 import { useI18n } from "../i18n";
 import type { AccountInfo, Bookmark } from "../types";
 
-/** 面板里的一个可跳转项:最近访问、账号根,或某个收藏。 */
+/** 一个可执行的命令(动作),由 App 提供。 */
+export interface PaletteCommand {
+  id: string;
+  label: string;
+  run: () => void;
+}
+
+/** 面板里的一行:跳转类(最近 / 账号 / 收藏)或命令类,统一带一个执行动作。 */
 export interface PaletteItem {
-  kind: "recent" | "account" | "bookmark";
-  account: string;
-  path: string;
+  key: string;
+  kind: "recent" | "account" | "bookmark" | "command";
   /** 展示用的主标题。 */
   label: string;
-  /** 展示用的副标题(账号项为厂商,其余为账号名)。 */
+  /** 展示用的副标题(账号项为厂商,跳转项为账号名,命令项为「命令」)。 */
   hint: string;
+  /** 选中执行的动作。 */
+  run: () => void;
 }
 
 interface Props {
   accounts: AccountInfo[];
   bookmarks: Bookmark[];
   recents: Bookmark[];
+  commands: PaletteCommand[];
   onJump: (account: string, path: string) => void;
   onClose: () => void;
 }
@@ -32,6 +42,7 @@ const ICONS = {
   recent: faClockRotateLeft,
   account: faCloud,
   bookmark: faBookmark,
+  command: faBolt,
 } as const;
 
 /**
@@ -42,6 +53,7 @@ export function CommandPalette({
   accounts,
   bookmarks,
   recents,
+  commands,
   onJump,
   onClose,
 }: Props) {
@@ -56,46 +68,51 @@ export function CommandPalette({
   }, []);
 
   const items = useMemo<PaletteItem[]>(() => {
-    // 最近访问在前,其次账号根,再次收藏;按 账号|路径 去重(先出现的胜出)。
+    // 顺序:最近访问 → 命令 → 账号根 → 收藏。跳转类按 loc:账号|路径 去重(先出现的胜出)。
+    const cmdHint = t("命令");
     const raw: PaletteItem[] = [
       ...recents.map((r) => ({
+        key: `loc:${r.account}|${r.path}`,
         kind: "recent" as const,
-        account: r.account,
-        path: r.path,
         label: r.path || "/",
         hint: r.account,
+        run: () => onJump(r.account, r.path),
+      })),
+      ...commands.map((c) => ({
+        key: `cmd:${c.id}`,
+        kind: "command" as const,
+        label: c.label,
+        hint: cmdHint,
+        run: c.run,
       })),
       ...accounts.map((a) => ({
+        key: `loc:${a.id}|`,
         kind: "account" as const,
-        account: a.id,
-        path: "",
         label: a.id,
         hint: a.vendor,
+        run: () => onJump(a.id, ""),
       })),
       ...bookmarks.map((b) => ({
+        key: `loc:${b.account}|${b.path}`,
         kind: "bookmark" as const,
-        account: b.account,
-        path: b.path,
         label: b.path || "/",
         hint: b.account,
+        run: () => onJump(b.account, b.path),
       })),
     ];
     const seen = new Set<string>();
     const all = raw.filter((it) => {
-      const key = `${it.account}|${it.path}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
+      if (seen.has(it.key)) return false;
+      seen.add(it.key);
       return true;
     });
     const q = query.trim().toLowerCase();
     if (!q) return all;
     return all.filter(
       (it) =>
-        it.label.toLowerCase().includes(q) ||
-        it.hint.toLowerCase().includes(q) ||
-        it.account.toLowerCase().includes(q),
+        it.label.toLowerCase().includes(q) || it.hint.toLowerCase().includes(q),
     );
-  }, [accounts, bookmarks, recents, query]);
+  }, [accounts, bookmarks, recents, commands, query, onJump, t]);
 
   // 过滤结果变化时,把选中项夹回有效范围。
   useEffect(() => {
@@ -104,7 +121,7 @@ export function CommandPalette({
 
   const choose = (it: PaletteItem | undefined) => {
     if (!it) return;
-    onJump(it.account, it.path);
+    it.run();
     onClose();
   };
 
@@ -139,7 +156,7 @@ export function CommandPalette({
             ref={inputRef}
             className="palette__input"
             value={query}
-            placeholder={t("跳转到账号或收藏…")}
+            placeholder={t("跳转或执行命令…")}
             onChange={(e) => {
               setQuery(e.target.value);
               setActive(0);
@@ -153,7 +170,7 @@ export function CommandPalette({
           ) : (
             items.map((it, i) => (
               <button
-                key={`${it.kind}:${it.account}:${it.path}`}
+                key={it.key}
                 className={`palette__item ${i === active ? "palette__item--active" : ""}`}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => choose(it)}

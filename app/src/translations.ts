@@ -50,8 +50,10 @@ export const EN: Record<string, string> = {
   还没有收藏: "No bookmarks yet",
 
   // 命令面板
-  "跳转到账号或收藏…": "Jump to an account or bookmark…",
+  "跳转或执行命令…": "Jump or run a command…",
   没有匹配项: "No matches",
+  命令: "Command",
+  切换主题: "Toggle theme",
 
   // 对象 ACL / 公共直链
   复制公共链接: "Copy public link",

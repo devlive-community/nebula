@@ -31,7 +31,10 @@ import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
 import { Bookmarks } from "./components/Bookmarks";
-import { CommandPalette } from "./components/CommandPalette";
+import {
+  CommandPalette,
+  type PaletteCommand,
+} from "./components/CommandPalette";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
 import { FileGrid } from "./components/FileGrid";
@@ -1594,6 +1597,61 @@ export default function App() {
     }
   };
 
+  // 命令面板可执行的动作,按当前上下文启用(复用工具栏 / 菜单的现有处理函数)。
+  const paletteCommands: PaletteCommand[] = [];
+  if (current)
+    paletteCommands.push({ id: "refresh", label: t("刷新"), run: () => void load() });
+  if (path !== "") {
+    paletteCommands.push({
+      id: "up",
+      label: t("上一层"),
+      run: () => setPath(parentPath(path)),
+    });
+    paletteCommands.push({ id: "upload", label: t("上传"), run: () => void upload() });
+    paletteCommands.push({
+      id: "upload-folder",
+      label: t("上传文件夹"),
+      run: () => void uploadFolder(),
+    });
+    paletteCommands.push({
+      id: "new-folder",
+      label: t("新建文件夹"),
+      run: () => setShowNewFolder(true),
+    });
+  }
+  if (path === "" && current)
+    paletteCommands.push({
+      id: "new-bucket",
+      label: t("新建 Bucket"),
+      run: () => setShowNewBucket(true),
+    });
+  paletteCommands.push({
+    id: "toggle-view",
+    label: view === "list" ? t("网格视图") : t("列表视图"),
+    run: () => setView((v) => (v === "list" ? "grid" : "list")),
+  });
+  paletteCommands.push({
+    id: "toggle-theme",
+    label: t("切换主题"),
+    run: () => setTheme((x) => (x === "dark" ? "light" : "dark")),
+  });
+  paletteCommands.push({
+    id: "settings",
+    label: t("设置"),
+    run: () => setShowSettings(true),
+  });
+  paletteCommands.push({
+    id: "add-account",
+    label: t("添加账号"),
+    run: () => setShowForm(true),
+  });
+  paletteCommands.push({ id: "about", label: t("关于"), run: () => setShowAbout(true) });
+  paletteCommands.push({
+    id: "check-update",
+    label: t("检查更新"),
+    run: () => void runUpdateCheck(true),
+  });
+
   return (
     <div className="layout">
       <Sidebar
@@ -2024,6 +2082,7 @@ export default function App() {
           accounts={accounts}
           bookmarks={bookmarks}
           recents={recents}
+          commands={paletteCommands}
           onJump={jumpBookmark}
           onClose={() => setShowPalette(false)}
         />
