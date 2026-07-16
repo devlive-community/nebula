@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Bookmark, Entry, FolderStats, IncompleteUpload, Integrity, Page, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Bookmark, Entry, FolderStats, IncompleteUpload, Integrity, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -278,6 +278,9 @@ export const createFolder = (account: string, path: string) =>
 
 export const rename = (account: string, from: string, to: string) =>
   invoke<void>("rename", { account, from, to });
+
+export const planBatchRename = (paths: string[], rule: RenameRule) =>
+  invoke<RenamePlan[]>("plan_batch_rename", { paths, rule });
 
 export const copy = (account: string, from: string, to: string) =>
   invoke<void>("copy", { account, from, to });

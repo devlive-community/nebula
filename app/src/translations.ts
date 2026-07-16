@@ -120,7 +120,25 @@ export const EN: Record<string, string> = {
   转换存储类型: "Change storage class",
   取回归档: "Restore archive",
   批量删除: "Delete",
+  批量重命名: "Batch rename",
   取消选择: "Clear selection",
+
+  // 批量重命名
+  添加前缀: "Add prefix",
+  "添加后缀(扩展名前)": "Add suffix (before extension)",
+  查找替换: "Find & replace",
+  前缀: "Prefix",
+  后缀: "Suffix",
+  查找: "Find",
+  替换为: "Replace with",
+  要替换的文本: "Text to replace",
+  留空即删除该文本: "Leave empty to remove it",
+  没有会改动的对象: "Nothing would change",
+  "将重命名 {n} 项:": "Will rename {n} item(s):",
+  "…还有 {n} 项": "…and {n} more",
+  "正在重命名 {n} 个对象…": "Renaming {n} object(s)…",
+  "重命名:成功 {ok},失败 {fail}": "Renamed: {ok} ok, {fail} failed",
+  "✓ 已重命名 {n} 个对象": "✓ Renamed {n} object(s)",
 
   // 传输面板
   传输: "Transfers",

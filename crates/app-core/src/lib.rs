@@ -128,6 +128,75 @@ pub struct Bookmark {
     pub path: String,
 }
 
+/// 批量重命名规则。`mode` 为 `prefix` / `suffix` / `replace`;
+/// `a` 是前缀 / 后缀 / 查找串,`b` 是替换串(仅 `replace` 用)。
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RenameRule {
+    pub mode: String,
+    #[serde(default)]
+    pub a: String,
+    #[serde(default)]
+    pub b: String,
+}
+
+/// 一条重命名计划:把对象从 `from` 改名到 `to`。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct RenamePlan {
+    pub from: String,
+    pub to: String,
+}
+
+/// 按规则变换单个对象的**基名**(路径最后一段);父前缀保持不变。
+fn rename_base(base: &str, rule: &RenameRule) -> String {
+    match rule.mode.as_str() {
+        "prefix" => format!("{}{base}", rule.a),
+        "suffix" => {
+            // 后缀插在扩展名之前(`a.txt` + `-v2` → `a-v2.txt`);无扩展名则直接追加。
+            // 只认最后一个「非开头」的点,`.gitignore` 这类隐藏文件不当作有扩展名。
+            match base.rfind('.') {
+                Some(i) if i > 0 => format!("{}{}{}", &base[..i], rule.a, &base[i..]),
+                _ => format!("{base}{}", rule.a),
+            }
+        }
+        "replace" => {
+            if rule.a.is_empty() {
+                base.to_string()
+            } else {
+                base.replace(&rule.a, &rule.b)
+            }
+        }
+        _ => base.to_string(),
+    }
+}
+
+/// 为一批对象路径计算重命名计划。父前缀不变、仅改基名;
+/// 新基名为空、或结果与原路径相同的项会被跳过(不出现在计划里)。
+pub fn plan_batch_rename(paths: &[String], rule: &RenameRule) -> Vec<RenamePlan> {
+    let mut plans = Vec::new();
+    for path in paths {
+        // 拆出父前缀(含末尾 `/`)与基名。
+        let (parent, base) = match path.rfind('/') {
+            Some(i) => (&path[..=i], &path[i + 1..]),
+            None => ("", path.as_str()),
+        };
+        if base.is_empty() {
+            continue; // 目录项(以 `/` 结尾),跳过
+        }
+        let new_base = rename_base(base, rule);
+        if new_base.is_empty() {
+            continue;
+        }
+        let to = format!("{parent}{new_base}");
+        if to != *path {
+            plans.push(RenamePlan {
+                from: path.clone(),
+                to,
+            });
+        }
+    }
+    plans
+}
+
 /// 钥匙串里存储密钥用的服务名。
 const KEYRING_SERVICE: &str = "org.devlive.nebula";
 
@@ -1385,6 +1454,59 @@ mod tests {
     use nebula_provider::{Capabilities, EntryKind, ProviderError};
     use std::collections::HashMap;
     use std::sync::Mutex;
+
+    fn rule(mode: &str, a: &str, b: &str) -> RenameRule {
+        RenameRule {
+            mode: mode.into(),
+            a: a.into(),
+            b: b.into(),
+        }
+    }
+
+    #[test]
+    fn batch_rename_prefix_suffix_replace() {
+        let paths = vec![
+            "bkt/photos/a.jpg".to_string(),
+            "bkt/photos/b.png".to_string(),
+            "bkt/photos/README".to_string(),
+        ];
+
+        // 前缀:只改基名,父前缀不变。
+        let p = plan_batch_rename(&paths, &rule("prefix", "2026_", ""));
+        assert_eq!(p[0].to, "bkt/photos/2026_a.jpg");
+        assert_eq!(p[2].to, "bkt/photos/2026_README");
+
+        // 后缀:插在扩展名之前;无扩展名则直接追加。
+        let p = plan_batch_rename(&paths, &rule("suffix", "-v2", ""));
+        assert_eq!(p[0].to, "bkt/photos/a-v2.jpg");
+        assert_eq!(p[2].to, "bkt/photos/README-v2");
+
+        // 查找替换:只在基名里替换(父前缀不动),不匹配的项被跳过。
+        let p = plan_batch_rename(&paths, &rule("replace", ".jpg", ".jpeg"));
+        assert_eq!(p.len(), 1);
+        assert_eq!(p[0].to, "bkt/photos/a.jpeg");
+    }
+
+    #[test]
+    fn batch_rename_skips_noops_and_dirs() {
+        let paths = vec![
+            "bkt/keep.txt".to_string(),
+            "bkt/sub/".to_string(), // 目录项:跳过
+        ];
+        // 查找串不匹配 → 结果不变 → 该项被跳过;目录项也被跳过。
+        let p = plan_batch_rename(&paths, &rule("replace", "zzz", "q"));
+        assert!(p.is_empty());
+        // 空查找串:replace 视为无操作。
+        let p = plan_batch_rename(&paths, &rule("replace", "", "x"));
+        assert!(p.is_empty());
+    }
+
+    #[test]
+    fn hidden_dotfile_has_no_extension() {
+        let paths = vec!["bkt/.gitignore".to_string()];
+        let p = plan_batch_rename(&paths, &rule("suffix", "-bak", ""));
+        assert_eq!(p[0].to, "bkt/.gitignore-bak");
+    }
 
     /// 内存版 provider,用于离线端到端测试 App 逻辑。路径即完整 key。
     struct MemoryProvider {

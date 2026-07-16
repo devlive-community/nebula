@@ -47,6 +47,22 @@ export interface Bookmark {
   path: string;
 }
 
+/** 批量重命名规则(与 Rust 端 app_core::RenameRule 对应)。 */
+export interface RenameRule {
+  /** "prefix" | "suffix" | "replace" */
+  mode: string;
+  /** 前缀 / 后缀 / 查找串 */
+  a: string;
+  /** 替换串(仅 replace 用) */
+  b: string;
+}
+
+/** 一条重命名计划:from → to(与 Rust 端 app_core::RenamePlan 对应)。 */
+export interface RenamePlan {
+  from: string;
+  to: string;
+}
+
 /** 展开后待上传的一项:本地路径 + 相对(远端)路径。 */
 export interface UploadEntry {
   local: string;

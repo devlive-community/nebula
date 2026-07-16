@@ -9,6 +9,7 @@ import type {
   Bookmark,
   DownloadProgress,
   Entry,
+  RenamePlan,
   FolderProgress,
   Settings,
   StorageBreakdown,
@@ -35,6 +36,7 @@ import {
   CommandPalette,
   type PaletteCommand,
 } from "./components/CommandPalette";
+import { BatchRenameDialog } from "./components/BatchRenameDialog";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
 import { FileGrid } from "./components/FileGrid";
@@ -231,6 +233,7 @@ export default function App() {
   const [pendingBatchDelete, setPendingBatchDelete] = useState(false);
   const [batchStorageClass, setBatchStorageClass] = useState(false);
   const [batchRestore, setBatchRestore] = useState(false);
+  const [showBatchRename, setShowBatchRename] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
@@ -865,6 +868,32 @@ export default function App() {
       tone: fail ? "warn" : "ok",
       text: `已发起取回:成功 ${ok}${fail ? `,失败 ${fail}(可能非归档对象)` : ""}`,
     });
+  };
+
+  // 批量重命名:按计划逐个改名(复用单个 rename 的 copy+delete),失败项单独统计。
+  const applyBatchRename = async (plan: RenamePlan[]) => {
+    setShowBatchRename(false);
+    if (!current || plan.length === 0) return;
+    setError(null);
+    setNotice({ tone: "info", text: t("正在重命名 {n} 个对象…", { n: plan.length }) });
+    let ok = 0;
+    let fail = 0;
+    await runPool(plan, settings.concurrency, async (p) => {
+      try {
+        await api.rename(current, p.from, p.to);
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    });
+    clearSelection();
+    setNotice({
+      tone: fail ? "warn" : "ok",
+      text: fail
+        ? t("重命名:成功 {ok},失败 {fail}", { ok, fail })
+        : t("✓ 已重命名 {n} 个对象", { n: ok }),
+    });
+    await load();
   };
 
   // 上传一组本地路径(文件或文件夹)到当前目录,文件夹递归、保留相对路径。
@@ -1534,6 +1563,7 @@ export default function App() {
     !!restoreTarget ||
     batchStorageClass ||
     batchRestore ||
+    showBatchRename ||
     !!shareUrl ||
     showNewFolder ||
     showNewBucket ||
@@ -1566,6 +1596,7 @@ export default function App() {
       else if (restoreTarget) setRestoreTarget(null);
       else if (batchStorageClass) setBatchStorageClass(false);
       else if (batchRestore) setBatchRestore(false);
+      else if (showBatchRename) setShowBatchRename(false);
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
       else if (showNewBucket) setShowNewBucket(false);
@@ -1736,6 +1767,9 @@ export default function App() {
                 </button>
                 <button className="btn" onClick={() => setBatchRestore(true)}>
                   {t("取回归档")}
+                </button>
+                <button className="btn" onClick={() => setShowBatchRename(true)}>
+                  {t("批量重命名")}
                 </button>
                 <button
                   className="btn btn--danger"
@@ -2055,6 +2089,14 @@ export default function App() {
           name={`已选 ${selected.size} 项`}
           onConfirm={doBatchRestore}
           onCancel={() => setBatchRestore(false)}
+        />
+      )}
+
+      {showBatchRename && (
+        <BatchRenameDialog
+          paths={[...selected]}
+          onApply={applyBatchRename}
+          onCancel={() => setShowBatchRename(false)}
         />
       )}
 

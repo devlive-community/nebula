@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, Bookmark, FolderStats, IncompleteUpload, Integrity, Page, SearchResult,
-    Settings, StorageBreakdown, TextPreview, TransferRecord,
+    AccountInfo, App, Bookmark, FolderStats, IncompleteUpload, Integrity, Page, RenamePlan,
+    RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -1195,6 +1195,12 @@ fn recent_locations(state: State<'_, App>) -> Vec<Bookmark> {
     state.recent_locations()
 }
 
+/// 为一批对象计算批量重命名计划(纯函数,前端用于预览与执行)。
+#[tauri::command]
+fn plan_batch_rename(paths: Vec<String>, rule: RenameRule) -> Vec<RenamePlan> {
+    app_core::plan_batch_rename(&paths, &rule)
+}
+
 /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度)。
 #[tauri::command]
 fn get_pref(state: State<'_, App>, key: String) -> Option<String> {
@@ -1350,6 +1356,7 @@ pub fn run() {
             remove_bookmark,
             record_visit,
             recent_locations,
+            plan_batch_rename,
             get_pref,
             set_pref,
         ])

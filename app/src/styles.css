@@ -1388,6 +1388,68 @@ body.resizing {
   border-color: var(--primary);
 }
 
+/* 批量重命名 */
+.rename-fields {
+  display: flex;
+  gap: 12px;
+}
+
+.rename-fields .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.rename-preview {
+  margin-top: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+}
+
+.rename-preview__head {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.rename-preview__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+.rename-preview__old {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+
+.rename-preview__arrow {
+  flex: none;
+  color: var(--text-faint);
+}
+
+.rename-preview__new {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.rename-preview__more {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding-top: 4px;
+}
+
 /* 命令面板(Cmd/Ctrl+K) */
 .palette__backdrop {
   position: fixed;
