@@ -327,6 +327,13 @@ export const addBookmark = (account: string, path: string) =>
 export const removeBookmark = (account: string, path: string) =>
   invoke<void>("remove_bookmark", { account, path });
 
+// 最近访问(持久化到 SQLite 的 recent_locations 表)
+export const recordVisit = (account: string, path: string) =>
+  invoke<void>("record_visit", { account, path });
+
+export const getRecentLocations = () =>
+  invoke<Bookmark[]>("recent_locations");
+
 // 界面偏好(持久化到 SQLite 的 ui_prefs 表)
 export const getPref = (key: string) => invoke<string | null>("get_pref", { key });
 

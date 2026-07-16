@@ -68,6 +68,12 @@ impl AccountStore {
             CREATE TABLE IF NOT EXISTS ui_prefs (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS recent_locations (
+                account TEXT NOT NULL,
+                path    TEXT NOT NULL,
+                seq     INTEGER NOT NULL,
+                PRIMARY KEY (account, path)
             );",
         )?;
         // 对已有库补列(1.6.0 及更早没有 custom_domain);已存在则忽略错误。
@@ -323,6 +329,42 @@ impl AccountStore {
         Ok(())
     }
 
+    /// 记录一次访问(账号 + 路径),已存在则顶到最前;只保留最近 `keep` 条。
+    /// 用一个单调递增的逻辑序号 `seq` 排序(不依赖墙钟,避免同毫秒并列)。
+    pub fn record_visit(&self, account: &str, path: &str, keep: usize) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO recent_locations (account, path, seq)
+             VALUES (?1, ?2, (SELECT COALESCE(MAX(seq), 0) + 1 FROM recent_locations))
+             ON CONFLICT(account, path) DO UPDATE
+                SET seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM recent_locations)",
+            params![account, path],
+        )?;
+        // 修剪:只留 seq 最大的 keep 条。
+        conn.execute(
+            "DELETE FROM recent_locations WHERE (account, path) NOT IN (
+                 SELECT account, path FROM recent_locations
+                 ORDER BY seq DESC LIMIT ?1
+             )",
+            params![keep as i64],
+        )?;
+        Ok(())
+    }
+
+    /// 列出最近访问(最新在前),最多 `limit` 条。
+    pub fn list_recent(&self, limit: usize) -> rusqlite::Result<Vec<BookmarkRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt =
+            conn.prepare("SELECT account, path FROM recent_locations ORDER BY seq DESC LIMIT ?1")?;
+        let rows = stmt.query_map(params![limit as i64], |r| {
+            Ok(BookmarkRow {
+                account: r.get(0)?,
+                path: r.get(1)?,
+            })
+        })?;
+        rows.collect()
+    }
+
     /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度等)。
     pub fn get_pref(&self, key: &str) -> rusqlite::Result<Option<String>> {
         let conn = self.conn.lock().unwrap();
@@ -448,6 +490,27 @@ mod tests {
         let listed = store.list_bookmarks().unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].account, "s3");
+    }
+
+    #[test]
+    fn recent_locations_tracks_and_prunes() {
+        let store = AccountStore::open(":memory:").unwrap();
+        assert!(store.list_recent(20).unwrap().is_empty());
+
+        store.record_visit("oss", "a/", 3).unwrap();
+        store.record_visit("oss", "b/", 3).unwrap();
+        store.record_visit("oss", "c/", 3).unwrap();
+        // 再访问 a/ 应把它顶到最前(不新增行)。
+        store.record_visit("oss", "a/", 3).unwrap();
+        let recent = store.list_recent(20).unwrap();
+        assert_eq!(recent.len(), 3);
+        assert_eq!(recent[0].path, "a/");
+
+        // 第 4 个不同位置触发修剪,最旧的 b/ 被淘汰。
+        store.record_visit("oss", "d/", 3).unwrap();
+        let recent = store.list_recent(20).unwrap();
+        assert_eq!(recent.len(), 3);
+        assert!(recent.iter().all(|r| r.path != "b/"));
     }
 
     #[test]

@@ -134,6 +134,9 @@ const KEYRING_SERVICE: &str = "org.devlive.nebula";
 /// 递归搜索最多扫描的条目数(跨所有层级),防止超大桶把搜索拖死。
 const SEARCH_SCAN_LIMIT: usize = 20_000;
 
+/// 「最近访问」保留的位置条数。
+const RECENT_LOCATIONS_KEEP: usize = 20;
+
 /// App 的核心状态与操作入口。可低成本 clone(共享注册表 / 存储 / 密钥库)。
 #[derive(Clone)]
 pub struct App {
@@ -1228,6 +1231,30 @@ impl App {
             store.remove_bookmark(account, path)?;
         }
         Ok(())
+    }
+
+    /// 记录一次访问(账号 + 路径),供「最近访问」用;只保留最近若干条。无存储时无操作。
+    pub fn record_visit(&self, account: &str, path: &str) -> Result<()> {
+        if let Some(store) = &self.store {
+            store.record_visit(account, path, RECENT_LOCATIONS_KEEP)?;
+        }
+        Ok(())
+    }
+
+    /// 列出最近访问(最新在前)。无存储时返回空。
+    pub fn recent_locations(&self) -> Vec<Bookmark> {
+        self.store
+            .as_ref()
+            .and_then(|s| s.list_recent(RECENT_LOCATIONS_KEEP).ok())
+            .map(|rows| {
+                rows.into_iter()
+                    .map(|r| Bookmark {
+                        account: r.account,
+                        path: r.path,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度)。无存储或未设置时返回 `None`。

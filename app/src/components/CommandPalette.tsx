@@ -1,32 +1,50 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCloud, faBookmark, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCloud,
+  faBookmark,
+  faClockRotateLeft,
+  faMagnifyingGlass,
+} from "@fortawesome/free-solid-svg-icons";
 import { useI18n } from "../i18n";
 import type { AccountInfo, Bookmark } from "../types";
 
-/** 面板里的一个可跳转项:账号根,或某个收藏。 */
+/** 面板里的一个可跳转项:最近访问、账号根,或某个收藏。 */
 export interface PaletteItem {
-  kind: "account" | "bookmark";
+  kind: "recent" | "account" | "bookmark";
   account: string;
   path: string;
   /** 展示用的主标题。 */
   label: string;
-  /** 展示用的副标题(账号项为厂商,收藏项为账号名)。 */
+  /** 展示用的副标题(账号项为厂商,其余为账号名)。 */
   hint: string;
 }
 
 interface Props {
   accounts: AccountInfo[];
   bookmarks: Bookmark[];
+  recents: Bookmark[];
   onJump: (account: string, path: string) => void;
   onClose: () => void;
 }
+
+const ICONS = {
+  recent: faClockRotateLeft,
+  account: faCloud,
+  bookmark: faBookmark,
+} as const;
 
 /**
  * 命令面板:Cmd/Ctrl+K 打开,输入即过滤账号与收藏,回车跳转。
  * 上下键选择、Esc 关闭;纯前端,复用已加载的账号 / 收藏数据。
  */
-export function CommandPalette({ accounts, bookmarks, onJump, onClose }: Props) {
+export function CommandPalette({
+  accounts,
+  bookmarks,
+  recents,
+  onJump,
+  onClose,
+}: Props) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -38,7 +56,15 @@ export function CommandPalette({ accounts, bookmarks, onJump, onClose }: Props) 
   }, []);
 
   const items = useMemo<PaletteItem[]>(() => {
-    const all: PaletteItem[] = [
+    // 最近访问在前,其次账号根,再次收藏;按 账号|路径 去重(先出现的胜出)。
+    const raw: PaletteItem[] = [
+      ...recents.map((r) => ({
+        kind: "recent" as const,
+        account: r.account,
+        path: r.path,
+        label: r.path || "/",
+        hint: r.account,
+      })),
       ...accounts.map((a) => ({
         kind: "account" as const,
         account: a.id,
@@ -54,6 +80,13 @@ export function CommandPalette({ accounts, bookmarks, onJump, onClose }: Props) 
         hint: b.account,
       })),
     ];
+    const seen = new Set<string>();
+    const all = raw.filter((it) => {
+      const key = `${it.account}|${it.path}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     const q = query.trim().toLowerCase();
     if (!q) return all;
     return all.filter(
@@ -62,7 +95,7 @@ export function CommandPalette({ accounts, bookmarks, onJump, onClose }: Props) 
         it.hint.toLowerCase().includes(q) ||
         it.account.toLowerCase().includes(q),
     );
-  }, [accounts, bookmarks, query]);
+  }, [accounts, bookmarks, recents, query]);
 
   // 过滤结果变化时,把选中项夹回有效范围。
   useEffect(() => {
@@ -125,10 +158,7 @@ export function CommandPalette({ accounts, bookmarks, onJump, onClose }: Props) 
                 onMouseEnter={() => setActive(i)}
                 onClick={() => choose(it)}
               >
-                <FontAwesomeIcon
-                  icon={it.kind === "account" ? faCloud : faBookmark}
-                  className="palette__icon"
-                />
+                <FontAwesomeIcon icon={ICONS[it.kind]} className="palette__icon" />
                 <span className="palette__label">{it.label}</span>
                 <span className="palette__hint">{it.hint}</span>
               </button>

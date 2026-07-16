@@ -1181,6 +1181,20 @@ fn remove_bookmark(state: State<'_, App>, account: String, path: String) -> Resu
         .map_err(|e| e.to_string())
 }
 
+/// 记录一次访问(账号 + 路径),供「最近访问」用。
+#[tauri::command]
+fn record_visit(state: State<'_, App>, account: String, path: String) -> Result<(), String> {
+    state
+        .record_visit(&account, &path)
+        .map_err(|e| e.to_string())
+}
+
+/// 列出最近访问(最新在前)。
+#[tauri::command]
+fn recent_locations(state: State<'_, App>) -> Vec<Bookmark> {
+    state.recent_locations()
+}
+
 /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度)。
 #[tauri::command]
 fn get_pref(state: State<'_, App>, key: String) -> Option<String> {
@@ -1334,6 +1348,8 @@ pub fn run() {
             bookmarks,
             add_bookmark,
             remove_bookmark,
+            record_visit,
+            recent_locations,
             get_pref,
             set_pref,
         ])

@@ -135,6 +135,25 @@ export default function App() {
     setPath(p);
   };
   const [showPalette, setShowPalette] = useState(false);
+  // 最近访问持久化在 SQLite(recent_locations 表);启动加载,导航时记录。
+  const [recents, setRecents] = useState<Bookmark[]>([]);
+  useEffect(() => {
+    api.getRecentLocations().then(setRecents).catch(() => {});
+  }, []);
+  // 停留 800ms 才记一次,避免快速穿行目录时频繁写库。
+  useEffect(() => {
+    if (!current) return;
+    const acct = current;
+    const p = path;
+    const id = setTimeout(() => {
+      api
+        .recordVisit(acct, p)
+        .then(() => api.getRecentLocations())
+        .then(setRecents)
+        .catch(() => {});
+    }, 800);
+    return () => clearTimeout(id);
+  }, [current, path]);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewBucket, setShowNewBucket] = useState(false);
   const [settings, setSettings] = useState<Settings>({
@@ -2004,6 +2023,7 @@ export default function App() {
         <CommandPalette
           accounts={accounts}
           bookmarks={bookmarks}
+          recents={recents}
           onJump={jumpBookmark}
           onClose={() => setShowPalette(false)}
         />
