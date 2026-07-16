@@ -31,6 +31,7 @@ import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
 import { Bookmarks } from "./components/Bookmarks";
+import { CommandPalette } from "./components/CommandPalette";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
 import { FileGrid } from "./components/FileGrid";
@@ -133,6 +134,7 @@ export default function App() {
     setCurrent(account);
     setPath(p);
   };
+  const [showPalette, setShowPalette] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewBucket, setShowNewBucket] = useState(false);
   const [settings, setSettings] = useState<Settings>({
@@ -1518,12 +1520,20 @@ export default function App() {
     !!statsTarget ||
     !!cleanupTarget ||
     pendingBatchDelete ||
+    showPalette ||
     showSettings;
 
   onKeyRef.current = (e: KeyboardEvent) => {
     const el = e.target as HTMLElement | null;
     const typing =
       !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+
+    // 命令面板:Cmd/Ctrl+K 全局开关(即使正在输入框里也可唤起)。
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      setShowPalette((v) => !v);
+      return;
+    }
 
     if (e.key === "Escape") {
       if (showSettings) setShowSettings(false);
@@ -1989,6 +1999,15 @@ export default function App() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+
+      {showPalette && (
+        <CommandPalette
+          accounts={accounts}
+          bookmarks={bookmarks}
+          onJump={jumpBookmark}
+          onClose={() => setShowPalette(false)}
+        />
+      )}
 
       {update && (
         <UpdateDialog update={update} onClose={() => setUpdate(null)} />

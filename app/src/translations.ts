@@ -49,6 +49,10 @@ export const EN: Record<string, string> = {
   取消收藏当前位置: "Remove this bookmark",
   还没有收藏: "No bookmarks yet",
 
+  // 命令面板
+  "跳转到账号或收藏…": "Jump to an account or bookmark…",
+  没有匹配项: "No matches",
+
   // 对象 ACL / 公共直链
   复制公共链接: "Copy public link",
   设为公开读: "Make public",

@@ -1382,6 +1382,103 @@ body.resizing {
   border-color: var(--primary);
 }
 
+/* 命令面板(Cmd/Ctrl+K) */
+.palette__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.palette {
+  width: 560px;
+  max-width: 90vw;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.palette__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.palette__search-icon {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.palette__input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.palette__list {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.palette__empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.palette__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.palette__item--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.palette__icon {
+  flex: none;
+  width: 16px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.palette__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.palette__hint {
+  flex: none;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 /* 收藏夹 */
 .bookmarks {
   position: relative;
