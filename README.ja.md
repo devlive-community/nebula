@@ -1,4 +1,4 @@
-[简体中文](README.md) · [English](README.en.md) · [Русский](README.ru.md) · **日本語** · [한국어](README.ko.md)
+[English](README.md) · [简体中文](README.zh-CN.md) · [Русский](README.ru.md) · **日本語** · [한국어](README.ko.md)
 
 # Nebula
 
@@ -39,7 +39,7 @@ Rust + Tauri 製 —— 軽量・高速で、macOS / Windows / Linux でネイ�
 
 Rust + Tauri 2.0、厳密に一方向の 3 層アーキテクチャを持つモノレポ:`cloud-core → ベンダー別 SDK → provider アダプター → app`。認証情報はシステムキーチェーン、非同期は tokio。
 
-ディレクトリ構成、SDK プレイブック、ベンダー別の仕様書は [メイン README(简体中文)](README.md) と [`docs/`](./docs) を参照。アプリの実行とパッケージング:[app/README.md](./app/README.md)。
+ディレクトリ構成、SDK プレイブック、ベンダー別の仕様書は [メイン README(简体中文)](README.zh-CN.md) と [`docs/`](./docs) を参照。アプリの実行とパッケージング:[app/README.md](./app/README.md)。
 
 ## ライセンス
 

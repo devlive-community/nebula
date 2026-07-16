@@ -1,4 +1,4 @@
-[简体中文](README.md) · [English](README.en.md) · [Русский](README.ru.md) · [日本語](README.ja.md) · **한국어**
+[English](README.md) · [简体中文](README.zh-CN.md) · [Русский](README.ru.md) · [日本語](README.ja.md) · **한국어**
 
 # Nebula
 
@@ -39,7 +39,7 @@ Rust + Tauri로 제작 —— 가볍고 빠르며 macOS / Windows / Linux에서 
 
 Rust + Tauri 2.0, 엄격하게 단방향인 3계층 아키텍처의 모노레포: `cloud-core → 벤더별 SDK → provider 어댑터 → app`. 비밀 키는 시스템 키체인에, 비동기는 tokio로.
 
-전체 디렉터리 구조, SDK 플레이북, 벤더별 사양서는 [기본 README(简体中文)](README.md)와 [`docs/`](./docs)를 참고하세요. 앱 실행 및 패키징: [app/README.md](./app/README.md).
+전체 디렉터리 구조, SDK 플레이북, 벤더별 사양서는 [기본 README(简体中文)](README.zh-CN.md)와 [`docs/`](./docs)를 참고하세요. 앱 실행 및 패키징: [app/README.md](./app/README.md).
 
 ## 라이선스
 
