@@ -2,100 +2,53 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faXmark,
-  faChevronLeft,
-  faChevronRight,
   faMagnifyingGlassPlus,
   faMagnifyingGlassMinus,
   faRotate,
-  faExpand,
-  faCompress,
   faCircleInfo,
+  faArrowsRotate,
 } from "@fortawesome/free-solid-svg-icons";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { formatBytes } from "../util";
 import type { ExifInfo, ImageData } from "../types";
 
-export interface ImageItem {
+interface Props {
+  account: string;
   path: string;
   name: string;
   etag: string | null;
   size: number;
 }
 
-interface Props {
-  account: string;
-  images: ImageItem[];
-  index: number;
-  onClose: () => void;
-}
-
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 8;
 
-/** 视口边长(乘 DPR、封顶),决定 Rust 渲染的展示图分辨率。 */
 function viewportEdge(): number {
   const dpr = window.devicePixelRatio || 1;
   const edge = Math.max(window.innerWidth, window.innerHeight) * dpr;
   return Math.min(2560, Math.round(edge));
 }
 
-/** 缩略图条里的一格,挂载时按需向 Rust 要缩略图(Rust 会缓存)。 */
-function StripThumb({
-  account,
-  item,
-  active,
-  onClick,
-}: {
-  account: string;
-  item: ImageItem;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    api
-      .imageThumb(account, item.path, item.etag, 96)
-      .then((d) => alive && setUrl(d.data_url))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [account, item.path, item.etag]);
-  return (
-    <button
-      className={`iv__thumb ${active ? "iv__thumb--active" : ""}`}
-      title={item.name}
-      onClick={onClick}
-    >
-      {url ? <img src={url} alt={item.name} /> : <div className="iv__thumb-ph" />}
-    </button>
-  );
-}
-
 /**
- * 图片浏览器:Rust 侧已把图解码 / 缩放到视口大小,这里只做缩放 / 平移 / 旋转 /
- * 前后翻页 / 全屏 / 信息与 EXIF。滚轮按光标缩放、拖拽平移、双击 适应↔2x。
+ * 独立窗口里的图片浏览器:只显示打开的这一张(不加载同目录其它图)。
+ * Rust 侧已解码 / 缩放到视口大小,这里做缩放 / 平移 / 旋转 / 信息 / EXIF。
+ * 编辑器(裁剪 / 调整 / 滤镜)后续也落在这个窗口。
  */
-export function ImageViewer({ account, images, index, onClose }: Props) {
+export function ImageWindow({ account, path, name, etag, size }: Props) {
   const { t } = useI18n();
-  const [idx, setIdx] = useState(index);
   const [data, setData] = useState<ImageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
-  const [fullscreen, setFullscreen] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [exif, setExif] = useState<ExifInfo | null>(null);
 
-  const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-
-  const cur = images[idx];
 
   const resetView = () => {
     setScale(1);
@@ -103,16 +56,16 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
     setRotation(0);
   };
 
-  // 加载当前图,并预取相邻两张(Rust 会缓存,翻页即时)。
   useEffect(() => {
-    if (!cur) return;
+    document.title = name;
+  }, [name]);
+
+  useEffect(() => {
     let alive = true;
     setLoading(true);
     setError(false);
-    resetView();
-    const edge = viewportEdge();
     api
-      .imageView(account, cur.path, cur.etag, edge)
+      .imageView(account, path, etag, viewportEdge())
       .then((d) => {
         if (!alive) return;
         setData(d);
@@ -123,38 +76,23 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
         setError(true);
         setLoading(false);
       });
-    for (const n of [idx - 1, idx + 1]) {
-      const nb = images[n];
-      if (nb) void api.imageView(account, nb.path, nb.etag, edge).catch(() => {});
-    }
     return () => {
       alive = false;
     };
-  }, [account, idx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [account, path, etag]);
 
-  // 信息面板打开时懒加载 EXIF。
   useEffect(() => {
-    if (!showInfo || !cur) return;
+    if (!showInfo) return;
     setExif(null);
     let alive = true;
     api
-      .imageExif(account, cur.path, cur.etag)
+      .imageExif(account, path, etag)
       .then((e) => alive && setExif(e))
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [showInfo, account, idx]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const go = useCallback(
-    (delta: number) => {
-      setIdx((i) => {
-        const n = i + delta;
-        return n < 0 || n >= images.length ? i : n;
-      });
-    },
-    [images.length],
-  );
+  }, [showInfo, account, path, etag]);
 
   const zoomAt = (factor: number, cx: number, cy: number) => {
     setScale((s) => {
@@ -191,29 +129,13 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
     drag.current = null;
   };
 
-  const toggleFullscreen = useCallback(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void el.requestFullscreen?.();
+  const close = useCallback(() => {
+    void getCurrentWindow().close();
   }, []);
 
-  useEffect(() => {
-    const onFs = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
-  }, []);
-
-  // 键盘:←/→ 翻页 · +/− 缩放 · 0 复位 · R 旋转 · F 全屏 · I 信息 · Esc 关闭。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       switch (e.key) {
-        case "ArrowLeft":
-          go(-1);
-          break;
-        case "ArrowRight":
-          go(1);
-          break;
         case "+":
         case "=":
           zoomAt(1.2, 0, 0);
@@ -228,23 +150,18 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
         case "R":
           setRotation((r) => (r + 90) % 360);
           break;
-        case "f":
-        case "F":
-          toggleFullscreen();
-          break;
         case "i":
         case "I":
           setShowInfo((v) => !v);
           break;
         case "Escape":
-          if (document.fullscreenElement) void document.exitFullscreen();
-          else onClose();
+          close();
           break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, toggleFullscreen, onClose]);
+  }, [close]);
 
   const exifRows = exif
     ? ([
@@ -259,13 +176,10 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
     : [];
 
   return (
-    <div className="iv" ref={rootRef}>
-      <div className="iv__bar">
-        <span className="iv__name" title={cur?.name}>
-          {cur?.name}
-        </span>
-        <span className="iv__count">
-          {idx + 1} / {images.length}
+    <div className="iv">
+      <div className="iv__bar" data-tauri-drag-region>
+        <span className="iv__name" title={name}>
+          {name}
         </span>
         <div className="iv__spacer" />
         <button className="iv__btn" title={t("缩小")} onClick={() => zoomAt(1 / 1.2, 0, 0)}>
@@ -282,6 +196,9 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
         >
           <FontAwesomeIcon icon={faRotate} />
         </button>
+        <button className="iv__btn" title={t("复位")} onClick={resetView}>
+          <FontAwesomeIcon icon={faArrowsRotate} />
+        </button>
         <button
           className={`iv__btn ${showInfo ? "iv__btn--on" : ""}`}
           title={t("信息")}
@@ -289,10 +206,7 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
         >
           <FontAwesomeIcon icon={faCircleInfo} />
         </button>
-        <button className="iv__btn" title={t("全屏")} onClick={toggleFullscreen}>
-          <FontAwesomeIcon icon={fullscreen ? faCompress : faExpand} />
-        </button>
-        <button className="iv__btn" title={t("关闭")} onClick={onClose}>
+        <button className="iv__btn" title={t("关闭")} onClick={close}>
           <FontAwesomeIcon icon={faXmark} />
         </button>
       </div>
@@ -307,18 +221,13 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
         onMouseLeave={endDrag}
         onDoubleClick={() => (scale === 1 ? zoomAt(2, 0, 0) : resetView())}
       >
-        {idx > 0 && (
-          <button className="iv__nav iv__nav--prev" onClick={() => go(-1)} title={t("上一张")}>
-            <FontAwesomeIcon icon={faChevronLeft} />
-          </button>
-        )}
         {loading && <div className="iv__status">{t("加载中…")}</div>}
         {error && <div className="iv__status">{t("无法加载该图片")}</div>}
         {data && !error && (
           <img
             className="iv__img"
             src={data.data_url}
-            alt={cur?.name}
+            alt={name}
             draggable={false}
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale}) rotate(${rotation}deg)`,
@@ -326,24 +235,17 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
             }}
           />
         )}
-        {idx < images.length - 1 && (
-          <button className="iv__nav iv__nav--next" onClick={() => go(1)} title={t("下一张")}>
-            <FontAwesomeIcon icon={faChevronRight} />
-          </button>
-        )}
 
         {showInfo && (
           <div className="iv__info" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="iv__info-title">{cur?.name}</div>
+            <div className="iv__info-title">{name}</div>
             <div className="iv__info-row">
               <span>{t("尺寸")}</span>
-              <span>
-                {data ? `${data.orig_width} × ${data.orig_height}` : "—"}
-              </span>
+              <span>{data ? `${data.orig_width} × ${data.orig_height}` : "—"}</span>
             </div>
             <div className="iv__info-row">
               <span>{t("大小")}</span>
-              <span>{cur ? formatBytes(cur.size) : "—"}</span>
+              <span>{formatBytes(size)}</span>
             </div>
             {exifRows.map(([k, v]) => (
               <div className="iv__info-row" key={k}>
@@ -364,20 +266,6 @@ export function ImageViewer({ account, images, index, onClose }: Props) {
           </div>
         )}
       </div>
-
-      {images.length > 1 && (
-        <div className="iv__strip">
-          {images.map((it, i) => (
-            <StripThumb
-              key={it.path}
-              account={account}
-              item={it}
-              active={i === idx}
-              onClick={() => setIdx(i)}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

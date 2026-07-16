@@ -37,7 +37,7 @@ import {
   type PaletteCommand,
 } from "./components/CommandPalette";
 import { BatchRenameDialog } from "./components/BatchRenameDialog";
-import { ImageViewer, type ImageItem } from "./components/ImageViewer";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
 import { FileGrid } from "./components/FileGrid";
@@ -63,6 +63,27 @@ import { AboutDialog } from "./components/AboutDialog";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { checkForUpdate, type Update } from "./update";
 import { Logo } from "./components/Logo";
+
+/** 在独立窗口打开一张图片(单张)。label 以 image- 开头以匹配 capability 权限。 */
+function openImageWindow(account: string, entry: Entry) {
+  const q = new URLSearchParams({
+    view: "image",
+    account,
+    path: entry.path,
+    name: entry.name,
+    etag: entry.etag ?? "",
+    size: String(entry.size),
+  });
+  const label = `image-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+  const win = new WebviewWindow(label, {
+    url: `index.html?${q.toString()}`,
+    title: entry.name,
+    width: 1100,
+    height: 760,
+    resizable: true,
+  });
+  win.once("tauri://error", (e) => console.error("open image window failed", e));
+}
 
 export default function App() {
   const { t } = useI18n();
@@ -183,10 +204,6 @@ export default function App() {
   } | null>(null);
   const [view, setView] = useState<"list" | "grid">("list");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const [imageViewer, setImageViewer] = useState<{
-    images: ImageItem[];
-    index: number;
-  } | null>(null);
 
   useEffect(() => {
     if (prefsHydrated.current) api.setPref("view", view).catch(() => {});
@@ -203,32 +220,9 @@ export default function App() {
       setDetailsEntry(entry);
       return;
     }
-    // 图片走加速浏览器:Rust 解码/缩放,并可在当前目录的图片间前后翻页。
+    // 图片在独立窗口打开(只这一张):Rust 解码/缩放,前端做缩放/平移/旋转/EXIF。
     if (kind === "image") {
-      const list: ImageItem[] = visibleEntries
-        .filter((e) => e.kind === "file" && previewKind(e.name) === "image")
-        .map((e) => ({
-          path: e.path,
-          name: e.name,
-          etag: e.etag,
-          size: e.size,
-        }));
-      const i = list.findIndex((it) => it.path === entry.path);
-      setImageViewer(
-        i >= 0
-          ? { images: list, index: i }
-          : {
-              images: [
-                {
-                  path: entry.path,
-                  name: entry.name,
-                  etag: entry.etag,
-                  size: entry.size,
-                },
-              ],
-              index: 0,
-            },
-      );
+      openImageWindow(current, entry);
       return;
     }
     setError(null);
@@ -1608,7 +1602,6 @@ export default function App() {
     !!cleanupTarget ||
     pendingBatchDelete ||
     showPalette ||
-    !!imageViewer ||
     showSettings;
 
   onKeyRef.current = (e: KeyboardEvent) => {
@@ -2192,14 +2185,6 @@ export default function App() {
         />
       )}
 
-      {imageViewer && current && (
-        <ImageViewer
-          account={current}
-          images={imageViewer.images}
-          index={imageViewer.index}
-          onClose={() => setImageViewer(null)}
-        />
-      )}
     </div>
   );
 

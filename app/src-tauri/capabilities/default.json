@@ -2,9 +2,10 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Nebula default capability set",
-  "windows": ["main"],
+  "windows": ["main", "image-*"],
   "permissions": [
     "core:default",
+    "core:webview:allow-create-webview-window",
     "dialog:default",
     "updater:default",
     "process:default"
