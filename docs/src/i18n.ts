@@ -25,7 +25,7 @@ const messages = {
       items: {
         multicloud: {title: '多云统一', desc: '一套界面管理多云对象存储,连 Bucket 的新建 / 删除都统一;跨区域的桶自动路由到各自的区域,不用手动切;新增厂商实现一个接口即可,界面零改动。'},
         browse: {title: '高效浏览', desc: '目录逐层展开、列表 / 网格视图、排序过滤、常去位置一键收藏跳转、Cmd/Ctrl+K 命令面板秒跳账号与收藏(空输入先列最近访问)、图片 / 视频 / 音频 / PDF / 文本代码预览、文件夹 / Bucket 大小统计与存储类型分布;对象详情含存储类型、真实 Content-Type(可改)与可读写的对象标签,单个对象或整个文件夹都能转换存储层、取回归档。'},
-        upload: {title: '上传无忧', desc: '拖拽文件或整个文件夹、多选上传;大文件并发分片、断点续传,内容未变的文件自动秒传跳过,可随时取消,进度、并发、失败重试尽在掌握;还能一键清理桶里残留的未完成分片上传,回收白白计费的存储。'},
+        upload: {title: '上传无忧', desc: '拖拽文件或整个文件夹、多选上传;大文件并发分片、断点续传,内容未变的文件自动秒传跳过,可随时取消,进度、并发、失败重试(可一键重试全部失败)尽在掌握;还能一键清理桶里残留的未完成分片上传,回收白白计费的存储。'},
         download: {title: '流式下载', desc: '边下边写,大文件不占内存;支持断点续传、整文件夹递归下载,本地已有且一致的文件自动跳过,每个任务独立进度(含速度与剩余时间),可设全局带宽限速。'},
         migrate: {title: '跨云迁移', desc: '把对象或整个文件夹从一个账号搬到另一个账号,任意云到任意云;同账号走服务端复制,跨账号自动中转;同账号内还能整目录复制 / 移动 / 重命名到任意目录。'},
         integrity: {title: '完整性校验', desc: '下载内容算 MD5 与远端 ETag 比对,一键确认文件是否在传输中损坏;逻辑只依赖 ETag,对每家云通用。'},
@@ -78,7 +78,7 @@ const messages = {
       items: {
         multicloud: {title: 'Multi-cloud', desc: 'Manage object storage from one UI, down to creating and deleting buckets; buckets in other regions are routed to their own region automatically; add a vendor by implementing a single trait — no UI changes.'},
         browse: {title: 'Fast browsing', desc: 'Drill into folders, list / grid views, sort and filter, bookmark and jump to frequent locations, a Cmd/Ctrl+K command palette to jump to any account or bookmark (recent locations listed first),image / video / audio / PDF / text-code previews,folder / bucket size stats and a storage-class breakdown; object details incl. storage class, the real Content-Type (editable) and read/write object tags, with tier transition and archive restore for a single object or a whole folder.'},
-        upload: {title: 'Effortless upload', desc: 'Drag files or whole folders, multi-select; large files upload in concurrent chunks, resume after interruption, unchanged files are skipped instantly, cancel anytime, with progress and retries; and clean up orphaned incomplete multipart uploads in a bucket to reclaim storage you are silently billed for.'},
+        upload: {title: 'Effortless upload', desc: 'Drag files or whole folders, multi-select; large files upload in concurrent chunks, resume after interruption, unchanged files are skipped instantly, cancel anytime, with progress and retries (retry all failed at once); and clean up orphaned incomplete multipart uploads in a bucket to reclaim storage you are silently billed for.'},
         download: {title: 'Streaming download', desc: 'Stream to disk without buffering huge files; resumable downloads, whole-folder recursive download, files already present and identical are skipped, per-task progress (with speed and ETA), and an optional global bandwidth cap.'},
         migrate: {title: 'Cross-cloud migration', desc: 'Move objects or entire folders from one account to another, any cloud to any cloud; same-account uses server-side copy, cross-account relays automatically, and a whole folder can be copied / moved / renamed to any directory within an account.'},
         integrity: {title: 'Integrity check', desc: 'Hash the downloaded bytes and compare against the remote ETag to confirm a file survived transfer intact; keyed only on ETag, so it works for every cloud.'},
