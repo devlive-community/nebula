@@ -7,6 +7,21 @@ import { useI18n } from "../i18n";
 /** 进度以字节计的传输种类(可显示速度 / ETA);文件夹类以文件数计,不显示。 */
 const BYTE_KINDS = new Set(["上传", "下载", "迁移"]);
 
+/** 失败(可再跑)的状态。 */
+const FAILED = new Set(["error", "cancelled", "interrupted"]);
+
+/**
+ * 是否可从面板重跑。迁移需带源端信息(重启后丢失 → 不可重试)。
+ */
+function isRetryable(i: TransferItem): boolean {
+  return (
+    i.kind === "上传" ||
+    i.kind === "下载" ||
+    i.kind === "下载文件夹" ||
+    ((i.kind === "迁移" || i.kind === "迁移文件夹") && !!i.srcAccount)
+  );
+}
+
 interface Props {
   items: TransferItem[];
   onClear: () => void;
@@ -19,6 +34,10 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
   const { t } = useI18n();
   const active = items.filter((i) => i.status === "active").length;
   const hasFinished = items.some((i) => i.status !== "active");
+  // 可一键重跑的失败任务(用于「重试全部」)。
+  const retryableFailed = items.filter(
+    (i) => FAILED.has(i.status) && isRetryable(i),
+  );
 
   return (
     <div className="transfers">
@@ -27,13 +46,23 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
           {t("传输")}
           {active > 0 ? t(" · 进行中 {n}", { n: active }) : ""}
         </span>
-        <button
-          className="transfers__clear"
-          onClick={onClear}
-          disabled={!hasFinished}
-        >
-          {t("清除已完成")}
-        </button>
+        <div className="transfers__actions">
+          {retryableFailed.length > 0 && (
+            <button
+              className="transfers__clear"
+              onClick={() => retryableFailed.forEach((i) => onRetry(i.id))}
+            >
+              {t("重试全部失败 ({n})", { n: retryableFailed.length })}
+            </button>
+          )}
+          <button
+            className="transfers__clear"
+            onClick={onClear}
+            disabled={!hasFinished}
+          >
+            {t("清除已完成")}
+          </button>
+        </div>
       </div>
       <div className="transfers__list">
         {items.map((i) => {
@@ -53,12 +82,7 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
               if (eta) active += ` · ~${eta}`;
             }
           }
-          // 可从面板重跑的种类;迁移需带源端信息(重启后丢失 → 不可重试)。
-          const retryable =
-            i.kind === "上传" ||
-            i.kind === "下载" ||
-            i.kind === "下载文件夹" ||
-            ((i.kind === "迁移" || i.kind === "迁移文件夹") && !!i.srcAccount);
+          const retryable = isRetryable(i);
           const label =
             i.status === "error"
               ? t("失败")

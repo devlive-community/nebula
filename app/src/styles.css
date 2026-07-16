@@ -1114,6 +1114,12 @@ body.resizing {
   color: var(--text);
 }
 
+.transfers__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .transfers__clear {
   background: none;
   border: none;

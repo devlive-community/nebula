@@ -124,6 +124,7 @@ export const EN: Record<string, string> = {
   传输: "Transfers",
   " · 进行中 {n}": " · {n} active",
   清除已完成: "Clear finished",
+  "重试全部失败 ({n})": "Retry all failed ({n})",
   失败: "Failed",
   已取消: "Cancelled",
   已中断: "Interrupted",
