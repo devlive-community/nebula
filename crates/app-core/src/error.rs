@@ -33,6 +33,10 @@ pub enum AppError {
     /// 请求参数非法(如把文件夹移动到它自己的子目录下)。
     #[error("invalid input: {0}")]
     InvalidInput(String),
+
+    /// 图片解码 / 编码 / 处理失败。
+    #[error("image error: {0}")]
+    Image(String),
 }
 
 /// App 层 Result 别名。

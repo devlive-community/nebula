@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 cloud-core = { path = "../cloud-core" }
 nebula-provider = { path = "../nebula-provider" }
+nebula-image = { path = "../nebula-image" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
 provider-tencent = { path = "../providers/provider-tencent" }
 provider-huawei = { path = "../providers/provider-huawei" }
@@ -20,8 +21,8 @@ provider-r2 = { path = "../providers/provider-r2" }
 provider-minio = { path = "../providers/provider-minio" }
 bytes = { workspace = true }
 futures = { workspace = true }
-# 断点续传上传要按偏移读本地文件分片。
-tokio = { workspace = true, features = ["fs", "io-util"] }
+# 断点续传上传要按偏移读本地文件分片;rt 提供 spawn_blocking(图片解码放阻塞线程池)。
+tokio = { workspace = true, features = ["fs", "io-util", "rt"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

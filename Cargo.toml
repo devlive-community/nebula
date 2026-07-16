@@ -31,6 +31,9 @@ members = [
     # App 统一抽象 trait(可选发布)
     "crates/nebula-provider",
 
+    # 图片处理流水线(纯函数,无云依赖,加速图片浏览 / 编辑)
+    "crates/nebula-image",
+
     # App 业务逻辑(框架无关,App 私有)
     "crates/app-core",
 

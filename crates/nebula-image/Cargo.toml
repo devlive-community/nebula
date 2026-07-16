@@ -1,0 +1,17 @@
+[package]
+name = "nebula-image"
+version.workspace = true
+description = "Pure image decode / resize / encode / EXIF pipeline for Nebula's accelerated viewer (no cloud deps)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+# 纯 Rust 编解码(0.25 起 JPEG 走 zune-jpeg,无 C 依赖,CI 可直接编译)。
+image = "0.25"
+# EXIF 解析(crate 名 kamadak-exif,import 名 exif)。
+kamadak-exif = "0.6"
+serde = { workspace = true }
+thiserror = { workspace = true }

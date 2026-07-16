@@ -7,8 +7,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, Bookmark, FolderStats, IncompleteUpload, Integrity, Page, RenamePlan,
-    RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferRecord,
+    AccountInfo, App, Bookmark, ExifInfo, FolderStats, ImageData, IncompleteUpload, Integrity,
+    Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview,
+    TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -1201,6 +1202,50 @@ fn plan_batch_rename(paths: Vec<String>, rule: RenameRule) -> Vec<RenamePlan> {
     app_core::plan_batch_rename(&paths, &rule)
 }
 
+/// 渲染一张浏览用图:Rust 侧解码 + 缩到 `max_edge` + 缓存,返回内联 data URL。
+#[tauri::command]
+async fn image_view(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    etag: Option<String>,
+    max_edge: u32,
+) -> Result<ImageData, String> {
+    let app = state.inner().clone();
+    app.image_view(&account, &path, etag, max_edge)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 渲染一张方形缩略图(Rust 侧生成 + 缓存)。
+#[tauri::command]
+async fn image_thumb(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    etag: Option<String>,
+    size: u32,
+) -> Result<ImageData, String> {
+    let app = state.inner().clone();
+    app.image_thumb(&account, &path, etag, size)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 解析对象的 EXIF 摘要(相机 / 拍摄参数 / GPS)。
+#[tauri::command]
+async fn image_exif(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    etag: Option<String>,
+) -> Result<ExifInfo, String> {
+    let app = state.inner().clone();
+    app.image_exif(&account, &path, etag)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度)。
 #[tauri::command]
 fn get_pref(state: State<'_, App>, key: String) -> Option<String> {
@@ -1283,6 +1328,10 @@ pub fn run() {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             let core = App::with_store(dir.join("nebula.db"))?;
+            // 图片渲染缓存放缓存目录(可被系统清理,不占用户数据目录)。
+            if let Ok(cache) = app.path().app_cache_dir() {
+                core.set_cache_dir(cache.join("nebula"));
+            }
             app.manage(core);
             app.manage(Transfers::default());
             Ok(())
@@ -1357,6 +1406,9 @@ pub fn run() {
             record_visit,
             recent_locations,
             plan_batch_rename,
+            image_view,
+            image_thumb,
+            image_exif,
             get_pref,
             set_pref,
         ])

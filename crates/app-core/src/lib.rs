@@ -11,6 +11,7 @@ mod breakdown;
 mod cancel;
 mod dedup;
 mod error;
+mod imaging;
 mod integrity;
 mod limits;
 mod preview;
@@ -34,6 +35,7 @@ use provider_tencent::TencentProvider;
 
 pub use breakdown::{ClassStat, StorageBreakdown};
 pub use error::{AppError, Result};
+pub use imaging::{ExifInfo, ImageData};
 pub use integrity::{verify_bytes, Integrity};
 pub use limits::TransferLimits;
 pub use nebula_provider::{
@@ -216,6 +218,8 @@ pub struct App {
     secrets: Arc<dyn SecretStore>,
     /// 全局传输带宽限速(所有克隆共享同一令牌桶)。
     limits: TransferLimits,
+    /// 图片缓存目录(渲染变体落盘);由 Tauri 层用 app_cache_dir 设置。所有克隆共享。
+    cache_dir: Arc<std::sync::OnceLock<std::path::PathBuf>>,
 }
 
 impl Default for App {
@@ -225,6 +229,7 @@ impl Default for App {
             store: None,
             secrets: Arc::new(MemorySecrets::default()),
             limits: TransferLimits::default(),
+            cache_dir: Arc::new(std::sync::OnceLock::new()),
         }
     }
 }
@@ -251,6 +256,7 @@ impl App {
             store: Some(Arc::new(store)),
             secrets,
             limits: TransferLimits::default(),
+            cache_dir: Arc::new(std::sync::OnceLock::new()),
         };
         app.load_persisted()?;
         // 应用持久化的限速设置。
