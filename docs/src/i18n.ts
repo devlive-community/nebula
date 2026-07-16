@@ -10,7 +10,7 @@ const messages = {
       badge: 'v{version} 已发布',
       title1: '一个界面,管理你的',
       title2: '多云对象存储',
-      subtitle: '跨平台桌面应用 —— 浏览、上传下载、分享、传输管理,一站搞定。Rust + Tauri 打造,原生轻量。',
+      subtitle: '在一个原生桌面应用里管理阿里云 OSS、腾讯云 COS、华为云 OBS、AWS S3、Cloudflare R2、七牛 Kodo、MinIO —— 浏览、上传下载、分享、跨云迁移,一站搞定。轻量、快速,macOS / Windows / Linux 原生三端。',
       download: '立即下载',
       github: '在 GitHub 查看'
     },
@@ -63,7 +63,7 @@ const messages = {
       badge: 'v{version} released',
       title1: 'One interface for your',
       title2: 'multi-cloud storage',
-      subtitle: 'A cross-platform desktop app — browse, upload, download, share and manage transfers in one place. Built with Rust + Tauri, native and lightweight.',
+      subtitle: 'Manage Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo and MinIO in one native desktop app — browse, upload, download, share and migrate across clouds, all in one place. Lightweight and fast, native on macOS, Windows and Linux.',
       download: 'Download now',
       github: 'View on GitHub'
     },

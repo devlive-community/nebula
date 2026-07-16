@@ -100,8 +100,8 @@ import {latestRelease} from '../content/releases'
 
 const {t} = useI18n()
 
-const chips = ['并发分片', '流式下载', '断点续传', '跨云迁移', '拖拽上传', '文件夹递归', '批量下载', '预签名分享', '图片视频预览', '列表 / 网格', '并发传输', '失败重试', '明暗主题', '快捷键']
-const marquee = [...chips, ...chips]
+const brands = ['Aliyun OSS', 'Tencent COS', 'Huawei OBS', 'AWS S3', 'Cloudflare R2', 'Qiniu Kodo', 'MinIO']
+const marquee = [...brands, ...brands, ...brands]
 
 const stats = computed(() => [
   {value: t('stats.vendors'), label: t('stats.vendorsLabel')},
