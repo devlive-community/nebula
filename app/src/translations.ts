@@ -43,6 +43,12 @@ export const EN: Record<string, string> = {
   "过滤当前目录 / 回车递归搜索…": "Filter here / Enter to search…",
   "处理中…": "Working…",
 
+  // 收藏夹
+  收藏夹: "Bookmarks",
+  收藏当前位置: "Bookmark this location",
+  取消收藏当前位置: "Remove this bookmark",
+  还没有收藏: "No bookmarks yet",
+
   // 对象 ACL / 公共直链
   复制公共链接: "Copy public link",
   设为公开读: "Make public",

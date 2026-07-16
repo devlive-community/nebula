@@ -1382,6 +1382,115 @@ body.resizing {
   border-color: var(--primary);
 }
 
+/* 收藏夹 */
+.bookmarks {
+  position: relative;
+  flex: none;
+}
+
+.bookmarks__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: 300px;
+  max-width: 80vw;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.bookmarks__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bookmarks__toggle:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.bookmarks__toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bookmarks__toggle--on {
+  color: #f5a623;
+}
+
+.bookmarks__list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.bookmarks__empty {
+  padding: 14px 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.bookmarks__item {
+  display: flex;
+  align-items: center;
+}
+
+.bookmarks__jump {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bookmarks__item:hover {
+  background: var(--bg);
+}
+
+.bookmarks__acct {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.bookmarks__path {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.bookmarks__remove {
+  flex: none;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.bookmarks__remove:hover {
+  color: var(--danger);
+}
+
 /* 残留分片清理弹窗 */
 .cleanup__list {
   display: flex;

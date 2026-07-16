@@ -29,6 +29,7 @@ import { useI18n } from "./i18n";
 import { Sidebar } from "./components/Sidebar";
 import { AccountForm } from "./components/AccountForm";
 import { Breadcrumb } from "./components/Breadcrumb";
+import { Bookmarks, type Bookmark } from "./components/Bookmarks";
 import { Toolbar } from "./components/Toolbar";
 import { FileList } from "./components/FileList";
 import { FileGrid } from "./components/FileGrid";
@@ -102,6 +103,34 @@ export default function App() {
   const [statsTarget, setStatsTarget] = useState<Entry | null>(null);
   const [statsData, setStatsData] = useState<StorageBreakdown | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<Entry | null>(null);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("nebula-bookmarks") ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem("nebula-bookmarks", JSON.stringify(bookmarks));
+  }, [bookmarks]);
+  const isBookmarked =
+    !!current && bookmarks.some((b) => b.account === current && b.path === path);
+  const toggleBookmark = () => {
+    if (!current) return;
+    setBookmarks((bm) =>
+      isBookmarked
+        ? bm.filter((b) => !(b.account === current && b.path === path))
+        : [...bm, { account: current, path }],
+    );
+  };
+  const removeBookmark = (account: string, p: string) =>
+    setBookmarks((bm) =>
+      bm.filter((b) => !(b.account === account && b.path === p)),
+    );
+  const jumpBookmark = (account: string, p: string) => {
+    setCurrent(account);
+    setPath(p);
+  };
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewBucket, setShowNewBucket] = useState(false);
   const [settings, setSettings] = useState<Settings>({
@@ -1548,6 +1577,14 @@ export default function App() {
           <>
             <div className="main__header">
               <Breadcrumb path={path} onNavigate={setPath} />
+              <Bookmarks
+                bookmarks={bookmarks}
+                isBookmarked={isBookmarked}
+                canBookmark={!!current}
+                onToggle={toggleBookmark}
+                onJump={jumpBookmark}
+                onRemove={removeBookmark}
+              />
               <Toolbar
                 canGoUp={path !== ""}
                 canUpload={path !== ""}
