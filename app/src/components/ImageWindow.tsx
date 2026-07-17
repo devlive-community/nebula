@@ -1370,14 +1370,16 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
         {shown && !error && (annotating || mosaicMode) && (
           <div className="iv__croplayer">
-            <img
-              ref={imgRef}
-              className="iv__img"
-              src={shown.data_url}
-              alt={name}
-              draggable={false}
-              onLoad={measureImg}
-            />
+            <div className="iv__cropimgwrap">
+              <img
+                ref={imgRef}
+                className="iv__img"
+                src={shown.data_url}
+                alt={name}
+                draggable={false}
+                onLoad={measureImg}
+              />
+            </div>
             {imgBox.width > 0 && (
               <canvas
                 ref={strokeCanvasRef}
@@ -1427,14 +1429,16 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
             onMouseUp={onCropUp}
             onMouseLeave={onCropUp}
           >
-            <img
-              ref={imgRef}
-              className="iv__img"
-              src={shown.data_url}
-              alt={name}
-              draggable={false}
-              onLoad={measureImg}
-            />
+            <div className="iv__cropimgwrap">
+              <img
+                ref={imgRef}
+                className="iv__img"
+                src={shown.data_url}
+                alt={name}
+                draggable={false}
+                onLoad={measureImg}
+              />
+            </div>
             {imgBox.width > 0 && (
               <div
                 className="iv__crop-box"

@@ -1648,6 +1648,14 @@ body.resizing {
   overflow: hidden;
 }
 
+/* inline-flex 收缩包裹图片,避免固定尺寸 flex 容器 + 双 max 约束导致的 WebKit 图片变形 */
+.iv__cropimgwrap {
+  display: inline-flex;
+  max-width: 100%;
+  max-height: 100%;
+  line-height: 0;
+}
+
 .iv__croplayer .iv__img {
   transform: none;
 }
