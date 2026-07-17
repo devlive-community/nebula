@@ -10,6 +10,8 @@ import {
   faPen,
   faFloppyDisk,
   faSpinner,
+  faCrop,
+  faCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as api from "../api";
@@ -74,6 +76,17 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveMenu, setSaveMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  // 裁剪子模式:cropRect 为相对显示图的比例(0..1)。
+  const [cropping, setCropping] = useState(false);
+  const [cropRect, setCropRect] = useState({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
+  const cropWrapRef = useRef<HTMLDivElement>(null);
+  const cropDrag = useRef<{
+    mode: string;
+    x: number;
+    y: number;
+    rect: { x: number; y: number; w: number; h: number };
+  } | null>(null);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -205,7 +218,76 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const exitEdit = () => {
     setEditing(false);
     setSaveMenu(false);
+    setCropping(false);
     resetView();
+  };
+
+  // 进入裁剪:清掉已有裁剪(显示完整变换图)、复位视图、给个居中初始框。
+  const startCrop = () => {
+    setOps((o) => ({ ...o, crop: null }));
+    setCropRect({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
+    resetView();
+    setCropping(true);
+  };
+  const applyCrop = () => {
+    if (editData) {
+      const ow = editData.orig_width;
+      const oh = editData.orig_height;
+      setOps((o) => ({
+        ...o,
+        crop: {
+          x: Math.round(cropRect.x * ow),
+          y: Math.round(cropRect.y * oh),
+          width: Math.max(1, Math.round(cropRect.w * ow)),
+          height: Math.max(1, Math.round(cropRect.h * oh)),
+        },
+      }));
+    }
+    setCropping(false);
+  };
+
+  const onCropDown = (e: React.MouseEvent, mode: string) => {
+    e.stopPropagation();
+    cropDrag.current = { mode, x: e.clientX, y: e.clientY, rect: cropRect };
+  };
+  const onCropMove = (e: React.MouseEvent) => {
+    const d = cropDrag.current;
+    const wrap = cropWrapRef.current;
+    if (!d || !wrap) return;
+    const box = wrap.getBoundingClientRect();
+    const dx = (e.clientX - d.x) / box.width;
+    const dy = (e.clientY - d.y) / box.height;
+    const cl = (v: number) => Math.min(1, Math.max(0, v));
+    const r = d.rect;
+    if (d.mode === "move") {
+      setCropRect({
+        ...r,
+        x: Math.min(Math.max(0, r.x + dx), 1 - r.w),
+        y: Math.min(Math.max(0, r.y + dy), 1 - r.h),
+      });
+      return;
+    }
+    let { x, y, w, h } = r;
+    const right = r.x + r.w;
+    const bottom = r.y + r.h;
+    if (d.mode.includes("w")) {
+      x = Math.min(cl(r.x + dx), right - 0.05);
+      w = right - x;
+    }
+    if (d.mode.includes("e")) {
+      w = Math.max(0.05, cl(right + dx) - r.x);
+    }
+    if (d.mode.includes("n")) {
+      y = Math.min(cl(r.y + dy), bottom - 0.05);
+      h = bottom - y;
+    }
+    if (d.mode.includes("s")) {
+      h = Math.max(0.05, cl(bottom + dy) - r.y);
+    }
+    setCropRect({ x, y, w, h });
+  };
+  const onCropUp = () => {
+    cropDrag.current = null;
   };
 
   const opsIdentity =
@@ -328,7 +410,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         </Tooltip>
       </div>
 
-      {editing && (
+      {editing && !cropping && (
         <div className="iv__editbar">
           <button className="iv__ebtn" onClick={() => setOps((o) => ({ ...o, rotate: (((o.rotate ?? 0) + 90) % 360) }))}>
             <FontAwesomeIcon icon={faRotate} /> {t("旋转")}
@@ -356,6 +438,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
             onClick={() => setOps((o) => ({ ...o, invert: !o.invert }))}
           >
             {t("反相")}
+          </button>
+          <button
+            className={`iv__ebtn ${ops.crop ? "iv__ebtn--on" : ""}`}
+            onClick={startCrop}
+          >
+            <FontAwesomeIcon icon={faCrop} /> {t("裁剪")}
           </button>
           <label className="iv__slider">
             {t("亮度")}
@@ -402,6 +490,19 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         </div>
       )}
 
+      {editing && cropping && (
+        <div className="iv__editbar">
+          <span className="iv__crop-hint">{t("拖动选框选择裁剪区域")}</span>
+          <div className="iv__spacer" />
+          <button className="iv__ebtn iv__ebtn--primary" onClick={applyCrop}>
+            <FontAwesomeIcon icon={faCheck} /> {t("应用裁剪")}
+          </button>
+          <button className="iv__ebtn" onClick={() => setCropping(false)}>
+            {t("取消")}
+          </button>
+        </div>
+      )}
+
       <div
         className="iv__stage"
         ref={stageRef}
@@ -414,7 +515,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       >
         {loading && <div className="iv__status">{t("加载中…")}</div>}
         {error && <div className="iv__status">{t("无法加载该图片")}</div>}
-        {shown && !error && (
+        {shown && !error && !cropping && (
           <img
             className="iv__img"
             src={shown.data_url}
@@ -425,6 +526,34 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               cursor: scale > 1 ? "grab" : "default",
             }}
           />
+        )}
+
+        {shown && !error && cropping && (
+          <div
+            className="iv__cropwrap"
+            ref={cropWrapRef}
+            onMouseMove={onCropMove}
+            onMouseUp={onCropUp}
+            onMouseLeave={onCropUp}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <img className="iv__img" src={shown.data_url} alt={name} draggable={false} />
+            <div
+              className="iv__crop-box"
+              style={{
+                left: `${cropRect.x * 100}%`,
+                top: `${cropRect.y * 100}%`,
+                width: `${cropRect.w * 100}%`,
+                height: `${cropRect.h * 100}%`,
+              }}
+              onMouseDown={(e) => onCropDown(e, "move")}
+            >
+              <span className="iv__crop-h iv__crop-h--nw" onMouseDown={(e) => onCropDown(e, "nw")} />
+              <span className="iv__crop-h iv__crop-h--ne" onMouseDown={(e) => onCropDown(e, "ne")} />
+              <span className="iv__crop-h iv__crop-h--sw" onMouseDown={(e) => onCropDown(e, "sw")} />
+              <span className="iv__crop-h iv__crop-h--se" onMouseDown={(e) => onCropDown(e, "se")} />
+            </div>
+          </div>
         )}
 
         {(editBusy || saving) && (

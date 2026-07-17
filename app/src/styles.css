@@ -1596,6 +1596,58 @@ body.resizing {
   background: var(--bg-hover);
 }
 
+/* 裁剪覆盖层 */
+.iv__cropwrap {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  max-height: 100%;
+  line-height: 0;
+}
+
+.iv__crop-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.iv__crop-box {
+  position: absolute;
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  cursor: move;
+  box-sizing: border-box;
+}
+
+.iv__crop-h {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 1px solid var(--primary);
+  border-radius: 2px;
+}
+
+.iv__crop-h--nw {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+.iv__crop-h--ne {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+.iv__crop-h--sw {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+.iv__crop-h--se {
+  bottom: -6px;
+  right: -6px;
+  cursor: nwse-resize;
+}
+
 .iv__busy {
   position: absolute;
   top: 50%;

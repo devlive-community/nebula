@@ -60,16 +60,10 @@ impl Ops {
     }
 }
 
-/// 依次应用编辑操作:裁剪 → 旋转 → 翻转 → 亮度 → 对比度 → 灰度 → 反相。
+/// 依次应用编辑操作:旋转 → 翻转 → 裁剪 → 亮度 → 对比度 → 灰度 → 反相。
+///
+/// 裁剪放在旋转 / 翻转**之后**,裁剪坐标基于变换后的图 —— 前端在预览图上画框即所见即所裁。
 fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
-    if let Some(c) = &ops.crop {
-        let (iw, ih) = (img.width(), img.height());
-        if c.x < iw && c.y < ih {
-            let w = c.width.min(iw - c.x).max(1);
-            let h = c.height.min(ih - c.y).max(1);
-            img = img.crop_imm(c.x, c.y, w, h);
-        }
-    }
     img = match ((ops.rotate % 360) + 360) % 360 {
         90 => img.rotate90(),
         180 => img.rotate180(),
@@ -81,6 +75,14 @@ fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
     }
     if ops.flip_v {
         img = img.flipv();
+    }
+    if let Some(c) = &ops.crop {
+        let (iw, ih) = (img.width(), img.height());
+        if c.x < iw && c.y < ih {
+            let w = c.width.min(iw - c.x).max(1);
+            let h = c.height.min(ih - c.y).max(1);
+            img = img.crop_imm(c.x, c.y, w, h);
+        }
     }
     if ops.brightness != 0 {
         img = img.brighten(ops.brightness);
@@ -400,6 +402,24 @@ mod tests {
         };
         let r = render_edit(&src, &ops, None).unwrap();
         assert_eq!((r.width, r.height), (100, 120));
+    }
+
+    #[test]
+    fn edit_crop_applies_after_rotate() {
+        // 800×300 旋转 90° → 300×800,再裁一块 → 裁剪基于旋转后的尺寸。
+        let src = png(800, 300);
+        let ops = Ops {
+            rotate: 90,
+            crop: Some(CropRect {
+                x: 10,
+                y: 20,
+                width: 200,
+                height: 400,
+            }),
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        assert_eq!((r.width, r.height), (200, 400));
     }
 
     #[test]
