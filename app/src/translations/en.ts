@@ -89,7 +89,7 @@ export const EN: Record<string, string> = {
   矩形: "Rectangle",
   箭头: "Arrow",
   文字: "Text",
-  输入文字: "Type text",
+  输入文字回车确认: "Type text, Enter to confirm",
   吸管取色: "Eyedropper",
   当前颜色: "Current color",
   描边: "Outline",

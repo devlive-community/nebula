@@ -1426,7 +1426,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                 className="iv__textinput"
                 autoFocus
                 value={textDraft}
-                placeholder={t("输入文字")}
+                placeholder={t("输入文字回车确认")}
                 style={{
                   left: textAt.px,
                   top: textAt.py,
@@ -1436,6 +1436,8 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                     penWidth * 4 * Math.max(imgBox.width, imgBox.height),
                   ),
                 }}
+                // 点输入框本身不冒泡到 div(否则会被当成新点击重新定位)。
+                onMouseDown={(e) => e.stopPropagation()}
                 onChange={(e) => setTextDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") commitText();
@@ -1444,7 +1446,6 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                     setTextDraft("");
                   }
                 }}
-                onBlur={commitText}
               />
             )}
           </div>
