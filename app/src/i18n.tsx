@@ -3,44 +3,51 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
-import { EN } from "./translations";
 import { getPref, setPref } from "./api";
+import { DEFAULT_LOCALE, isLocale, localeDef } from "./locales";
 
-export type Locale = "zh" | "en";
+/** 语言代码(如 `zh` / `en` / `ja`);具体支持哪些见 [`LOCALES`](./locales)。 */
+export type Locale = string;
 
 interface I18nCtx {
   locale: Locale;
   setLocale: (l: Locale) => void;
   /**
-   * 翻译。以**中文原文为 key**:英文下查 [`EN`] 表,查不到就回退中文(不会出现空缺);
-   * 中文下原样返回。`params` 用于 `{name}` 形式的占位替换。
+   * 翻译。以**中文原文为 key**:当前语言有译文就用,查不到回退中文(不会出现空缺)。
+   * 基准语言(zh)无翻译表,原样返回。`params` 用于 `{name}` 形式的占位替换。
    */
   t: (zh: string, params?: Record<string, string | number>) => string;
 }
 
 const LocaleContext = createContext<I18nCtx | null>(null);
 
+function applyHtmlLang(code: string) {
+  document.documentElement.lang = localeDef(code).htmlLang ?? code;
+}
+
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  // 语言偏好持久化在 SQLite(ui_prefs 表);先以中文渲染,挂载后加载并回填。
-  const [locale, setLocaleState] = useState<Locale>("zh");
+  // 语言偏好持久化在 SQLite(ui_prefs 表);先以默认语言渲染,挂载后加载并回填。
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
   const hydrated = useRef(false);
 
   const setLocale = useCallback((l: Locale) => {
+    if (!isLocale(l)) return;
     setLocaleState(l);
     if (hydrated.current) setPref("locale", l).catch(() => {});
-    document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
+    applyHtmlLang(l);
   }, []);
 
   useEffect(() => {
     getPref("locale")
       .then((v) => {
-        if (v === "en" || v === "zh") {
+        if (v && isLocale(v)) {
           setLocaleState(v);
-          document.documentElement.lang = v === "zh" ? "zh-CN" : "en";
+          applyHtmlLang(v);
         }
       })
       .catch(() => {})
@@ -49,9 +56,12 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  // 当前语言的翻译表(基准语言无表 → undefined,t() 直接回退中文原文)。
+  const table = useMemo(() => localeDef(locale).table, [locale]);
+
   const t = useCallback(
     (zh: string, params?: Record<string, string | number>) => {
-      let s = locale === "en" ? (EN[zh] ?? zh) : zh;
+      let s = table?.[zh] ?? zh;
       if (params) {
         for (const [k, v] of Object.entries(params)) {
           s = s.split(`{${k}}`).join(String(v));
@@ -59,7 +69,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       }
       return s;
     },
-    [locale],
+    [table],
   );
 
   return (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Settings } from "../types";
 import { Select } from "./Select";
 import { useI18n } from "../i18n";
+import { LOCALES } from "../locales";
 
 interface Props {
   settings: Settings;
@@ -32,11 +33,8 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
             <span>{t("语言")}</span>
             <Select
               value={locale}
-              options={[
-                { value: "zh", label: "中文" },
-                { value: "en", label: "English" },
-              ]}
-              onChange={(v) => setLocale(v as "zh" | "en")}
+              options={LOCALES.map((l) => ({ value: l.code, label: l.label }))}
+              onChange={setLocale}
             />
           </label>
           <label className="field">
