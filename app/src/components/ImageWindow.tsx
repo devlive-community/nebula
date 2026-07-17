@@ -57,6 +57,12 @@ function baseName(p: string): string {
   return i >= 0 ? p.slice(i + 1) : p;
 }
 
+/** 与给定颜色对比的描边色:亮色配黑、暗色配白。 */
+function contrastColor(c: [number, number, number]): string {
+  const lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+  return lum > 140 ? "rgb(0,0,0)" : "rgb(255,255,255)";
+}
+
 /** 保存格式对应的扩展名。 */
 function formatExt(format: string): string {
   return format === "png" ? "png" : format === "webp" ? "webp" : "jpg";
@@ -157,9 +163,10 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   >("pen");
   const strokeCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<[number, number][] | null>(null);
-  // 文字标注:正在输入的位置(相对 0..1)与草稿文字。
+  // 文字标注:正在输入的位置(相对 0..1)、草稿文字、是否描边。
   const [textAt, setTextAt] = useState<{ x: number; y: number } | null>(null);
   const [textDraft, setTextDraft] = useState("");
+  const [textOutline, setTextOutline] = useState(true);
   // 主预览图片的布局尺寸(不含 transform 缩放),用于文字浮层字号换算。
   const mainImgRef = useRef<HTMLImageElement>(null);
   const [mainImg, setMainImg] = useState({ w: 0, h: 0 });
@@ -415,10 +422,18 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       for (const s of ops.shapes ?? [])
         drawShape(s.kind, s.from, s.to, rgb(s.color), s.width);
       for (const tx of ops.texts ?? []) {
-        ctx.fillStyle = rgb(tx.color);
+        const x = tx.x * cvs.width;
+        const y = tx.y * cvs.height;
         ctx.font = `${Math.round(tx.size * long)}px sans-serif`;
         ctx.textBaseline = "top";
-        ctx.fillText(tx.text, tx.x * cvs.width, tx.y * cvs.height);
+        if (tx.outline) {
+          ctx.strokeStyle = contrastColor(tx.color);
+          ctx.lineWidth = Math.max(2, tx.size * long * 0.14);
+          ctx.lineJoin = "round";
+          ctx.strokeText(tx.text, x, y);
+        }
+        ctx.fillStyle = rgb(tx.color);
+        ctx.fillText(tx.text, x, y);
       }
       if (drawing.current) {
         const css = rgb(penColor);
@@ -449,6 +464,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
             text: textDraft,
             color: penColor,
             size: penWidth * 4,
+            outline: textOutline,
           },
         ],
       });
@@ -674,10 +690,18 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     ctx.drawImage(img, 0, 0);
     const long = Math.max(canvas.width, canvas.height);
     for (const tx of ops.texts ?? []) {
-      ctx.fillStyle = `rgb(${tx.color[0]},${tx.color[1]},${tx.color[2]})`;
+      const x = tx.x * canvas.width;
+      const y = tx.y * canvas.height;
       ctx.font = `${Math.round(tx.size * long)}px sans-serif`;
       ctx.textBaseline = "top";
-      ctx.fillText(tx.text, tx.x * canvas.width, tx.y * canvas.height);
+      if (tx.outline) {
+        ctx.strokeStyle = contrastColor(tx.color);
+        ctx.lineWidth = Math.max(2, tx.size * long * 0.14);
+        ctx.lineJoin = "round";
+        ctx.strokeText(tx.text, x, y);
+      }
+      ctx.fillStyle = `rgb(${tx.color[0]},${tx.color[1]},${tx.color[2]})`;
+      ctx.fillText(tx.text, x, y);
     }
     const mime = mimeOf(format);
     const blob: Blob = await new Promise((res) =>
@@ -1185,6 +1209,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               }}
             />
           </div>
+          {tool === "text" && (
+            <button
+              className={`iv__ebtn ${textOutline ? "iv__ebtn--on" : ""}`}
+              onClick={() => setTextOutline((v) => !v)}
+            >
+              {t("描边")}
+            </button>
+          )}
           <label className="iv__slider">
             {t("粗细")}
             <input
@@ -1245,6 +1277,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                     top: `${tx.y * 100}%`,
                     color: `rgb(${tx.color[0]},${tx.color[1]},${tx.color[2]})`,
                     fontSize: tx.size * Math.max(mainImg.w, mainImg.h),
+                    textShadow: tx.outline
+                      ? (() => {
+                          const o = contrastColor(tx.color);
+                          return `-1px -1px 0 ${o},1px -1px 0 ${o},-1px 1px 0 ${o},1px 1px 0 ${o}`;
+                        })()
+                      : undefined,
                   }}
                 >
                   {tx.text}

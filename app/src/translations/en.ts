@@ -92,6 +92,7 @@ export const EN: Record<string, string> = {
   输入文字: "Type text",
   吸管取色: "Eyedropper",
   当前颜色: "Current color",
+  描边: "Outline",
   粗细: "Width",
   撤销: "Undo",
   重做: "Redo",
