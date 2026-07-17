@@ -12,6 +12,9 @@ import {
   faSpinner,
   faCrop,
   faCheck,
+  faExpand,
+  faRotateLeft,
+  faRotateRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -83,7 +86,39 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const [exif, setExif] = useState<ExifInfo | null>(null);
 
   const [editing, setEditing] = useState(false);
-  const [ops, setOps] = useState<ImageOps>({});
+  // ops 历史栈:撤销 / 重做。同类连续微调(滑块)用 coalesce 合并成一步。
+  const [hist, setHist] = useState<{ stack: ImageOps[]; idx: number }>({
+    stack: [{}],
+    idx: 0,
+  });
+  const lastCoalesce = useRef<string | null>(null);
+  const ops = hist.stack[hist.idx];
+  const canUndo = hist.idx > 0;
+  const canRedo = hist.idx < hist.stack.length - 1;
+  const pushOps = (next: ImageOps, coalesce?: string) => {
+    setHist(({ stack, idx }) => {
+      const base = stack.slice(0, idx + 1);
+      if (coalesce && coalesce === lastCoalesce.current) {
+        const copy = base.slice();
+        copy[idx] = next;
+        return { stack: copy, idx };
+      }
+      lastCoalesce.current = coalesce ?? null;
+      return { stack: [...base, next], idx: idx + 1 };
+    });
+  };
+  const resetOps = () => {
+    lastCoalesce.current = null;
+    setHist({ stack: [{}], idx: 0 });
+  };
+  const undo = () => {
+    lastCoalesce.current = null;
+    setHist((h) => ({ ...h, idx: Math.max(0, h.idx - 1) }));
+  };
+  const redo = () => {
+    lastCoalesce.current = null;
+    setHist((h) => ({ ...h, idx: Math.min(h.stack.length - 1, h.idx + 1) }));
+  };
   const [editData, setEditData] = useState<ImageData | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,6 +127,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   // 保存格式与 JPEG 画质。
   const [format, setFormat] = useState(() => defaultFormat(name));
   const [quality, setQuality] = useState(90);
+  // 尺寸调整对话框。
+  const [resizeOpen, setResizeOpen] = useState(false);
+  const [resizeW, setResizeW] = useState(0);
+  const [resizeH, setResizeH] = useState(0);
+  const [resizeLock, setResizeLock] = useState(true);
+  const aspect = useRef(1);
 
   // 裁剪子模式:cropRect 为相对图片的比例(0..1);imgBox 是图片在舞台里的实际像素框。
   const [cropping, setCropping] = useState(false);
@@ -250,7 +291,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   }, []);
 
   const enterEdit = () => {
-    setOps({});
+    resetOps();
     setEditData(data);
     resetView();
     setEditing(true);
@@ -264,7 +305,6 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
   // 进入裁剪:清掉已有裁剪(显示完整变换图)、复位视图、给个居中初始框。
   const startCrop = () => {
-    setOps((o) => ({ ...o, crop: null }));
     setCropRect({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
     resetView();
     setCropping(true);
@@ -273,17 +313,42 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     if (editData) {
       const ow = editData.orig_width;
       const oh = editData.orig_height;
-      setOps((o) => ({
-        ...o,
+      pushOps({
+        ...ops,
         crop: {
           x: Math.round(cropRect.x * ow),
           y: Math.round(cropRect.y * oh),
           width: Math.max(1, Math.round(cropRect.w * ow)),
           height: Math.max(1, Math.round(cropRect.h * oh)),
         },
-      }));
+      });
     }
     setCropping(false);
+  };
+
+  // 打开尺寸对话框:以当前(已应用其它编辑的)全分辨率尺寸为基准。
+  const openResize = () => {
+    const w = ops.resize?.width ?? editData?.orig_width ?? 0;
+    const h = ops.resize?.height ?? editData?.orig_height ?? 0;
+    aspect.current = h > 0 ? w / h : 1;
+    setResizeW(w);
+    setResizeH(h);
+    setResizeOpen(true);
+  };
+  const onResizeW = (v: number) => {
+    setResizeW(v);
+    if (resizeLock) setResizeH(Math.max(1, Math.round(v / aspect.current)));
+  };
+  const onResizeH = (v: number) => {
+    setResizeH(v);
+    if (resizeLock) setResizeW(Math.max(1, Math.round(v * aspect.current)));
+  };
+  const applyResize = () => {
+    pushOps({
+      ...ops,
+      resize: { width: Math.max(1, resizeW), height: Math.max(1, resizeH) },
+    });
+    setResizeOpen(false);
   };
 
   const onCropDown = (e: React.MouseEvent, mode: string) => {
@@ -336,7 +401,8 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     !ops.brightness &&
     !ops.contrast &&
     !ops.grayscale &&
-    !ops.invert;
+    !ops.invert &&
+    !ops.resize;
 
   const save = async (overwrite: boolean) => {
     setSaveMenu(false);
@@ -384,6 +450,13 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 编辑时:Cmd/Ctrl+Z 撤销,Cmd/Ctrl+Shift+Z 重做。
+      if (editing && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
       switch (e.key) {
         case "+":
         case "=":
@@ -400,14 +473,15 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           setShowInfo((v) => !v);
           break;
         case "Escape":
-          if (editing) exitEdit();
+          if (resizeOpen) setResizeOpen(false);
+          else if (editing) exitEdit();
           else close();
           break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, editing]);
+  }, [close, editing, resizeOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const exifRows = exif
     ? ([
@@ -470,30 +544,43 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
       {editing && !cropping && (
         <div className="iv__editbar">
-          <button className="iv__ebtn" onClick={() => setOps((o) => ({ ...o, rotate: (((o.rotate ?? 0) + 90) % 360) }))}>
+          <Tooltip label={t("撤销")}>
+            <button className="iv__ebtn" disabled={!canUndo} onClick={undo}>
+              <FontAwesomeIcon icon={faRotateLeft} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("重做")}>
+            <button className="iv__ebtn" disabled={!canRedo} onClick={redo}>
+              <FontAwesomeIcon icon={faRotateRight} />
+            </button>
+          </Tooltip>
+          <button
+            className="iv__ebtn"
+            onClick={() => pushOps({ ...ops, rotate: ((ops.rotate ?? 0) + 90) % 360 })}
+          >
             <FontAwesomeIcon icon={faRotate} /> {t("旋转")}
           </button>
           <button
             className={`iv__ebtn ${ops.flip_h ? "iv__ebtn--on" : ""}`}
-            onClick={() => setOps((o) => ({ ...o, flip_h: !o.flip_h }))}
+            onClick={() => pushOps({ ...ops, flip_h: !ops.flip_h })}
           >
             {t("水平翻转")}
           </button>
           <button
             className={`iv__ebtn ${ops.flip_v ? "iv__ebtn--on" : ""}`}
-            onClick={() => setOps((o) => ({ ...o, flip_v: !o.flip_v }))}
+            onClick={() => pushOps({ ...ops, flip_v: !ops.flip_v })}
           >
             {t("垂直翻转")}
           </button>
           <button
             className={`iv__ebtn ${ops.grayscale ? "iv__ebtn--on" : ""}`}
-            onClick={() => setOps((o) => ({ ...o, grayscale: !o.grayscale }))}
+            onClick={() => pushOps({ ...ops, grayscale: !ops.grayscale })}
           >
             {t("灰度")}
           </button>
           <button
             className={`iv__ebtn ${ops.invert ? "iv__ebtn--on" : ""}`}
-            onClick={() => setOps((o) => ({ ...o, invert: !o.invert }))}
+            onClick={() => pushOps({ ...ops, invert: !ops.invert })}
           >
             {t("反相")}
           </button>
@@ -503,6 +590,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           >
             <FontAwesomeIcon icon={faCrop} /> {t("裁剪")}
           </button>
+          <button
+            className={`iv__ebtn ${ops.resize ? "iv__ebtn--on" : ""}`}
+            onClick={openResize}
+          >
+            <FontAwesomeIcon icon={faExpand} /> {t("调整尺寸")}
+          </button>
           <label className="iv__slider">
             {t("亮度")}
             <input
@@ -510,7 +603,9 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               min={-100}
               max={100}
               value={ops.brightness ?? 0}
-              onChange={(e) => setOps((o) => ({ ...o, brightness: Number(e.target.value) }))}
+              onChange={(e) =>
+                pushOps({ ...ops, brightness: Number(e.target.value) }, "brightness")
+              }
             />
           </label>
           <label className="iv__slider">
@@ -520,10 +615,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               min={-100}
               max={100}
               value={ops.contrast ?? 0}
-              onChange={(e) => setOps((o) => ({ ...o, contrast: Number(e.target.value) }))}
+              onChange={(e) =>
+                pushOps({ ...ops, contrast: Number(e.target.value) }, "contrast")
+              }
             />
           </label>
-          <button className="iv__ebtn" onClick={() => setOps({})}>
+          <button className="iv__ebtn" onClick={resetOps}>
             {t("重置")}
           </button>
           <div className="iv__spacer" />
@@ -659,6 +756,57 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         )}
 
         {toast && <div className="iv__toast">{toast}</div>}
+
+        {resizeOpen && (
+          <div
+            className="iv__resize-backdrop"
+            onMouseDown={() => setResizeOpen(false)}
+          >
+            <div
+              className="iv__resize"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="iv__resize-title">{t("调整尺寸")}</div>
+              <div className="iv__resize-row">
+                <label>
+                  {t("宽")}
+                  <input
+                    type="number"
+                    min={1}
+                    value={resizeW}
+                    onChange={(e) => onResizeW(Number(e.target.value))}
+                  />
+                </label>
+                <span className="iv__resize-x">×</span>
+                <label>
+                  {t("高")}
+                  <input
+                    type="number"
+                    min={1}
+                    value={resizeH}
+                    onChange={(e) => onResizeH(Number(e.target.value))}
+                  />
+                </label>
+              </div>
+              <label className="iv__resize-lock">
+                <input
+                  type="checkbox"
+                  checked={resizeLock}
+                  onChange={(e) => setResizeLock(e.target.checked)}
+                />
+                {t("锁定宽高比")}
+              </label>
+              <div className="iv__resize-actions">
+                <button className="iv__ebtn" onClick={() => setResizeOpen(false)}>
+                  {t("取消")}
+                </button>
+                <button className="iv__ebtn iv__ebtn--primary" onClick={applyResize}>
+                  {t("确定")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showInfo && !editing && (
           <div className="iv__info" onMouseDown={(e) => e.stopPropagation()}>

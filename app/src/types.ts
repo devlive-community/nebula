@@ -66,6 +66,7 @@ export interface ImageOps {
   contrast?: number;
   grayscale?: boolean;
   invert?: boolean;
+  resize?: { width: number; height: number } | null;
 }
 
 /** EXIF 摘要(字段全部可选),与 nebula_image::ExifInfo 对应。 */

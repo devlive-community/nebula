@@ -22,6 +22,13 @@ pub struct CropRect {
     pub height: u32,
 }
 
+/// 目标尺寸(像素)。作为最后一步把结果缩放到该尺寸。
+#[derive(Debug, Clone, Deserialize)]
+pub struct Resize {
+    pub width: u32,
+    pub height: u32,
+}
+
 /// 一组编辑操作。几何操作先应用,再颜色调整;字段全部可选(默认无变化)。
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Ops {
@@ -44,6 +51,9 @@ pub struct Ops {
     pub grayscale: bool,
     #[serde(default)]
     pub invert: bool,
+    /// 目标尺寸;设了就在最后把结果缩放到该尺寸。
+    #[serde(default)]
+    pub resize: Option<Resize>,
 }
 
 impl Ops {
@@ -57,6 +67,7 @@ impl Ops {
             && self.contrast == 0.0
             && !self.grayscale
             && !self.invert
+            && self.resize.is_none()
     }
 }
 
@@ -95,6 +106,14 @@ fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
     }
     if ops.invert {
         img.invert();
+    }
+    // 缩放放最后:对最终结果改尺寸(限个上限,避免异常大值)。
+    if let Some(r) = &ops.resize {
+        let w = r.width.clamp(1, 20_000);
+        let h = r.height.clamp(1, 20_000);
+        if (w, h) != (img.width(), img.height()) {
+            img = img.resize_exact(w, h, FilterType::Lanczos3);
+        }
     }
     img
 }
@@ -425,6 +444,20 @@ mod tests {
         };
         let r = render_edit(&src, &ops, None).unwrap();
         assert_eq!((r.width, r.height), (200, 400));
+    }
+
+    #[test]
+    fn edit_resize_changes_output_dimensions() {
+        let src = png(800, 600);
+        let ops = Ops {
+            resize: Some(Resize {
+                width: 400,
+                height: 300,
+            }),
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        assert_eq!((r.width, r.height), (400, 300));
     }
 
     #[test]

@@ -1695,6 +1695,78 @@ body.resizing {
   cursor: nwse-resize;
 }
 
+/* 尺寸调整对话框 */
+.iv__resize-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.iv__resize {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  min-width: 240px;
+}
+
+.iv__resize-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.iv__resize-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.iv__resize-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.iv__resize-row input {
+  width: 80px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.iv__resize-x {
+  color: var(--text-dim);
+  padding-bottom: 7px;
+}
+
+.iv__resize-lock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 12px;
+}
+
+.iv__resize-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
 .iv__busy {
   position: absolute;
   top: 50%;
