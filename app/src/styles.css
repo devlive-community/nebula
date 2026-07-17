@@ -1596,6 +1596,24 @@ body.resizing {
   background: var(--bg-hover);
 }
 
+.iv__busy {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 18px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 13px;
+  box-shadow: var(--shadow);
+}
+
 .iv__toast {
   position: absolute;
   bottom: 22px;

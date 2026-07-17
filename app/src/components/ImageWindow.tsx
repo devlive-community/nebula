@@ -9,6 +9,7 @@ import {
   faArrowsRotate,
   faPen,
   faFloppyDisk,
+  faSpinner,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as api from "../api";
@@ -69,6 +70,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const [editing, setEditing] = useState(false);
   const [ops, setOps] = useState<ImageOps>({});
   const [editData, setEditData] = useState<ImageData | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMenu, setSaveMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -134,15 +136,17 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     };
   }, [showInfo, account, path, etag]);
 
-  // 编辑中:操作变化后(防抖)向 Rust 要预览(基于缓存原图,快)。
+  // 编辑中:操作变化后(防抖)向 Rust 要预览。渲染期间显示「处理中…」。
   useEffect(() => {
     if (!editing) return;
     let alive = true;
     const id = setTimeout(() => {
+      setEditBusy(true);
       api
         .imageEditPreview(account, path, etag, ops, viewportEdge())
         .then((d) => alive && setEditData(d))
-        .catch((e) => alive && setToast(t("预览失败:{msg}", { msg: String(e) })));
+        .catch((e) => alive && setToast(t("预览失败:{msg}", { msg: String(e) })))
+        .finally(() => alive && setEditBusy(false));
     }, 120);
     return () => {
       alive = false;
@@ -421,6 +425,13 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               cursor: scale > 1 ? "grab" : "default",
             }}
           />
+        )}
+
+        {(editBusy || saving) && (
+          <div className="iv__busy">
+            <FontAwesomeIcon icon={faSpinner} spin />{" "}
+            {saving ? t("保存中…") : t("处理中…")}
+          </div>
         )}
 
         {toast && <div className="iv__toast">{toast}</div>}
