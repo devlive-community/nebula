@@ -68,6 +68,8 @@ export interface ImageOps {
   saturation?: number;
   temperature?: number;
   sharpen?: number;
+  hue?: number;
+  blur?: number;
   grayscale?: boolean;
   invert?: boolean;
   resize?: { width: number; height: number } | null;

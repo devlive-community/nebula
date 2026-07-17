@@ -410,6 +410,8 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     !ops.saturation &&
     !ops.temperature &&
     !ops.sharpen &&
+    !ops.hue &&
+    !ops.blur &&
     !ops.grayscale &&
     !ops.invert &&
     !ops.resize;
@@ -689,6 +691,30 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               value={ops.sharpen ?? 0}
               onChange={(e) =>
                 pushOps({ ...ops, sharpen: Number(e.target.value) }, "sharpen")
+              }
+            />
+          </label>
+          <label className="iv__slider">
+            {t("模糊")}
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={ops.blur ?? 0}
+              onChange={(e) =>
+                pushOps({ ...ops, blur: Number(e.target.value) }, "blur")
+              }
+            />
+          </label>
+          <label className="iv__slider">
+            {t("色相")}
+            <input
+              type="range"
+              min={-180}
+              max={180}
+              value={ops.hue ?? 0}
+              onChange={(e) =>
+                pushOps({ ...ops, hue: Number(e.target.value) }, "hue")
               }
             />
           </label>

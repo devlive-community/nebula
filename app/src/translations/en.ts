@@ -94,6 +94,8 @@ export const EN: Record<string, string> = {
   饱和度: "Saturation",
   色温: "Warmth",
   锐化: "Sharpen",
+  模糊: "Blur",
+  色相: "Hue",
   重置: "Reset",
   退出编辑: "Exit",
   "保存中…": "Saving…",

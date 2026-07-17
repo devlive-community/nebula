@@ -59,6 +59,12 @@ pub struct Ops {
     /// 锐化强度,0..100(0 不锐化)。
     #[serde(default)]
     pub sharpen: i32,
+    /// 色相旋转,-180..180 度(0 不变)。
+    #[serde(default)]
+    pub hue: i32,
+    /// 高斯模糊强度,0..100(0 不模糊)。
+    #[serde(default)]
+    pub blur: i32,
     #[serde(default)]
     pub grayscale: bool,
     #[serde(default)]
@@ -81,6 +87,8 @@ impl Ops {
             && self.saturation == 0
             && self.temperature == 0
             && self.sharpen == 0
+            && self.hue == 0
+            && self.blur == 0
             && !self.grayscale
             && !self.invert
             && self.resize.is_none()
@@ -194,11 +202,19 @@ fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
     if ops.saturation != 0 || ops.temperature != 0 {
         img = adjust_color(&img, ops.saturation, ops.temperature);
     }
+    if ops.hue != 0 {
+        img = img.huerotate(ops.hue);
+    }
     if ops.grayscale {
         img = img.grayscale();
     }
     if ops.invert {
         img.invert();
+    }
+    if ops.blur > 0 {
+        // 高斯模糊;sigma 越大越糊(0..100 → 0..10)。
+        let sigma = (ops.blur.clamp(0, 100) as f32) / 100.0 * 10.0;
+        img = img.blur(sigma);
     }
     if ops.sharpen > 0 {
         // unsharp mask;sigma 越大锐化越强(0..100 → 0..3)。
@@ -614,9 +630,30 @@ mod tests {
             saturation: 0,
             temperature: 0,
             sharpen: 0,
+            hue: 0,
+            blur: 0,
             ..Default::default()
         }
         .is_identity());
+    }
+
+    #[test]
+    fn hue_and_blur_apply_without_error() {
+        let src = png(32, 32);
+        let hue = Ops {
+            hue: 90,
+            ..Default::default()
+        };
+        let r = render_edit(&src, &hue, None).unwrap();
+        assert_eq!((r.width, r.height), (32, 32));
+        assert!(decode(&r.bytes).is_ok());
+        let blur = Ops {
+            blur: 50,
+            ..Default::default()
+        };
+        let r = render_edit(&src, &blur, None).unwrap();
+        assert_eq!((r.width, r.height), (32, 32));
+        assert!(decode(&r.bytes).is_ok());
     }
 
     #[test]
