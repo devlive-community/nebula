@@ -65,6 +65,9 @@ export interface ImageOps {
   flip_v?: boolean;
   brightness?: number;
   contrast?: number;
+  saturation?: number;
+  temperature?: number;
+  sharpen?: number;
   grayscale?: boolean;
   invert?: boolean;
   resize?: { width: number; height: number } | null;

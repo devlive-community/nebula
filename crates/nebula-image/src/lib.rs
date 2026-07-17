@@ -50,6 +50,15 @@ pub struct Ops {
     /// 对比度,-100..100(正数增强)。
     #[serde(default)]
     pub contrast: f32,
+    /// 饱和度,-100..100(-100 去饱和成灰、0 不变、100 加倍)。
+    #[serde(default)]
+    pub saturation: i32,
+    /// 色温,-100..100(正数偏暖 / 加红减蓝,负数偏冷)。
+    #[serde(default)]
+    pub temperature: i32,
+    /// 锐化强度,0..100(0 不锐化)。
+    #[serde(default)]
+    pub sharpen: i32,
     #[serde(default)]
     pub grayscale: bool,
     #[serde(default)]
@@ -69,6 +78,9 @@ impl Ops {
             && !self.flip_v
             && self.brightness == 0
             && self.contrast == 0.0
+            && self.saturation == 0
+            && self.temperature == 0
+            && self.sharpen == 0
             && !self.grayscale
             && !self.invert
             && self.resize.is_none()
@@ -122,7 +134,31 @@ fn bilinear(src: &image::RgbaImage, sx: f32, sy: f32) -> image::Rgba<u8> {
     Rgba(out)
 }
 
-/// 依次应用编辑操作:旋转 → 翻转 → 拉直 → 裁剪 → 亮度 → 对比度 → 灰度 → 反相。
+/// 逐像素调整饱和度与色温。`sat`/`temp` 均为 -100..100。
+fn adjust_color(img: &DynamicImage, sat: i32, temp: i32) -> DynamicImage {
+    let mut buf = img.to_rgba8();
+    let factor = 1.0 + sat as f32 / 100.0; // -100→0(灰), 0→1, 100→2
+    let shift = temp as f32 / 100.0 * 30.0; // 最多 ±30 的红/蓝偏移
+    for p in buf.pixels_mut() {
+        let [r, g, b, a] = p.0;
+        let (mut rf, mut gf, mut bf) = (r as f32, g as f32, b as f32);
+        if sat != 0 {
+            let luma = 0.299 * rf + 0.587 * gf + 0.114 * bf;
+            rf = luma + (rf - luma) * factor;
+            gf = luma + (gf - luma) * factor;
+            bf = luma + (bf - luma) * factor;
+        }
+        if temp != 0 {
+            rf += shift;
+            bf -= shift;
+        }
+        let clamp = |v: f32| v.round().clamp(0.0, 255.0) as u8;
+        p.0 = [clamp(rf), clamp(gf), clamp(bf), a];
+    }
+    DynamicImage::ImageRgba8(buf)
+}
+
+/// 依次应用编辑操作:旋转 → 翻转 → 拉直 → 裁剪 → 亮度 → 对比度 → 饱和度 / 色温 → 灰度 → 反相 → 锐化。
 ///
 /// 裁剪放在旋转 / 翻转**之后**,裁剪坐标基于变换后的图 —— 前端在预览图上画框即所见即所裁。
 fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
@@ -155,11 +191,19 @@ fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
     if ops.contrast != 0.0 {
         img = img.adjust_contrast(ops.contrast);
     }
+    if ops.saturation != 0 || ops.temperature != 0 {
+        img = adjust_color(&img, ops.saturation, ops.temperature);
+    }
     if ops.grayscale {
         img = img.grayscale();
     }
     if ops.invert {
         img.invert();
+    }
+    if ops.sharpen > 0 {
+        // unsharp mask;sigma 越大锐化越强(0..100 → 0..3)。
+        let sigma = (ops.sharpen.clamp(0, 100) as f32) / 100.0 * 3.0;
+        img = img.unsharpen(sigma, 0);
     }
     // 缩放放最后:对最终结果改尺寸(限个上限,避免异常大值)。
     if let Some(r) = &ops.resize {
@@ -521,6 +565,55 @@ mod tests {
     fn straighten_zero_is_identity() {
         assert!(Ops {
             straighten: 0.0,
+            ..Default::default()
+        }
+        .is_identity());
+    }
+
+    #[test]
+    fn saturation_minus_100_greys_out() {
+        // 一张彩色图,饱和度拉到 -100,每个像素三通道应相等(去饱和成灰)。
+        let mut img = RgbImage::new(8, 8);
+        for (x, _y, p) in img.enumerate_pixels_mut() {
+            *p = Rgb([200, 60, (x * 20) as u8]);
+        }
+        let mut out = Cursor::new(Vec::new());
+        DynamicImage::ImageRgb8(img)
+            .write_to(&mut out, ImageFormat::Png)
+            .unwrap();
+        let ops = Ops {
+            saturation: -100,
+            ..Default::default()
+        };
+        let r = render_edit(&out.into_inner(), &ops, None).unwrap();
+        let rgba = decode(&r.bytes).unwrap().to_rgba8();
+        for p in rgba.pixels() {
+            let [rr, gg, bb, _] = p.0;
+            assert!(rr.abs_diff(gg) <= 1 && gg.abs_diff(bb) <= 1);
+        }
+    }
+
+    #[test]
+    fn temperature_warm_raises_red_lowers_blue() {
+        let src = png(4, 4); // 像素 blue 通道固定 128
+        let ops = Ops {
+            temperature: 100,
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        let rgba = decode(&r.bytes).unwrap().to_rgba8();
+        // png(4,4) 在 (2,2) 处原始为 Rgb([2, 2, 128])。
+        let p = rgba.get_pixel(2, 2).0;
+        assert!(p[0] as i32 > 2); // 红升
+        assert!((p[2] as i32) < 128); // 蓝降
+    }
+
+    #[test]
+    fn color_and_sharpen_zero_is_identity() {
+        assert!(Ops {
+            saturation: 0,
+            temperature: 0,
+            sharpen: 0,
             ..Default::default()
         }
         .is_identity());

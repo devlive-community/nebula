@@ -407,6 +407,9 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     !ops.flip_v &&
     !ops.brightness &&
     !ops.contrast &&
+    !ops.saturation &&
+    !ops.temperature &&
+    !ops.sharpen &&
     !ops.grayscale &&
     !ops.invert &&
     !ops.resize;
@@ -650,6 +653,42 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               value={ops.contrast ?? 0}
               onChange={(e) =>
                 pushOps({ ...ops, contrast: Number(e.target.value) }, "contrast")
+              }
+            />
+          </label>
+          <label className="iv__slider">
+            {t("饱和度")}
+            <input
+              type="range"
+              min={-100}
+              max={100}
+              value={ops.saturation ?? 0}
+              onChange={(e) =>
+                pushOps({ ...ops, saturation: Number(e.target.value) }, "saturation")
+              }
+            />
+          </label>
+          <label className="iv__slider">
+            {t("色温")}
+            <input
+              type="range"
+              min={-100}
+              max={100}
+              value={ops.temperature ?? 0}
+              onChange={(e) =>
+                pushOps({ ...ops, temperature: Number(e.target.value) }, "temperature")
+              }
+            />
+          </label>
+          <label className="iv__slider">
+            {t("锐化")}
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={ops.sharpen ?? 0}
+              onChange={(e) =>
+                pushOps({ ...ops, sharpen: Number(e.target.value) }, "sharpen")
               }
             />
           </label>
