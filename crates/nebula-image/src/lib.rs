@@ -29,13 +29,11 @@ pub struct Resize {
     pub height: u32,
 }
 
-/// 马赛克打码区域,坐标是相对(几何变换后)图的比例 0..1。
+/// 一笔马赛克涂抹:折线各点为相对坐标 0..1;`width` 是相对图较长边的笔刷宽度比例。
 #[derive(Debug, Clone, Deserialize)]
-pub struct MosaicArea {
-    pub x: f32,
-    pub y: f32,
-    pub w: f32,
-    pub h: f32,
+pub struct MosaicStroke {
+    pub points: Vec<[f32; 2]>,
+    pub width: f32,
 }
 
 /// 一笔画笔标注:折线各点为相对坐标 0..1;`width` 是相对图较长边的线宽比例。
@@ -89,9 +87,9 @@ pub struct Ops {
     /// 目标尺寸;设了就在最后把结果缩放到该尺寸。
     #[serde(default)]
     pub resize: Option<Resize>,
-    /// 马赛克打码区域(可多个),在几何变换后、调色前应用。
+    /// 马赛克涂抹(可多笔),在几何变换后、调色前应用。
     #[serde(default)]
-    pub mosaics: Vec<MosaicArea>,
+    pub mosaics: Vec<MosaicStroke>,
     /// 画笔标注(可多笔),在所有处理的最后烧录进图。
     #[serde(default)]
     pub strokes: Vec<Stroke>,
@@ -167,52 +165,86 @@ fn bilinear(src: &image::RgbaImage, sx: f32, sy: f32) -> image::Rgba<u8> {
     Rgba(out)
 }
 
-/// 对若干矩形区域做块像素化(马赛克打码)。区域坐标是相对图的比例 0..1。
-fn apply_mosaics(img: &DynamicImage, areas: &[MosaicArea]) -> DynamicImage {
+/// 把整张图按 `block` 做块平均像素化,返回像素化后的副本。
+fn pixelate_whole(src: &image::RgbaImage, block: u32) -> image::RgbaImage {
+    let (w, h) = (src.width(), src.height());
+    let mut out = src.clone();
+    let mut by = 0;
+    while by < h {
+        let mut bx = 0;
+        while bx < w {
+            let (bw, bh) = ((bx + block).min(w), (by + block).min(h));
+            let (mut sr, mut sg, mut sb, mut sa, mut n) = (0u64, 0u64, 0u64, 0u64, 0u64);
+            for yy in by..bh {
+                for xx in bx..bw {
+                    let p = src.get_pixel(xx, yy).0;
+                    sr += p[0] as u64;
+                    sg += p[1] as u64;
+                    sb += p[2] as u64;
+                    sa += p[3] as u64;
+                    n += 1;
+                }
+            }
+            let avg = image::Rgba([
+                (sr / n) as u8,
+                (sg / n) as u8,
+                (sb / n) as u8,
+                (sa / n) as u8,
+            ]);
+            for yy in by..bh {
+                for xx in bx..bw {
+                    out.put_pixel(xx, yy, avg);
+                }
+            }
+            bx += block;
+        }
+        by += block;
+    }
+    out
+}
+
+/// 沿马赛克涂抹路径,把圆形笔刷内的像素替换成像素化图对应像素(涂到哪打码到哪)。
+fn apply_mosaics(img: &DynamicImage, strokes: &[MosaicStroke]) -> DynamicImage {
     let mut buf = img.to_rgba8();
-    let (w, h) = (buf.width(), buf.height());
-    for a in areas {
-        let x0 = (a.x.clamp(0.0, 1.0) * w as f32) as u32;
-        let y0 = (a.y.clamp(0.0, 1.0) * h as f32) as u32;
-        let x1 = ((a.x + a.w).clamp(0.0, 1.0) * w as f32) as u32;
-        let y1 = ((a.y + a.h).clamp(0.0, 1.0) * h as f32) as u32;
-        if x1 <= x0 || y1 <= y0 {
+    let (w, h) = (buf.width() as f32, buf.height() as f32);
+    let long = w.max(h);
+    let block = ((long * 0.02) as u32).max(6);
+    let pixelated = pixelate_whole(&buf, block);
+    let stamp = |buf: &mut image::RgbaImage, cx: f32, cy: f32, r: f32| {
+        let r2 = r * r;
+        let (x0, x1) = ((cx - r).floor() as i32, (cx + r).ceil() as i32);
+        let (y0, y1) = ((cy - r).floor() as i32, (cy + r).ceil() as i32);
+        for y in y0.max(0)..=y1.min(h as i32 - 1) {
+            for x in x0.max(0)..=x1.min(w as i32 - 1) {
+                let dx = x as f32 - cx;
+                let dy = y as f32 - cy;
+                if dx * dx + dy * dy <= r2 {
+                    let p = *pixelated.get_pixel(x as u32, y as u32);
+                    buf.put_pixel(x as u32, y as u32, p);
+                }
+            }
+        }
+    };
+    for s in strokes {
+        let r = (s.width * long / 2.0).max(block as f32);
+        let pts: Vec<(f32, f32)> = s.points.iter().map(|p| (p[0] * w, p[1] * h)).collect();
+        if pts.is_empty() {
             continue;
         }
-        // 块大小按区域较短边自适应,至少 4px。
-        let block = (((x1 - x0).min(y1 - y0)) / 10).max(4);
-        let mut by = y0;
-        while by < y1 {
-            let mut bx = x0;
-            while bx < x1 {
-                let (bw, bh) = ((bx + block).min(x1), (by + block).min(y1));
-                // 块内均值。
-                let (mut sr, mut sg, mut sb, mut sa, mut n) = (0u64, 0u64, 0u64, 0u64, 0u64);
-                for yy in by..bh {
-                    for xx in bx..bw {
-                        let p = buf.get_pixel(xx, yy).0;
-                        sr += p[0] as u64;
-                        sg += p[1] as u64;
-                        sb += p[2] as u64;
-                        sa += p[3] as u64;
-                        n += 1;
-                    }
-                }
-                // 块内至少 1 像素,n 恒 ≥ 1。
-                let avg = image::Rgba([
-                    (sr / n) as u8,
-                    (sg / n) as u8,
-                    (sb / n) as u8,
-                    (sa / n) as u8,
-                ]);
-                for yy in by..bh {
-                    for xx in bx..bw {
-                        buf.put_pixel(xx, yy, avg);
-                    }
-                }
-                bx += block;
+        stamp(&mut buf, pts[0].0, pts[0].1, r);
+        for seg in pts.windows(2) {
+            let (p0, p1) = (seg[0], seg[1]);
+            let dist = ((p1.0 - p0.0).powi(2) + (p1.1 - p0.1).powi(2)).sqrt();
+            let steps = (dist / (r * 0.5)).ceil().max(1.0) as usize;
+            for i in 1..=steps {
+                let t = i as f32 / steps as f32;
+                stamp(
+                    &mut buf,
+                    p0.0 + (p1.0 - p0.0) * t,
+                    p0.1 + (p1.1 - p0.1) * t,
+                    r,
+                );
             }
-            by += block;
         }
     }
     DynamicImage::ImageRgba8(buf)
@@ -800,17 +832,15 @@ mod tests {
             .write_to(&mut out, ImageFormat::Png)
             .unwrap();
         let ops = Ops {
-            mosaics: vec![MosaicArea {
-                x: 0.3,
-                y: 0.3,
-                w: 0.4,
-                h: 0.4,
+            mosaics: vec![MosaicStroke {
+                points: vec![[0.3, 0.5], [0.7, 0.5]], // 横向涂抹一笔
+                width: 0.2,
             }],
             ..Default::default()
         };
         let r = render_edit(&out.into_inner(), &ops, None).unwrap();
         let rgba = decode(&r.bytes).unwrap().to_rgba8();
-        // 区域中心相邻两像素应相等(同一马赛克块)。
+        // 涂抹经过的中点附近相邻像素应相等(落在同一马赛克块)。
         assert_eq!(rgba.get_pixel(50, 50).0, rgba.get_pixel(51, 50).0);
     }
 

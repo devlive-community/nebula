@@ -321,22 +321,10 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     resetView();
   };
 
-  // 马赛克打码:框选区域,应用后加进 ops.mosaics(可连续加多个)。
+  // 马赛克打码:像画笔一样在图上涂抹,涂过的地方打码。
   const startMosaic = () => {
-    setCropRect({ x: 0.35, y: 0.35, w: 0.3, h: 0.3 });
     resetView();
     setMosaicMode(true);
-  };
-  const applyMosaic = () => {
-    pushOps({
-      ...ops,
-      mosaics: [
-        ...(ops.mosaics ?? []),
-        { x: cropRect.x, y: cropRect.y, w: cropRect.w, h: cropRect.h },
-      ],
-    });
-    setCropRect({ x: 0.35, y: 0.35, w: 0.3, h: 0.3 });
-    setToast(t("✓ 已打码"));
   };
 
   // 画笔标注:canvas 覆盖在图片上,实时画;抬手把这一笔加进 ops.strokes。
@@ -351,13 +339,8 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     if (!ctx) return;
     ctx.clearRect(0, 0, cvs.width, cvs.height);
     const long = Math.max(cvs.width, cvs.height);
-    const drawOne = (
-      pts: [number, number][],
-      color: [number, number, number],
-      width: number,
-    ) => {
+    const drawOne = (pts: [number, number][], css: string, width: number) => {
       if (!pts.length) return;
-      const css = `rgb(${color[0]},${color[1]},${color[2]})`;
       ctx.strokeStyle = css;
       ctx.fillStyle = css;
       ctx.lineWidth = width * long;
@@ -374,9 +357,15 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       for (const p of pts.slice(1)) ctx.lineTo(p[0] * cvs.width, p[1] * cvs.height);
       ctx.stroke();
     };
-    for (const s of ops.strokes ?? []) drawOne(s.points, s.color, s.width);
-    if (drawing.current) drawOne(drawing.current, penColor, penWidth);
-  }, [ops.strokes, penColor, penWidth]);
+    if (mosaicMode) {
+      // 已应用的马赛克由后端预览烧录;这里只画正在涂的一笔(半透明灰提示)。
+      if (drawing.current) drawOne(drawing.current, "rgba(0,0,0,0.45)", penWidth);
+    } else {
+      const rgb = (c: [number, number, number]) => `rgb(${c[0]},${c[1]},${c[2]})`;
+      for (const s of ops.strokes ?? []) drawOne(s.points, rgb(s.color), s.width);
+      if (drawing.current) drawOne(drawing.current, rgb(penColor), penWidth);
+    }
+  }, [ops.strokes, penColor, penWidth, mosaicMode]);
 
   const relFromEvent = (e: React.MouseEvent): [number, number] => {
     const cvs = strokeCanvasRef.current!;
@@ -397,27 +386,34 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   };
   const onPenUp = () => {
     if (drawing.current && drawing.current.length) {
-      pushOps({
-        ...ops,
-        strokes: [
-          ...(ops.strokes ?? []),
-          { points: drawing.current, color: penColor, width: penWidth },
-        ],
-      });
+      if (mosaicMode) {
+        pushOps({
+          ...ops,
+          mosaics: [...(ops.mosaics ?? []), { points: drawing.current, width: penWidth }],
+        });
+      } else {
+        pushOps({
+          ...ops,
+          strokes: [
+            ...(ops.strokes ?? []),
+            { points: drawing.current, color: penColor, width: penWidth },
+          ],
+        });
+      }
     }
     drawing.current = null;
   };
 
-  // 标注 canvas:随图片框设像素尺寸并重绘。
+  // 标注 / 马赛克 canvas:随图片框设像素尺寸并重绘。
   useEffect(() => {
-    if (!annotating) return;
+    if (!annotating && !mosaicMode) return;
     const cvs = strokeCanvasRef.current;
     if (cvs && imgBox.width > 0) {
       cvs.width = Math.round(imgBox.width);
       cvs.height = Math.round(imgBox.height);
       redrawStrokes();
     }
-  }, [annotating, imgBox, redrawStrokes]);
+  }, [annotating, mosaicMode, imgBox, redrawStrokes]);
 
   // 进入裁剪:清掉已有裁剪(显示完整变换图)、复位视图、给个居中初始框。
   const startCrop = () => {
@@ -923,11 +919,23 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
       {editing && mosaicMode && (
         <div className="iv__editbar">
-          <span className="iv__crop-hint">{t("框选要打码的区域,可连续添加")}</span>
+          <span className="iv__crop-hint">{t("在图上按住拖动涂抹要打码的区域")}</span>
+          <label className="iv__slider">
+            {t("粗细")}
+            <input
+              type="range"
+              min={2}
+              max={40}
+              value={Math.round(penWidth * 1000)}
+              onChange={(e) => setPenWidth(Number(e.target.value) / 1000)}
+            />
+          </label>
           <div className="iv__spacer" />
-          <button className="iv__ebtn iv__ebtn--primary" onClick={applyMosaic}>
-            <FontAwesomeIcon icon={faCheck} /> {t("打码")}
-          </button>
+          <Tooltip label={t("撤销")}>
+            <button className="iv__ebtn" disabled={!canUndo} onClick={undo}>
+              <FontAwesomeIcon icon={faRotateLeft} />
+            </button>
+          </Tooltip>
           <button className="iv__ebtn" onClick={() => setMosaicMode(false)}>
             {t("完成")}
           </button>
@@ -1003,7 +1011,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           />
         )}
 
-        {shown && !error && annotating && (
+        {shown && !error && (annotating || mosaicMode) && (
           <div className="iv__croplayer">
             <img
               ref={imgRef}
@@ -1032,7 +1040,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           </div>
         )}
 
-        {shown && !error && (cropping || mosaicMode) && (
+        {shown && !error && cropping && (
           <div
             className="iv__croplayer"
             onMouseMove={onCropMove}

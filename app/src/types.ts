@@ -73,7 +73,7 @@ export interface ImageOps {
   grayscale?: boolean;
   invert?: boolean;
   resize?: { width: number; height: number } | null;
-  mosaics?: { x: number; y: number; w: number; h: number }[];
+  mosaics?: { points: [number, number][]; width: number }[];
   strokes?: { points: [number, number][]; color: [number, number, number]; width: number }[];
 }
 
