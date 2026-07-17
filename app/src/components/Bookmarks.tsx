@@ -44,7 +44,7 @@ export function Bookmarks({
     <div className="bookmarks" ref={ref}>
       <button
         className="btn"
-        title={t("收藏夹")}
+        data-tooltip={t("收藏夹")}
         onClick={() => setOpen((o) => !o)}
       >
         <FontAwesomeIcon icon={faBookmark} />
@@ -80,7 +80,7 @@ export function Bookmarks({
                   </button>
                   <button
                     className="bookmarks__remove"
-                    title={t("移除")}
+                    data-tooltip={t("移除")}
                     onClick={() => onRemove(b.account, b.path)}
                   >
                     <FontAwesomeIcon icon={faXmark} />

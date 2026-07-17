@@ -87,6 +87,19 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     document.title = name;
   }, [name]);
 
+  // 独立窗口跟随应用主题(从 SQLite 读偏好并设 data-theme)。
+  useEffect(() => {
+    api
+      .getPref("theme")
+      .then((th) =>
+        document.documentElement.setAttribute(
+          "data-theme",
+          th === "light" ? "light" : "dark",
+        ),
+      )
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -271,31 +284,57 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           {name}
         </span>
         <div className="iv__spacer" />
-        <button className="iv__btn" title={t("缩小")} onClick={() => zoomAt(1 / 1.2, 0, 0)}>
+        <button
+          className="iv__btn"
+          data-tooltip={t("缩小")}
+          data-tooltip-below=""
+          onClick={() => zoomAt(1 / 1.2, 0, 0)}
+        >
           <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
         </button>
         <span className="iv__zoom">{Math.round(scale * 100)}%</span>
-        <button className="iv__btn" title={t("放大")} onClick={() => zoomAt(1.2, 0, 0)}>
+        <button
+          className="iv__btn"
+          data-tooltip={t("放大")}
+          data-tooltip-below=""
+          onClick={() => zoomAt(1.2, 0, 0)}
+        >
           <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
         </button>
-        <button className="iv__btn" title={t("复位")} onClick={resetView}>
+        <button
+          className="iv__btn"
+          data-tooltip={t("复位")}
+          data-tooltip-below=""
+          onClick={resetView}
+        >
           <FontAwesomeIcon icon={faArrowsRotate} />
         </button>
         {!editing && (
           <button
             className={`iv__btn ${showInfo ? "iv__btn--on" : ""}`}
-            title={t("信息")}
+            data-tooltip={t("信息")}
+            data-tooltip-below=""
             onClick={() => setShowInfo((v) => !v)}
           >
             <FontAwesomeIcon icon={faCircleInfo} />
           </button>
         )}
         {!editing && (
-          <button className="iv__btn" title={t("编辑")} onClick={enterEdit}>
+          <button
+            className="iv__btn"
+            data-tooltip={t("编辑")}
+            data-tooltip-below=""
+            onClick={enterEdit}
+          >
             <FontAwesomeIcon icon={faPen} />
           </button>
         )}
-        <button className="iv__btn" title={t("关闭")} onClick={close}>
+        <button
+          className="iv__btn"
+          data-tooltip={t("关闭")}
+          data-tooltip-below=""
+          onClick={close}
+        >
           <FontAwesomeIcon icon={faXmark} />
         </button>
       </div>

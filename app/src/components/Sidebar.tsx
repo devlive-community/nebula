@@ -70,7 +70,7 @@ export function Sidebar({
               </span>
               <button
                 className="account-item__action"
-                title={t("编辑账号")}
+                data-tooltip={t("编辑账号")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit(acc.id);
@@ -80,7 +80,7 @@ export function Sidebar({
               </button>
               <button
                 className="account-item__action account-item__action--danger"
-                title={t("移除账号")}
+                data-tooltip={t("移除账号")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onRemove(acc.id);
@@ -102,7 +102,7 @@ export function Sidebar({
           <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} />{" "}
           {theme === "dark" ? t("浅色") : t("深色")}
         </button>
-        <button className="btn" onClick={onSettings} title={t("设置")}>
+        <button className="btn" onClick={onSettings} data-tooltip={t("设置")}>
           <FontAwesomeIcon icon={faGear} /> {t("设置")}
         </button>
       </div>

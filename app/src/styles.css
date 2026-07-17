@@ -9,6 +9,7 @@
   --text-faint: #6b7280;
   --primary: #4f8cff;
   --primary-hover: #3d7bf0;
+  --accent: #4f8cff;
   --danger: #ef4757;
   --radius: 10px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
@@ -28,6 +29,7 @@
   --text-faint: #9aa3b2;
   --primary: #2f6fed;
   --primary-hover: #245fd6;
+  --accent: #2f6fed;
   --danger: #e5484d;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   --scrollbar: #cdd3db;
@@ -1450,15 +1452,15 @@ body.resizing {
   padding-top: 4px;
 }
 
-/* 图片浏览器(沉浸式深色灯箱) */
+/* 图片浏览器 / 编辑器(独立窗口,跟随主题) */
 .iv {
   position: fixed;
   inset: 0;
   z-index: 300;
   display: flex;
   flex-direction: column;
-  background: #0b0b0d;
-  color: #e8e8ea;
+  background: var(--bg);
+  color: var(--text);
 }
 
 .iv__bar {
@@ -1466,8 +1468,8 @@ body.resizing {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: rgba(0, 0, 0, 0.5);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
 }
 
 .iv__name {
@@ -1476,11 +1478,6 @@ body.resizing {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.iv__count {
-  font-size: 12px;
-  color: #9a9aa2;
 }
 
 .iv__spacer {
@@ -1493,23 +1490,23 @@ body.resizing {
   border: none;
   border-radius: 7px;
   background: transparent;
-  color: #cfcfd4;
+  color: var(--text-dim);
   cursor: pointer;
 }
 
 .iv__btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .iv__btn--on {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--bg-hover);
+  color: var(--primary);
 }
 
 .iv__zoom {
   font-size: 12px;
-  color: #9a9aa2;
+  color: var(--text-dim);
   min-width: 44px;
   text-align: center;
 }
@@ -1519,8 +1516,8 @@ body.resizing {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: rgba(0, 0, 0, 0.4);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
@@ -1530,27 +1527,22 @@ body.resizing {
   gap: 6px;
   padding: 5px 10px;
   font-size: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--border);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #d6d6da;
+  background: var(--bg-elev-2);
+  color: var(--text-dim);
   cursor: pointer;
 }
 
 .iv__ebtn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
-.iv__ebtn--on {
-  background: #3a6df0;
-  border-color: #3a6df0;
-  color: #fff;
-}
-
+.iv__ebtn--on,
 .iv__ebtn--primary {
-  background: #3a6df0;
-  border-color: #3a6df0;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 
@@ -1562,9 +1554,9 @@ body.resizing {
 .iv__slider {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
-  color: #b6b6bc;
+  color: var(--text-dim);
 }
 
 .iv__slider input {
@@ -1583,25 +1575,25 @@ body.resizing {
   display: flex;
   flex-direction: column;
   min-width: 140px;
-  background: #1c1c22;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow);
 }
 
 .iv__savemenu button {
   padding: 9px 12px;
   border: none;
   background: none;
-  color: #e0e0e4;
+  color: var(--text);
   font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
 
 .iv__savemenu button:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
 }
 
 .iv__toast {
@@ -1611,11 +1603,12 @@ body.resizing {
   transform: translateX(-50%);
   z-index: 4;
   padding: 8px 16px;
-  background: rgba(20, 20, 26, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 13px;
-  color: #e8e8ea;
+  color: var(--text);
+  box-shadow: var(--shadow);
 }
 
 .iv__stage {
@@ -1625,11 +1618,12 @@ body.resizing {
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: var(--bg);
   background-image:
-    linear-gradient(45deg, #17171a 25%, transparent 25%),
-    linear-gradient(-45deg, #17171a 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #17171a 75%),
-    linear-gradient(-45deg, transparent 75%, #17171a 75%);
+    linear-gradient(45deg, var(--bg-elev-2) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--bg-elev-2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--bg-elev-2) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--bg-elev-2) 75%);
   background-size: 24px 24px;
   background-position: 0 0, 0 12px, 12px -12px, -12px 0;
 }
@@ -1643,34 +1637,8 @@ body.resizing {
 }
 
 .iv__status {
-  color: #9a9aa2;
+  color: var(--text-dim);
   font-size: 14px;
-}
-
-.iv__nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.4);
-  color: #fff;
-  cursor: pointer;
-  z-index: 2;
-}
-
-.iv__nav:hover {
-  background: rgba(0, 0, 0, 0.7);
-}
-
-.iv__nav--prev {
-  left: 16px;
-}
-
-.iv__nav--next {
-  right: 16px;
 }
 
 .iv__info {
@@ -1679,11 +1647,11 @@ body.resizing {
   right: 16px;
   width: 260px;
   max-width: 70vw;
-  background: rgba(20, 20, 24, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
-  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
   z-index: 3;
 }
 
@@ -1700,11 +1668,11 @@ body.resizing {
   gap: 12px;
   font-size: 12px;
   padding: 3px 0;
-  color: #c6c6cc;
+  color: var(--text);
 }
 
 .iv__info-row span:first-child {
-  color: #8a8a92;
+  color: var(--text-dim);
   flex: none;
 }
 
@@ -1717,45 +1685,7 @@ body.resizing {
   display: inline-block;
   margin-top: 8px;
   font-size: 12px;
-  color: #6ea8fe;
-}
-
-.iv__strip {
-  display: flex;
-  gap: 6px;
-  padding: 8px 10px;
-  overflow-x: auto;
-  background: rgba(0, 0, 0, 0.5);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.iv__thumb {
-  flex: none;
-  width: 56px;
-  height: 56px;
-  padding: 0;
-  border: 2px solid transparent;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #1c1c20;
-  cursor: pointer;
-}
-
-.iv__thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.iv__thumb--active {
-  border-color: #6ea8fe;
-}
-
-.iv__thumb-ph {
-  width: 100%;
-  height: 100%;
-  background: #26262b;
+  color: var(--primary);
 }
 
 /* 命令面板(Cmd/Ctrl+K) */
@@ -2512,4 +2442,94 @@ body.resizing {
   border-radius: 999px;
   box-shadow: var(--shadow);
   animation: modal-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 主题化的范围拖动条(编辑器亮度/对比度等) */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-elev);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--bg-elev);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 主题化的轻量 tooltip:给按钮加 data-tooltip 即可 */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 500;
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 靠近顶栏的按钮把 tooltip 显示在下方,避免被窗口边缘裁掉 */
+[data-tooltip-below]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+  transform: translateX(-50%) translateY(-3px);
+}
+
+[data-tooltip-below]:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 顶部工具栏 / 头部的 tooltip 朝下,避免被窗口上沿裁掉 */
+.toolbar [data-tooltip]::after,
+.bookmarks > .btn[data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+  transform: translateX(-50%) translateY(-3px);
+}
+
+.toolbar [data-tooltip]:hover::after,
+.bookmarks > .btn[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
 }
