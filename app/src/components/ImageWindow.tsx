@@ -304,7 +304,11 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     });
   };
 
+  // 覆盖层模式(裁剪 / 马赛克 / 标注)下,舞台不响应缩放 / 平移 / 双击,
+  // 避免绘制点击被当成缩放 / 双击导致图片被放大。
+  const overlayMode = cropping || annotating || mosaicMode;
   const onWheel = (e: React.WheelEvent) => {
+    if (overlayMode) return;
     e.preventDefault();
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -314,10 +318,11 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   };
 
   const onMouseDown = (e: React.MouseEvent) => {
+    if (overlayMode) return;
     drag.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
   };
   const onMouseMove = (e: React.MouseEvent) => {
-    if (!drag.current) return;
+    if (overlayMode || !drag.current) return;
     setOffset({
       x: drag.current.ox + (e.clientX - drag.current.x),
       y: drag.current.oy + (e.clientY - drag.current.y),
@@ -1305,7 +1310,11 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         onMouseMove={onMouseMove}
         onMouseUp={endDrag}
         onMouseLeave={endDrag}
-        onDoubleClick={() => (scale === 1 ? zoomAt(2, 0, 0) : resetView())}
+        onDoubleClick={() => {
+          if (overlayMode) return;
+          if (scale === 1) zoomAt(2, 0, 0);
+          else resetView();
+        }}
       >
         {loading && <div className="iv__status">{t("加载中…")}</div>}
         {error && <div className="iv__status">{t("无法加载该图片")}</div>}

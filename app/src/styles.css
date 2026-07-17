@@ -1524,7 +1524,8 @@ body.resizing {
   overflow-y: hidden;
 }
 
-.iv__editbar .iv__slider input {
+/* 除 spacer 外都不压缩;放不下就横向滚动,而不是把滑块挤扁 */
+.iv__editbar > *:not(.iv__spacer) {
   flex: none;
 }
 
