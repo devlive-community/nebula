@@ -142,13 +142,13 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       api
         .imageEditPreview(account, path, etag, ops, viewportEdge())
         .then((d) => alive && setEditData(d))
-        .catch(() => {});
+        .catch((e) => alive && setToast(t("预览失败:{msg}", { msg: String(e) })));
     }, 120);
     return () => {
       alive = false;
       clearTimeout(id);
     };
-  }, [editing, ops, account, path, etag]);
+  }, [editing, ops, account, path, etag]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!toast) return;
