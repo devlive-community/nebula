@@ -387,6 +387,8 @@ impl OssClient {
             builder = builder.header("Content-MD5", md5);
         }
         if let Some(body) = payload.body {
+            // 显式设 Content-Length(含 0 字节);空 body 时 reqwest 可能省略,部分服务端会拒绝。
+            builder = builder.header(CONTENT_LENGTH, body.len());
             builder = builder.body(body);
         }
         builder

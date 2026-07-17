@@ -187,7 +187,11 @@ pub fn build_signed_request(
         builder = builder.header(*k, v);
     }
     if let Some(body) = spec.body {
-        builder = builder.body(body);
+        // 显式设 Content-Length(含 0 字节):空 body 时 reqwest 可能省略该头,
+        // 而 S3 / OBS 的 PUT 强制要求它(新建文件夹上传 0 字节对象会触发 MissingContentLength)。
+        builder = builder
+            .header(reqwest::header::CONTENT_LENGTH, body.len())
+            .body(body);
     }
     builder.build().map_err(CoreError::from)
 }
@@ -342,6 +346,33 @@ mod tests {
                 .to_str()
                 .unwrap(),
             expected
+        );
+    }
+
+    #[test]
+    fn empty_body_put_sets_content_length_zero() {
+        // 回归:新建文件夹上传 0 字节对象时,必须显式带 Content-Length: 0,否则 S3 报 MissingContentLength。
+        let http = HttpClient::new();
+        let p = params();
+        let req = build_signed_request(
+            &http,
+            &p,
+            RequestSpec {
+                method: Method::PUT,
+                canonical_uri: "/mybucket/newdir/",
+                query: &[],
+                content_type: None,
+                amz_headers: &[],
+                body: Some(bytes::Bytes::new()),
+            },
+            at(1_440_938_160),
+        )
+        .unwrap();
+        assert_eq!(
+            req.headers()
+                .get(reqwest::header::CONTENT_LENGTH)
+                .and_then(|v| v.to_str().ok()),
+            Some("0")
         );
     }
 

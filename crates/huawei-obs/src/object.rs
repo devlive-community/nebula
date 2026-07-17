@@ -381,7 +381,9 @@ impl ObsClient {
             builder = builder.header("Content-MD5", md5);
         }
         if let Some(body) = payload.body {
-            builder = builder.body(body);
+            // 显式设 Content-Length(含 0 字节):OBS 的 PUT 强制要求,新建文件夹(0 字节对象)
+            // 若省略该头会报 MissingContentLength。
+            builder = builder.header(CONTENT_LENGTH, body.len()).body(body);
         }
         builder
             .build()

@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use bytes::Bytes;
 use cloud_core::{CoreError, HttpClient};
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE};
 use reqwest::{Method, Request};
 
 use crate::error::{CosError, Result};
@@ -185,7 +185,8 @@ impl CosClient {
             builder = builder.header(*k, v);
         }
         if let Some(body) = spec.body {
-            builder = builder.body(body);
+            // 显式设 Content-Length(含 0 字节):空 body 时 reqwest 可能省略,COS 会拒绝。
+            builder = builder.header(CONTENT_LENGTH, body.len()).body(body);
         }
         builder
             .build()
