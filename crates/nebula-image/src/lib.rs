@@ -44,6 +44,16 @@ pub struct Stroke {
     pub width: f32,
 }
 
+/// 形状标注:矩形(`kind = "rect"`)或箭头(`kind = "arrow"`)。`from`/`to` 相对 0..1。
+#[derive(Debug, Clone, Deserialize)]
+pub struct Shape {
+    pub kind: String,
+    pub from: [f32; 2],
+    pub to: [f32; 2],
+    pub color: [u8; 3],
+    pub width: f32,
+}
+
 /// 一组编辑操作。几何操作先应用,再颜色调整;字段全部可选(默认无变化)。
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Ops {
@@ -93,6 +103,9 @@ pub struct Ops {
     /// 画笔标注(可多笔),在所有处理的最后烧录进图。
     #[serde(default)]
     pub strokes: Vec<Stroke>,
+    /// 形状标注(矩形 / 箭头),和画笔一起最后烧录。
+    #[serde(default)]
+    pub shapes: Vec<Shape>,
 }
 
 impl Ops {
@@ -115,6 +128,7 @@ impl Ops {
             && self.resize.is_none()
             && self.mosaics.is_empty()
             && self.strokes.is_empty()
+            && self.shapes.is_empty()
     }
 }
 
@@ -271,6 +285,29 @@ fn fill_circle(buf: &mut image::RgbaImage, cx: f32, cy: f32, r: f32, color: [u8;
     }
 }
 
+/// 画一条圆头粗线(沿线采样画填充圆)。坐标为像素。
+fn draw_thick_line(
+    buf: &mut image::RgbaImage,
+    p0: (f32, f32),
+    p1: (f32, f32),
+    r: f32,
+    color: [u8; 3],
+) {
+    fill_circle(buf, p0.0, p0.1, r, color);
+    let dist = ((p1.0 - p0.0).powi(2) + (p1.1 - p0.1).powi(2)).sqrt();
+    let steps = (dist / (r * 0.5)).ceil().max(1.0) as usize;
+    for i in 1..=steps {
+        let t = i as f32 / steps as f32;
+        fill_circle(
+            buf,
+            p0.0 + (p1.0 - p0.0) * t,
+            p0.1 + (p1.1 - p0.1) * t,
+            r,
+            color,
+        );
+    }
+}
+
 /// 把画笔标注烧录进图。坐标相对 0..1,线宽相对图较长边的比例。
 fn draw_strokes(img: &DynamicImage, strokes: &[Stroke]) -> DynamicImage {
     let mut buf = img.to_rgba8();
@@ -282,18 +319,44 @@ fn draw_strokes(img: &DynamicImage, strokes: &[Stroke]) -> DynamicImage {
         if pts.is_empty() {
             continue;
         }
-        // 单点也画一个圆点。
         fill_circle(&mut buf, pts[0].0, pts[0].1, r, s.color);
         for seg in pts.windows(2) {
-            let (p0, p1) = (seg[0], seg[1]);
-            let dist = ((p1.0 - p0.0).powi(2) + (p1.1 - p0.1).powi(2)).sqrt();
-            let steps = (dist / (r * 0.5)).ceil().max(1.0) as usize;
-            for i in 1..=steps {
-                let t = i as f32 / steps as f32;
-                let x = p0.0 + (p1.0 - p0.0) * t;
-                let y = p0.1 + (p1.1 - p0.1) * t;
-                fill_circle(&mut buf, x, y, r, s.color);
+            draw_thick_line(&mut buf, seg[0], seg[1], r, s.color);
+        }
+    }
+    DynamicImage::ImageRgba8(buf)
+}
+
+/// 把矩形 / 箭头形状标注烧录进图。坐标相对 0..1。
+fn draw_shapes(img: &DynamicImage, shapes: &[Shape]) -> DynamicImage {
+    let mut buf = img.to_rgba8();
+    let (w, h) = (buf.width() as f32, buf.height() as f32);
+    let long = w.max(h);
+    for s in shapes {
+        let r = (s.width * long / 2.0).max(0.5);
+        let from = (s.from[0] * w, s.from[1] * h);
+        let to = (s.to[0] * w, s.to[1] * h);
+        match s.kind.as_str() {
+            "rect" => {
+                let (x0, y0) = (from.0.min(to.0), from.1.min(to.1));
+                let (x1, y1) = (from.0.max(to.0), from.1.max(to.1));
+                draw_thick_line(&mut buf, (x0, y0), (x1, y0), r, s.color);
+                draw_thick_line(&mut buf, (x1, y0), (x1, y1), r, s.color);
+                draw_thick_line(&mut buf, (x1, y1), (x0, y1), r, s.color);
+                draw_thick_line(&mut buf, (x0, y1), (x0, y0), r, s.color);
             }
+            "arrow" => {
+                draw_thick_line(&mut buf, from, to, r, s.color);
+                // 两翼:在终点处,朝起点方向张开约 ±28°。
+                let ang = (from.1 - to.1).atan2(from.0 - to.0);
+                let wl = (r * 5.0).max(8.0);
+                for da in [0.5f32, -0.5] {
+                    let a = ang + da;
+                    let wing = (to.0 + wl * a.cos(), to.1 + wl * a.sin());
+                    draw_thick_line(&mut buf, to, wing, r, s.color);
+                }
+            }
+            _ => {}
         }
     }
     DynamicImage::ImageRgba8(buf)
@@ -389,9 +452,12 @@ fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
             img = img.resize_exact(w, h, FilterType::Lanczos3);
         }
     }
-    // 画笔标注最后烧录(相对坐标,不受缩放影响)。
+    // 画笔 / 形状标注最后烧录(相对坐标,不受缩放影响)。
     if !ops.strokes.is_empty() {
         img = draw_strokes(&img, &ops.strokes);
+    }
+    if !ops.shapes.is_empty() {
+        img = draw_shapes(&img, &ops.shapes);
     }
     img
 }
@@ -861,6 +927,27 @@ mod tests {
         assert_eq!(rgba.get_pixel(50, 50).0, [255, 0, 0, 255]);
         // 线外(左上角)不受影响。
         assert_ne!(rgba.get_pixel(2, 2).0, [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn shape_rect_paints_its_border() {
+        let src = png(100, 100);
+        let ops = Ops {
+            shapes: vec![Shape {
+                kind: "rect".into(),
+                from: [0.2, 0.2],
+                to: [0.8, 0.8],
+                color: [0, 255, 0],
+                width: 0.04,
+            }],
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        let rgba = decode(&r.bytes).unwrap().to_rgba8();
+        // 上边中点(约 x=50,y=20)应为绿色边框。
+        assert_eq!(rgba.get_pixel(50, 20).0, [0, 255, 0, 255]);
+        // 矩形内部中心不是边框,不应为绿。
+        assert_ne!(rgba.get_pixel(50, 50).0, [0, 255, 0, 255]);
     }
 
     #[test]

@@ -22,6 +22,8 @@ import {
   faRightFromBracket,
   faSave,
   faTableCells,
+  faSquare,
+  faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -148,6 +150,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const [annotating, setAnnotating] = useState(false);
   const [penColor, setPenColor] = useState<[number, number, number]>([255, 59, 48]);
   const [penWidth, setPenWidth] = useState(0.008);
+  const [tool, setTool] = useState<"pen" | "rect" | "arrow">("pen");
   const strokeCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<[number, number][] | null>(null);
   const [cropRect, setCropRect] = useState({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
@@ -240,8 +243,8 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   useEffect(() => {
     if (!editing) return;
     let alive = true;
-    // 标注模式下 strokes 由前端 canvas 实时画,预览图不烧录(避免双重绘制 / 延迟闪烁)。
-    const previewOps = annotating ? { ...ops, strokes: [] } : ops;
+    // 标注模式下 strokes / shapes 由前端 canvas 实时画,预览图不烧录(避免双重绘制 / 延迟闪烁)。
+    const previewOps = annotating ? { ...ops, strokes: [], shapes: [] } : ops;
     const id = setTimeout(() => {
       setEditBusy(true);
       api
@@ -357,15 +360,54 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       for (const p of pts.slice(1)) ctx.lineTo(p[0] * cvs.width, p[1] * cvs.height);
       ctx.stroke();
     };
+    const drawShape = (
+      kind: "rect" | "arrow",
+      from: [number, number],
+      to: [number, number],
+      css: string,
+      width: number,
+    ) => {
+      ctx.strokeStyle = css;
+      ctx.lineWidth = width * long;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      const fx = from[0] * cvs.width;
+      const fy = from[1] * cvs.height;
+      const tx = to[0] * cvs.width;
+      const ty = to[1] * cvs.height;
+      if (kind === "rect") {
+        ctx.strokeRect(Math.min(fx, tx), Math.min(fy, ty), Math.abs(tx - fx), Math.abs(ty - fy));
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+        const ang = Math.atan2(fy - ty, fx - tx);
+        const wl = Math.max(width * long * 2.5, 10);
+        for (const da of [0.5, -0.5]) {
+          ctx.beginPath();
+          ctx.moveTo(tx, ty);
+          ctx.lineTo(tx + wl * Math.cos(ang + da), ty + wl * Math.sin(ang + da));
+          ctx.stroke();
+        }
+      }
+    };
     if (mosaicMode) {
       // 已应用的马赛克由后端预览烧录;这里只画正在涂的一笔(半透明灰提示)。
       if (drawing.current) drawOne(drawing.current, "rgba(0,0,0,0.45)", penWidth);
     } else {
       const rgb = (c: [number, number, number]) => `rgb(${c[0]},${c[1]},${c[2]})`;
       for (const s of ops.strokes ?? []) drawOne(s.points, rgb(s.color), s.width);
-      if (drawing.current) drawOne(drawing.current, rgb(penColor), penWidth);
+      for (const s of ops.shapes ?? [])
+        drawShape(s.kind, s.from, s.to, rgb(s.color), s.width);
+      if (drawing.current) {
+        const css = rgb(penColor);
+        if (tool === "pen") drawOne(drawing.current, css, penWidth);
+        else if (drawing.current.length >= 2)
+          drawShape(tool, drawing.current[0], drawing.current[1], css, penWidth);
+      }
     }
-  }, [ops.strokes, penColor, penWidth, mosaicMode]);
+  }, [ops.strokes, ops.shapes, penColor, penWidth, mosaicMode, tool]);
 
   const relFromEvent = (e: React.MouseEvent): [number, number] => {
     const cvs = strokeCanvasRef.current!;
@@ -375,28 +417,39 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
     ];
   };
+  // 画笔 / 马赛克是自由折线;矩形 / 箭头是两点拖拽。
+  const freehand = mosaicMode || tool === "pen";
   const onPenDown = (e: React.MouseEvent) => {
-    drawing.current = [relFromEvent(e)];
+    const p = relFromEvent(e);
+    drawing.current = freehand ? [p] : [p, p];
     redrawStrokes();
   };
   const onPenMove = (e: React.MouseEvent) => {
     if (!drawing.current) return;
-    drawing.current.push(relFromEvent(e));
+    const p = relFromEvent(e);
+    if (freehand) drawing.current.push(p);
+    else drawing.current[1] = p;
     redrawStrokes();
   };
   const onPenUp = () => {
-    if (drawing.current && drawing.current.length) {
+    const d = drawing.current;
+    if (d && d.length) {
       if (mosaicMode) {
         pushOps({
           ...ops,
-          mosaics: [...(ops.mosaics ?? []), { points: drawing.current, width: penWidth }],
+          mosaics: [...(ops.mosaics ?? []), { points: d, width: penWidth }],
         });
-      } else {
+      } else if (tool === "pen") {
         pushOps({
           ...ops,
-          strokes: [
-            ...(ops.strokes ?? []),
-            { points: drawing.current, color: penColor, width: penWidth },
+          strokes: [...(ops.strokes ?? []), { points: d, color: penColor, width: penWidth }],
+        });
+      } else if (d.length >= 2) {
+        pushOps({
+          ...ops,
+          shapes: [
+            ...(ops.shapes ?? []),
+            { kind: tool, from: d[0], to: d[1], color: penColor, width: penWidth },
           ],
         });
       }
@@ -731,9 +784,9 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               <FontAwesomeIcon icon={faTableCells} />
             </button>
           </Tooltip>
-          <Tooltip label={t("画笔")}>
+          <Tooltip label={t("标注")}>
             <button
-              className={`iv__ebtn ${ops.strokes?.length ? "iv__ebtn--on" : ""}`}
+              className={`iv__ebtn ${ops.strokes?.length || ops.shapes?.length ? "iv__ebtn--on" : ""}`}
               onClick={startAnnotate}
             >
               <FontAwesomeIcon icon={faPen} />
@@ -944,7 +997,30 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
       {editing && annotating && (
         <div className="iv__editbar">
-          <span className="iv__crop-hint">{t("在图上按住拖动即可画")}</span>
+          <Tooltip label={t("画笔")}>
+            <button
+              className={`iv__ebtn ${tool === "pen" ? "iv__ebtn--on" : ""}`}
+              onClick={() => setTool("pen")}
+            >
+              <FontAwesomeIcon icon={faPen} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("矩形")}>
+            <button
+              className={`iv__ebtn ${tool === "rect" ? "iv__ebtn--on" : ""}`}
+              onClick={() => setTool("rect")}
+            >
+              <FontAwesomeIcon icon={faSquare} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("箭头")}>
+            <button
+              className={`iv__ebtn ${tool === "arrow" ? "iv__ebtn--on" : ""}`}
+              onClick={() => setTool("arrow")}
+            >
+              <FontAwesomeIcon icon={faArrowRight} />
+            </button>
+          </Tooltip>
           <div className="iv__pencolors">
             {(
               [

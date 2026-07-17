@@ -75,6 +75,13 @@ export interface ImageOps {
   resize?: { width: number; height: number } | null;
   mosaics?: { points: [number, number][]; width: number }[];
   strokes?: { points: [number, number][]; color: [number, number, number]; width: number }[];
+  shapes?: {
+    kind: "rect" | "arrow";
+    from: [number, number];
+    to: [number, number];
+    color: [number, number, number];
+    width: number;
+  }[];
 }
 
 /** EXIF 摘要(字段全部可选),与 nebula_image::ExifInfo 对应。 */
