@@ -461,8 +461,10 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   }, [ops.strokes, ops.shapes, ops.texts, ops.badges, penColor, penWidth, mosaicMode, tool]);
 
   const relFromEvent = (e: React.MouseEvent): [number, number] => {
-    const cvs = strokeCanvasRef.current!;
-    const rect = cvs.getBoundingClientRect();
+    // 用图片元素测坐标(canvas 可能因 imgBox 未就绪而未渲染)。
+    const el = imgRef.current;
+    if (!el) return [0.5, 0.5];
+    const rect = el.getBoundingClientRect();
     return [
       Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
       Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
@@ -1369,7 +1371,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         )}
 
         {shown && !error && (annotating || mosaicMode) && (
-          <div className="iv__croplayer">
+          <div
+            className="iv__croplayer"
+            style={{ cursor: tool === "eyedropper" ? "cell" : "crosshair" }}
+            onMouseDown={onPenDown}
+            onMouseMove={onPenMove}
+            onMouseUp={onPenUp}
+            onMouseLeave={onPenUp}
+          >
             <div className="iv__cropimgwrap">
               <img
                 ref={imgRef}
@@ -1390,13 +1399,9 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                   width: imgBox.width,
                   height: imgBox.height,
                 }}
-                onMouseDown={onPenDown}
-                onMouseMove={onPenMove}
-                onMouseUp={onPenUp}
-                onMouseLeave={onPenUp}
               />
             )}
-            {textAt && imgBox.width > 0 && (
+            {textAt && (
               <input
                 className="iv__textinput"
                 autoFocus

@@ -1518,7 +1518,14 @@ body.resizing {
   padding: 8px 14px;
   background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
+  /* 单行(必要时横向滚动):各模式工具栏高度一致,切换时下方图片不跳。 */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.iv__editbar .iv__slider input {
+  flex: none;
 }
 
 .iv__ebtn {
@@ -1667,7 +1674,7 @@ body.resizing {
 
 .iv__strokecanvas {
   position: absolute;
-  cursor: crosshair;
+  pointer-events: none;
   touch-action: none;
 }
 
