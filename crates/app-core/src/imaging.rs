@@ -120,9 +120,14 @@ impl App {
         ops: Ops,
         max_edge: u32,
     ) -> Result<ImageData> {
-        let orig = self.original_bytes(account, path, &etag).await?;
-        let rendered =
-            spawn_render(move || nebula_image::render_edit(&orig, &ops, Some(max_edge))).await?;
+        // 裁剪坐标基于原图像素,须在全分辨率上做;其余操作在缩小底图上预览即可(大图快很多)。
+        let rendered = if ops.crop.is_some() {
+            let orig = self.original_bytes(account, path, &etag).await?;
+            spawn_render(move || nebula_image::render_edit(&orig, &ops, Some(max_edge))).await?
+        } else {
+            let base = self.edit_base(account, path, &etag, max_edge).await?;
+            spawn_render(move || nebula_image::render_edit(&base, &ops, None)).await?
+        };
         Ok(ImageData::from(rendered))
     }
 
@@ -157,6 +162,40 @@ impl App {
     /// 下载对象原始字节。
     async fn fetch_bytes(&self, account: &str, path: &str) -> Result<Vec<u8>> {
         Ok(self.provider(account)?.read(path).await?.to_vec())
+    }
+
+    /// 取「编辑底图」:原图缩到 `max_edge` 的无损 PNG,磁盘缓存。
+    /// 大图编辑时,调参预览都在这张小图上做,不必反复解码 / 缩放原图。
+    async fn edit_base(
+        &self,
+        account: &str,
+        path: &str,
+        etag: &Option<String>,
+        max_edge: u32,
+    ) -> Result<Vec<u8>> {
+        let variant = format!("editbase-{max_edge}");
+        if let Some(dir) = self.cache_dir.get() {
+            let file = dir.join("editbase").join(format!(
+                "{:016x}.png",
+                digest(account, path, etag, &variant)
+            ));
+            if let Ok(bytes) = std::fs::read(&file) {
+                return Ok(bytes);
+            }
+            let orig = self.original_bytes(account, path, etag).await?;
+            let png = spawn_blocking_ok(move || nebula_image::downscaled_png(&orig, max_edge))
+                .await?
+                .map_err(|e| AppError::Image(e.to_string()))?;
+            if let Some(parent) = file.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(&file, &png);
+            return Ok(png);
+        }
+        let orig = self.original_bytes(account, path, etag).await?;
+        spawn_blocking_ok(move || nebula_image::downscaled_png(&orig, max_edge))
+            .await?
+            .map_err(|e| AppError::Image(e.to_string()))
     }
 
     /// 取原图字节:命中磁盘缓存直接读,否则下载并缓存(编辑时反复用)。

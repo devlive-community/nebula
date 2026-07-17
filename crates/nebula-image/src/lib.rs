@@ -234,6 +234,21 @@ pub fn render_edit(bytes: &[u8], ops: &Ops, max_edge: Option<u32>) -> Result<Ren
     })
 }
 
+/// 生成「编辑底图」:摆正 → 缩到 `max_edge` → 无损 PNG 编码。
+///
+/// 大图编辑时,先把原图缩到视口大小做成底图缓存起来;之后每次调参预览都在这张小图上应用操作,
+/// 不必反复解码 / 缩放几千万像素的原图。PNG 无损,重复应用操作不会累积压缩失真。
+pub fn downscaled_png(bytes: &[u8], max_edge: u32) -> Result<Vec<u8>> {
+    let mut img = apply_orientation(decode(bytes)?, exif::orientation(bytes));
+    if max_edge > 0 && img.width().max(img.height()) > max_edge {
+        img = img.resize(max_edge, max_edge, FilterType::Lanczos3);
+    }
+    let mut out = Cursor::new(Vec::new());
+    img.write_to(&mut out, ImageFormat::Png)
+        .map_err(|e| ImageError::Encode(e.to_string()))?;
+    Ok(out.into_inner())
+}
+
 /// 应用编辑操作后按指定格式全分辨率编码,用于保存回云端。
 ///
 /// `format` 取 `png` 或 `jpeg`(其余按 `jpeg`);`quality` 仅 JPEG 用(1..100)。
@@ -417,6 +432,15 @@ mod tests {
         let (jpg_bytes, mime) = encode_edit(&src, &ops, "jpeg", 90).unwrap();
         assert_eq!(mime, "image/jpeg");
         assert!(decode(&jpg_bytes).is_ok());
+    }
+
+    #[test]
+    fn downscaled_png_shrinks_and_stays_png() {
+        let src = png(2000, 1000);
+        let out = downscaled_png(&src, 500).unwrap();
+        let m = meta(&out).unwrap();
+        assert_eq!(m.format, "png");
+        assert_eq!(m.width.max(m.height), 500);
     }
 
     #[test]
