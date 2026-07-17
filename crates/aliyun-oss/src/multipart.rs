@@ -465,10 +465,9 @@ impl OssClient {
         req: PartRequest<'_>,
         date: &str,
     ) -> Result<Request> {
-        // CanonicalizedResource 的对象名需与 URL path 一样做百分号编码(OSS 遵循 S3 V2:
-        // 用未解码的 Request-URI 路径)。否则含空格 / 中文 / 特殊字符的 key 会签名不匹配。
-        let canonical =
-            sign::canonicalized_resource(bucket, &encode_key(req.key), req.subresources);
+        // CanonicalizedResource 用未编码的原始 key:OSS 按解码后的 key 验签,编码会让含
+        // 空格 / 中文 / 特殊字符的 key 签名不匹配(URL path 才做百分号编码)。
+        let canonical = sign::canonicalized_resource(bucket, req.key, req.subresources);
         let sts = sign::string_to_sign(
             req.method.as_str(),
             req.content_md5.unwrap_or(""),

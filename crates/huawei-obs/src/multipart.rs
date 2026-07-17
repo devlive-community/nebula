@@ -466,8 +466,7 @@ impl ObsClient {
     ) -> Result<Request> {
         // CanonicalizedResource 的对象名需与 URL path 一样做百分号编码(OBS 遵循 S3 V2:
         // 用未解码的 Request-URI 路径)。否则含空格 / 中文 / 特殊字符的 key 会签名不匹配。
-        let canonical =
-            sign::canonicalized_resource(bucket, &encode_key(req.key), req.subresources);
+        let canonical = sign::canonicalized_resource(bucket, req.key, req.subresources);
         let sts = sign::string_to_sign(
             req.method.as_str(),
             req.content_md5.unwrap_or(""),
@@ -709,8 +708,8 @@ mod tests {
 
     #[test]
     fn tagging_request_signs_the_tagging_subresource() {
-        // 回归:GET ?tagging 的 URL 与签名的 CanonicalizedResource 都应带 `?tagging`,
-        // 且对象名按编码后路径签名。
+        // 回归:GET ?tagging 的 URL 与签名的 CanonicalizedResource 都应带 `?tagging`;
+        // URL path 按编码后签名的 CanonicalizedResource 用**未编码的原始 key**(OBS 按解码后 key 验签)。
         let client = test_client();
         let date = "Thu, 17 Nov 2005 18:49:58 GMT";
         let req = client
@@ -734,14 +733,14 @@ mod tests {
             .url()
             .as_str()
             .contains("/dir/%E7%85%A7%E7%89%87%201.jpg?tagging"));
-        // 签名针对编码后的资源路径 + tagging 子资源。
+        // 签名针对**原始**的资源路径 + tagging 子资源(中文 / 空格不编码)。
         let sts = sign::string_to_sign(
             "GET",
             "",
             "",
             date,
             "",
-            "/examplebucket/dir/%E7%85%A7%E7%89%87%201.jpg?tagging",
+            "/examplebucket/dir/照片 1.jpg?tagging",
         );
         assert_eq!(
             req.headers().get(AUTHORIZATION).unwrap().to_str().unwrap(),
