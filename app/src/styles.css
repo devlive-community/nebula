@@ -1596,13 +1596,60 @@ body.resizing {
   background: var(--bg-hover);
 }
 
-/* 裁剪覆盖层 */
-.iv__cropwrap {
-  position: relative;
-  display: inline-flex;
-  max-width: 100%;
-  max-height: 100%;
-  line-height: 0;
+.iv__savemenu--wide {
+  min-width: 220px;
+  padding: 4px;
+}
+
+.iv__saveopt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.iv__fmts {
+  display: flex;
+  gap: 6px;
+}
+
+.iv__fmt {
+  flex: 1;
+  padding: 5px 0 !important;
+  text-align: center !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px;
+  background: var(--bg-elev-2) !important;
+  color: var(--text-dim) !important;
+  font-size: 11px;
+}
+
+.iv__fmt--on {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+}
+
+.iv__savemenu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* 裁剪覆盖层:铺满舞台并居中图片,选框按图片实际像素框绝对定位 */
+.iv__croplayer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.iv__croplayer .iv__img {
+  transform: none;
 }
 
 .iv__crop-hint {

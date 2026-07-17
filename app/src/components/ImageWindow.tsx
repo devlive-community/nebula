@@ -42,15 +42,27 @@ function baseName(p: string): string {
   return i >= 0 ? p.slice(i + 1) : p;
 }
 
+/** 保存格式对应的扩展名。 */
+function formatExt(format: string): string {
+  return format === "png" ? "png" : format === "webp" ? "webp" : "jpg";
+}
+
 /** 另存为新对象的路径:在扩展名前加 -edited,并按保存格式改扩展名。 */
 function editedPath(p: string, format: string): string {
-  const ext = format === "png" ? "png" : "jpg";
+  const ext = formatExt(format);
   const slash = p.lastIndexOf("/");
   const dir = slash >= 0 ? p.slice(0, slash + 1) : "";
   const base = slash >= 0 ? p.slice(slash + 1) : p;
   const dot = base.lastIndexOf(".");
   const stem = dot > 0 ? base.slice(0, dot) : base;
   return `${dir}${stem}-edited.${ext}`;
+}
+
+/** 由原文件名推断默认保存格式。 */
+function defaultFormat(name: string): string {
+  if (/\.png$/i.test(name)) return "png";
+  if (/\.webp$/i.test(name)) return "webp";
+  return "jpeg";
 }
 
 /**
@@ -76,17 +88,36 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveMenu, setSaveMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // 保存格式与 JPEG 画质。
+  const [format, setFormat] = useState(() => defaultFormat(name));
+  const [quality, setQuality] = useState(90);
 
-  // 裁剪子模式:cropRect 为相对显示图的比例(0..1)。
+  // 裁剪子模式:cropRect 为相对图片的比例(0..1);imgBox 是图片在舞台里的实际像素框。
   const [cropping, setCropping] = useState(false);
   const [cropRect, setCropRect] = useState({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
-  const cropWrapRef = useRef<HTMLDivElement>(null);
+  const [imgBox, setImgBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
+  const imgRef = useRef<HTMLImageElement>(null);
   const cropDrag = useRef<{
     mode: string;
     x: number;
     y: number;
     rect: { x: number; y: number; w: number; h: number };
   } | null>(null);
+
+  // 测量图片在舞台内的真实渲染框(裁剪选框据此定位,永远对齐)。
+  const measureImg = useCallback(() => {
+    const img = imgRef.current;
+    const stage = stageRef.current;
+    if (!img || !stage) return;
+    const ir = img.getBoundingClientRect();
+    const sr = stage.getBoundingClientRect();
+    setImgBox({
+      left: ir.left - sr.left,
+      top: ir.top - sr.top,
+      width: ir.width,
+      height: ir.height,
+    });
+  }, []);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -173,6 +204,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     return () => clearTimeout(id);
   }, [toast]);
 
+  // 裁剪时:图片加载 / 窗口尺寸变化后重新测量图片框。
+  useEffect(() => {
+    if (!cropping) return;
+    measureImg();
+    window.addEventListener("resize", measureImg);
+    return () => window.removeEventListener("resize", measureImg);
+  }, [cropping, editData, measureImg]);
+
   const zoomAt = (factor: number, cx: number, cy: number) => {
     setScale((s) => {
       const ns = Math.min(MAX_SCALE, Math.max(MIN_SCALE, s * factor));
@@ -252,11 +291,9 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   };
   const onCropMove = (e: React.MouseEvent) => {
     const d = cropDrag.current;
-    const wrap = cropWrapRef.current;
-    if (!d || !wrap) return;
-    const box = wrap.getBoundingClientRect();
-    const dx = (e.clientX - d.x) / box.width;
-    const dy = (e.clientY - d.y) / box.height;
+    if (!d || imgBox.width === 0) return;
+    const dx = (e.clientX - d.x) / imgBox.width;
+    const dy = (e.clientY - d.y) / imgBox.height;
     const cl = (v: number) => Math.min(1, Math.max(0, v));
     const r = d.rect;
     if (d.mode === "move") {
@@ -302,15 +339,15 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
   const save = async (overwrite: boolean) => {
     setSaveMenu(false);
-    if (opsIdentity) {
+    if (opsIdentity && overwrite && format === defaultFormat(name)) {
+      // 覆盖原图且无任何改动、格式也没变 → 没意义。
       setToast(t("没有改动"));
       return;
     }
     setSaving(true);
-    const format = /\.png$/i.test(name) ? "png" : "jpeg";
     const dest = overwrite ? path : editedPath(path, format);
     try {
-      await api.imageEditSave(account, path, etag, ops, dest, format, 90);
+      await api.imageEditSave(account, path, etag, ops, dest, format, quality);
       setToast(
         overwrite
           ? t("✓ 已覆盖保存")
@@ -478,7 +515,36 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               <FontAwesomeIcon icon={faFloppyDisk} /> {saving ? t("保存中…") : t("保存")}
             </button>
             {saveMenu && (
-              <div className="iv__savemenu">
+              <div className="iv__savemenu iv__savemenu--wide">
+                <div className="iv__saveopt">
+                  <span>{t("格式")}</span>
+                  <div className="iv__fmts">
+                    {["jpeg", "png", "webp"].map((f) => (
+                      <button
+                        key={f}
+                        className={`iv__fmt ${format === f ? "iv__fmt--on" : ""}`}
+                        onClick={() => setFormat(f)}
+                      >
+                        {f.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {format === "jpeg" && (
+                  <div className="iv__saveopt">
+                    <span>
+                      {t("画质")} {quality}
+                    </span>
+                    <input
+                      type="range"
+                      min={40}
+                      max={100}
+                      value={quality}
+                      onChange={(e) => setQuality(Number(e.target.value))}
+                    />
+                  </div>
+                )}
+                <div className="iv__savemenu-sep" />
                 <button onClick={() => save(false)}>{t("另存为新对象")}</button>
                 <button onClick={() => save(true)}>{t("覆盖原图")}</button>
               </div>
@@ -530,29 +596,36 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
         {shown && !error && cropping && (
           <div
-            className="iv__cropwrap"
-            ref={cropWrapRef}
+            className="iv__croplayer"
             onMouseMove={onCropMove}
             onMouseUp={onCropUp}
             onMouseLeave={onCropUp}
-            onMouseDown={(e) => e.stopPropagation()}
           >
-            <img className="iv__img" src={shown.data_url} alt={name} draggable={false} />
-            <div
-              className="iv__crop-box"
-              style={{
-                left: `${cropRect.x * 100}%`,
-                top: `${cropRect.y * 100}%`,
-                width: `${cropRect.w * 100}%`,
-                height: `${cropRect.h * 100}%`,
-              }}
-              onMouseDown={(e) => onCropDown(e, "move")}
-            >
-              <span className="iv__crop-h iv__crop-h--nw" onMouseDown={(e) => onCropDown(e, "nw")} />
-              <span className="iv__crop-h iv__crop-h--ne" onMouseDown={(e) => onCropDown(e, "ne")} />
-              <span className="iv__crop-h iv__crop-h--sw" onMouseDown={(e) => onCropDown(e, "sw")} />
-              <span className="iv__crop-h iv__crop-h--se" onMouseDown={(e) => onCropDown(e, "se")} />
-            </div>
+            <img
+              ref={imgRef}
+              className="iv__img"
+              src={shown.data_url}
+              alt={name}
+              draggable={false}
+              onLoad={measureImg}
+            />
+            {imgBox.width > 0 && (
+              <div
+                className="iv__crop-box"
+                style={{
+                  left: imgBox.left + cropRect.x * imgBox.width,
+                  top: imgBox.top + cropRect.y * imgBox.height,
+                  width: cropRect.w * imgBox.width,
+                  height: cropRect.h * imgBox.height,
+                }}
+                onMouseDown={(e) => onCropDown(e, "move")}
+              >
+                <span className="iv__crop-h iv__crop-h--nw" onMouseDown={(e) => onCropDown(e, "nw")} />
+                <span className="iv__crop-h iv__crop-h--ne" onMouseDown={(e) => onCropDown(e, "ne")} />
+                <span className="iv__crop-h iv__crop-h--sw" onMouseDown={(e) => onCropDown(e, "sw")} />
+                <span className="iv__crop-h iv__crop-h--se" onMouseDown={(e) => onCropDown(e, "se")} />
+              </div>
+            )}
           </div>
         )}
 

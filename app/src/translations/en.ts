@@ -89,6 +89,8 @@ export const EN: Record<string, string> = {
   "保存中…": "Saving…",
   另存为新对象: "Save as new object",
   覆盖原图: "Overwrite original",
+  格式: "Format",
+  画质: "Quality",
   没有改动: "No changes",
   "预览失败:{msg}": "Preview failed: {msg}",
   "✓ 已覆盖保存": "✓ Saved (overwritten)",

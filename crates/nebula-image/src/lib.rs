@@ -253,7 +253,7 @@ pub fn downscaled_png(bytes: &[u8], max_edge: u32) -> Result<Vec<u8>> {
 
 /// 应用编辑操作后按指定格式全分辨率编码,用于保存回云端。
 ///
-/// `format` 取 `png` 或 `jpeg`(其余按 `jpeg`);`quality` 仅 JPEG 用(1..100)。
+/// `format` 取 `png`(无损)/ `jpeg`(有损,`quality` 1..100)/ `webp`(无损);其余按 `jpeg`。
 pub fn encode_edit(
     bytes: &[u8],
     ops: &Ops,
@@ -269,6 +269,11 @@ pub fn encode_edit(
         img.write_to(&mut out, ImageFormat::Png)
             .map_err(|e| ImageError::Encode(e.to_string()))?;
         Ok((out.into_inner(), "image/png".into()))
+    } else if format.eq_ignore_ascii_case("webp") {
+        // image crate 的 WebP 编码为无损;不吃 quality。
+        img.write_to(&mut out, ImageFormat::WebP)
+            .map_err(|e| ImageError::Encode(e.to_string()))?;
+        Ok((out.into_inner(), "image/webp".into()))
     } else {
         let q = quality.clamp(1, 100);
         let rgb = img.to_rgb8();
@@ -452,6 +457,9 @@ mod tests {
         let (jpg_bytes, mime) = encode_edit(&src, &ops, "jpeg", 90).unwrap();
         assert_eq!(mime, "image/jpeg");
         assert!(decode(&jpg_bytes).is_ok());
+        let (webp_bytes, mime) = encode_edit(&src, &ops, "webp", 90).unwrap();
+        assert_eq!(mime, "image/webp");
+        assert!(decode(&webp_bytes).is_ok());
     }
 
     #[test]
