@@ -325,6 +325,23 @@ export const imageEditSave = (
     save: { dest, format, quality },
   });
 
+export const imageEditDownload = (
+  account: string,
+  path: string,
+  etag: string | null,
+  ops: ImageOps,
+  dest: string,
+  format: string,
+  quality: number,
+) =>
+  invoke<void>("image_edit_download", {
+    account,
+    path,
+    etag,
+    ops,
+    save: { dest, format, quality },
+  });
+
 export const copy = (account: string, from: string, to: string) =>
   invoke<void>("copy", { account, from, to });
 

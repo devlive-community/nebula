@@ -1278,6 +1278,26 @@ async fn image_edit_save(
         .map_err(|e| e.to_string())
 }
 
+/// 把编辑结果编码后保存到本地文件(`save.dest` 为本地路径,不回云端)。
+#[tauri::command]
+async fn image_edit_download(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    etag: Option<String>,
+    ops: Ops,
+    save: EditSave,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    let (bytes, _mime) = app
+        .image_edit_bytes(&account, &path, etag, ops, save.format, save.quality)
+        .await
+        .map_err(|e| e.to_string())?;
+    tokio::fs::write(&save.dest, bytes)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度)。
 #[tauri::command]
 fn get_pref(state: State<'_, App>, key: String) -> Option<String> {
@@ -1443,6 +1463,7 @@ pub fn run() {
             image_exif,
             image_edit_preview,
             image_edit_save,
+            image_edit_download,
             get_pref,
             set_pref,
         ])

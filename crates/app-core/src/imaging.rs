@@ -131,8 +131,27 @@ impl App {
         Ok(ImageData::from(rendered))
     }
 
-    /// 保存编辑结果:全分辨率应用操作 → 按 `format`/`quality` 编码 → 写回云端 `dest`
-    /// (`dest == path` 即覆盖原图;否则另存为新对象)。
+    /// 全分辨率应用编辑操作并按 `format`/`quality` 编码,返回 `(字节, MIME)`。
+    /// 保存回云端与下载到本地都复用它。
+    pub async fn image_edit_bytes(
+        &self,
+        account: &str,
+        path: &str,
+        etag: Option<String>,
+        ops: Ops,
+        format: String,
+        quality: u8,
+    ) -> Result<(Vec<u8>, String)> {
+        let orig = self.original_bytes(account, path, &etag).await?;
+        tokio::task::spawn_blocking(move || {
+            nebula_image::encode_edit(&orig, &ops, &format, quality)
+        })
+        .await
+        .map_err(|e| AppError::Image(e.to_string()))?
+        .map_err(|e| AppError::Image(e.to_string()))
+    }
+
+    /// 保存编辑结果:编码后写回云端 `dest`(`dest == path` 即覆盖原图;否则另存为新对象)。
     pub async fn image_edit_save(
         &self,
         account: &str,
@@ -141,18 +160,14 @@ impl App {
         ops: Ops,
         save: EditSave,
     ) -> Result<()> {
-        let orig = self.original_bytes(account, path, &etag).await?;
         let EditSave {
             dest,
             format,
             quality,
         } = save;
-        let (bytes, mime) = tokio::task::spawn_blocking(move || {
-            nebula_image::encode_edit(&orig, &ops, &format, quality)
-        })
-        .await
-        .map_err(|e| AppError::Image(e.to_string()))?
-        .map_err(|e| AppError::Image(e.to_string()))?;
+        let (bytes, mime) = self
+            .image_edit_bytes(account, path, etag, ops, format, quality)
+            .await?;
         self.provider(account)?
             .write(&dest, bytes::Bytes::from(bytes), Some(&mime))
             .await?;

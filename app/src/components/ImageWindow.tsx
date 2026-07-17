@@ -14,6 +14,7 @@ import {
   faCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { formatBytes } from "../util";
@@ -361,6 +362,26 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setSaving(false);
   };
 
+  // 下载到本地:弹保存对话框,Rust 编码后写到所选路径。
+  const downloadLocal = async () => {
+    setSaveMenu(false);
+    const ext = formatExt(format);
+    const suggested = baseName(editedPath(path, format));
+    const dest = await saveDialog({
+      defaultPath: suggested,
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+    });
+    if (typeof dest !== "string") return;
+    setSaving(true);
+    try {
+      await api.imageEditDownload(account, path, etag, ops, dest, format, quality);
+      setToast(t("✓ 已下载到本地"));
+    } catch {
+      setToast(t("保存失败"));
+    }
+    setSaving(false);
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       switch (e.key) {
@@ -547,6 +568,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                 <div className="iv__savemenu-sep" />
                 <button onClick={() => save(false)}>{t("另存为新对象")}</button>
                 <button onClick={() => save(true)}>{t("覆盖原图")}</button>
+                <button onClick={downloadLocal}>{t("下载到本地")}</button>
               </div>
             )}
           </div>

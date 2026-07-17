@@ -89,6 +89,8 @@ export const EN: Record<string, string> = {
   "保存中…": "Saving…",
   另存为新对象: "Save as new object",
   覆盖原图: "Overwrite original",
+  下载到本地: "Download to local",
+  "✓ 已下载到本地": "✓ Downloaded",
   格式: "Format",
   画质: "Quality",
   没有改动: "No changes",
