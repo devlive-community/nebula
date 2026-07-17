@@ -157,6 +157,13 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   // 文字标注:正在输入的位置(相对 0..1)与草稿文字。
   const [textAt, setTextAt] = useState<{ x: number; y: number } | null>(null);
   const [textDraft, setTextDraft] = useState("");
+  // 主预览图片的布局尺寸(不含 transform 缩放),用于文字浮层字号换算。
+  const mainImgRef = useRef<HTMLImageElement>(null);
+  const [mainImg, setMainImg] = useState({ w: 0, h: 0 });
+  const measureMain = useCallback(() => {
+    const el = mainImgRef.current;
+    if (el) setMainImg({ w: el.offsetWidth, h: el.offsetHeight });
+  }, []);
   const [cropRect, setCropRect] = useState({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
   const [imgBox, setImgBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
@@ -493,6 +500,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     }
     drawing.current = null;
   };
+
+  // 主预览图片布局尺寸:窗口缩放时重新测(用于文字浮层字号)。
+  useEffect(() => {
+    window.addEventListener("resize", measureMain);
+    return () => window.removeEventListener("resize", measureMain);
+  }, [measureMain]);
 
   // 标注 / 马赛克 canvas:随图片框设像素尺寸并重绘。
   useEffect(() => {
@@ -1162,16 +1175,37 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         {loading && <div className="iv__status">{t("加载中…")}</div>}
         {error && <div className="iv__status">{t("无法加载该图片")}</div>}
         {shown && !error && !cropping && !mosaicMode && !annotating && (
-          <img
-            className="iv__img"
-            src={shown.data_url}
-            alt={name}
-            draggable={false}
+          <div
+            className="iv__imgwrap"
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale}) rotate(${rotation}deg)`,
               cursor: scale > 1 ? "grab" : "default",
             }}
-          />
+          >
+            <img
+              ref={mainImgRef}
+              className="iv__img"
+              src={shown.data_url}
+              alt={name}
+              draggable={false}
+              onLoad={measureMain}
+            />
+            {editing &&
+              (ops.texts ?? []).map((tx, i) => (
+                <span
+                  key={i}
+                  className="iv__textmark"
+                  style={{
+                    left: `${tx.x * 100}%`,
+                    top: `${tx.y * 100}%`,
+                    color: `rgb(${tx.color[0]},${tx.color[1]},${tx.color[2]})`,
+                    fontSize: tx.size * Math.max(mainImg.w, mainImg.h),
+                  }}
+                >
+                  {tx.text}
+                </span>
+              ))}
+          </div>
         )}
 
         {shown && !error && (annotating || mosaicMode) && (

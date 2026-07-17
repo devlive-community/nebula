@@ -1864,6 +1864,31 @@ body.resizing {
   transition: transform 0.05s linear;
 }
 
+/* 主预览:图片 + 文字浮层一起缩放平移的容器 */
+.iv__imgwrap {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  max-height: 100%;
+  line-height: 0;
+  will-change: transform;
+  transition: transform 0.05s linear;
+}
+
+.iv__imgwrap .iv__img {
+  transition: none;
+}
+
+.iv__textmark {
+  position: absolute;
+  transform: translateY(0);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: pre;
+  pointer-events: none;
+  user-select: none;
+}
+
 .iv__status {
   color: var(--text-dim);
   font-size: 14px;
