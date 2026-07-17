@@ -325,6 +325,24 @@ export const imageEditSave = (
     save: { dest, format, quality },
   });
 
+// 文字标注:取全分辨率编辑图 → 前端 canvas 叠加文字 → 上传合成字节
+export const imageEditFull = (
+  account: string,
+  path: string,
+  etag: string | null,
+  ops: ImageOps,
+) => invoke<ImageData>("image_edit_full", { account, path, etag, ops });
+
+export const putImageBytes = (
+  account: string,
+  dest: string,
+  bytes: number[],
+  contentType: string,
+) => invoke<void>("put_image_bytes", { account, dest, bytes, contentType });
+
+export const saveImageBytesLocal = (dest: string, bytes: number[]) =>
+  invoke<void>("save_image_bytes_local", { dest, bytes });
+
 export const imageEditDownload = (
   account: string,
   path: string,

@@ -88,6 +88,8 @@ export const EN: Record<string, string> = {
   标注: "Annotate",
   矩形: "Rectangle",
   箭头: "Arrow",
+  文字: "Text",
+  输入文字: "Type text",
   粗细: "Width",
   撤销: "Undo",
   重做: "Redo",

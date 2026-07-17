@@ -24,6 +24,7 @@ import {
   faTableCells,
   faSquare,
   faArrowRight,
+  faFont,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -150,9 +151,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const [annotating, setAnnotating] = useState(false);
   const [penColor, setPenColor] = useState<[number, number, number]>([255, 59, 48]);
   const [penWidth, setPenWidth] = useState(0.008);
-  const [tool, setTool] = useState<"pen" | "rect" | "arrow">("pen");
+  const [tool, setTool] = useState<"pen" | "rect" | "arrow" | "text">("pen");
   const strokeCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<[number, number][] | null>(null);
+  // 文字标注:正在输入的位置(相对 0..1)与草稿文字。
+  const [textAt, setTextAt] = useState<{ x: number; y: number } | null>(null);
+  const [textDraft, setTextDraft] = useState("");
   const [cropRect, setCropRect] = useState({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
   const [imgBox, setImgBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
@@ -400,14 +404,20 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       for (const s of ops.strokes ?? []) drawOne(s.points, rgb(s.color), s.width);
       for (const s of ops.shapes ?? [])
         drawShape(s.kind, s.from, s.to, rgb(s.color), s.width);
+      for (const tx of ops.texts ?? []) {
+        ctx.fillStyle = rgb(tx.color);
+        ctx.font = `${Math.round(tx.size * long)}px sans-serif`;
+        ctx.textBaseline = "top";
+        ctx.fillText(tx.text, tx.x * cvs.width, tx.y * cvs.height);
+      }
       if (drawing.current) {
         const css = rgb(penColor);
         if (tool === "pen") drawOne(drawing.current, css, penWidth);
-        else if (drawing.current.length >= 2)
+        else if ((tool === "rect" || tool === "arrow") && drawing.current.length >= 2)
           drawShape(tool, drawing.current[0], drawing.current[1], css, penWidth);
       }
     }
-  }, [ops.strokes, ops.shapes, penColor, penWidth, mosaicMode, tool]);
+  }, [ops.strokes, ops.shapes, ops.texts, penColor, penWidth, mosaicMode, tool]);
 
   const relFromEvent = (e: React.MouseEvent): [number, number] => {
     const cvs = strokeCanvasRef.current!;
@@ -417,9 +427,36 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
     ];
   };
-  // 画笔 / 马赛克是自由折线;矩形 / 箭头是两点拖拽。
+  const commitText = () => {
+    if (textAt && textDraft.trim()) {
+      pushOps({
+        ...ops,
+        texts: [
+          ...(ops.texts ?? []),
+          {
+            x: textAt.x,
+            y: textAt.y,
+            text: textDraft,
+            color: penColor,
+            size: penWidth * 4,
+          },
+        ],
+      });
+    }
+    setTextAt(null);
+    setTextDraft("");
+  };
+
+  // 画笔 / 马赛克是自由折线;矩形 / 箭头是两点拖拽;文字是点一下放输入框。
   const freehand = mosaicMode || tool === "pen";
   const onPenDown = (e: React.MouseEvent) => {
+    if (!mosaicMode && tool === "text") {
+      const p = relFromEvent(e);
+      commitText(); // 提交上一个未完成的
+      setTextAt({ x: p[0], y: p[1] });
+      setTextDraft("");
+      return;
+    }
     const p = relFromEvent(e);
     drawing.current = freehand ? [p] : [p, p];
     redrawStrokes();
@@ -444,7 +481,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           ...ops,
           strokes: [...(ops.strokes ?? []), { points: d, color: penColor, width: penWidth }],
         });
-      } else if (d.length >= 2) {
+      } else if ((tool === "rect" || tool === "arrow") && d.length >= 2) {
         pushOps({
           ...ops,
           shapes: [
@@ -575,6 +612,38 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     !ops.invert &&
     !ops.resize;
 
+  const mimeOf = (fmt: string) =>
+    fmt === "png" ? "image/png" : fmt === "webp" ? "image/webp" : "image/jpeg";
+
+  // 有文字标注时:取全分辨率编辑图 → canvas 叠加文字(系统字体,支持中文)→ 返回合成字节。
+  const compositeTexts = async (): Promise<{ bytes: number[]; mime: string }> => {
+    const full = await api.imageEditFull(account, path, etag, ops);
+    const img = new Image();
+    await new Promise((res, rej) => {
+      img.onload = () => res(null);
+      img.onerror = rej;
+      img.src = full.data_url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = full.orig_width;
+    canvas.height = full.orig_height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const long = Math.max(canvas.width, canvas.height);
+    for (const tx of ops.texts ?? []) {
+      ctx.fillStyle = `rgb(${tx.color[0]},${tx.color[1]},${tx.color[2]})`;
+      ctx.font = `${Math.round(tx.size * long)}px sans-serif`;
+      ctx.textBaseline = "top";
+      ctx.fillText(tx.text, tx.x * canvas.width, tx.y * canvas.height);
+    }
+    const mime = mimeOf(format);
+    const blob: Blob = await new Promise((res) =>
+      canvas.toBlob((b) => res(b!), mime, quality / 100),
+    );
+    const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
+    return { bytes, mime };
+  };
+
   const save = async (overwrite: boolean) => {
     setSaveMenu(false);
     if (opsIdentity && overwrite && format === defaultFormat(name)) {
@@ -585,7 +654,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setSaving(true);
     const dest = overwrite ? path : editedPath(path, format);
     try {
-      await api.imageEditSave(account, path, etag, ops, dest, format, quality);
+      if (ops.texts?.length) {
+        const { bytes, mime } = await compositeTexts();
+        await api.putImageBytes(account, dest, bytes, mime);
+      } else {
+        await api.imageEditSave(account, path, etag, ops, dest, format, quality);
+      }
       setToast(
         overwrite
           ? t("✓ 已覆盖保存")
@@ -599,7 +673,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setSaving(false);
   };
 
-  // 下载到本地:弹保存对话框,Rust 编码后写到所选路径。
+  // 下载到本地:弹保存对话框,Rust 编码后写到所选路径(有文字则前端合成)。
   const downloadLocal = async () => {
     setSaveMenu(false);
     const ext = formatExt(format);
@@ -611,7 +685,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     if (typeof dest !== "string") return;
     setSaving(true);
     try {
-      await api.imageEditDownload(account, path, etag, ops, dest, format, quality);
+      if (ops.texts?.length) {
+        const { bytes } = await compositeTexts();
+        await api.saveImageBytesLocal(dest, bytes);
+      } else {
+        await api.imageEditDownload(account, path, etag, ops, dest, format, quality);
+      }
       setToast(t("✓ 已下载到本地"));
     } catch {
       setToast(t("保存失败"));
@@ -1021,6 +1100,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               <FontAwesomeIcon icon={faArrowRight} />
             </button>
           </Tooltip>
+          <Tooltip label={t("文字")}>
+            <button
+              className={`iv__ebtn ${tool === "text" ? "iv__ebtn--on" : ""}`}
+              onClick={() => setTool("text")}
+            >
+              <FontAwesomeIcon icon={faFont} />
+            </button>
+          </Tooltip>
           <div className="iv__pencolors">
             {(
               [
@@ -1111,6 +1198,29 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                 onMouseMove={onPenMove}
                 onMouseUp={onPenUp}
                 onMouseLeave={onPenUp}
+              />
+            )}
+            {textAt && imgBox.width > 0 && (
+              <input
+                className="iv__textinput"
+                autoFocus
+                value={textDraft}
+                placeholder={t("输入文字")}
+                style={{
+                  left: imgBox.left + textAt.x * imgBox.width,
+                  top: imgBox.top + textAt.y * imgBox.height,
+                  color: `rgb(${penColor[0]},${penColor[1]},${penColor[2]})`,
+                  fontSize: penWidth * 4 * Math.max(imgBox.width, imgBox.height),
+                }}
+                onChange={(e) => setTextDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitText();
+                  else if (e.key === "Escape") {
+                    setTextAt(null);
+                    setTextDraft("");
+                  }
+                }}
+                onBlur={commitText}
               />
             )}
           </div>

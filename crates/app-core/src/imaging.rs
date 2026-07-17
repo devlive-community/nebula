@@ -131,6 +131,33 @@ impl App {
         Ok(ImageData::from(rendered))
     }
 
+    /// 全分辨率渲染编辑结果(不缩放),返回 data URL。供前端叠加文字后再合成上传。
+    pub async fn image_edit_full(
+        &self,
+        account: &str,
+        path: &str,
+        etag: Option<String>,
+        ops: Ops,
+    ) -> Result<ImageData> {
+        let orig = self.original_bytes(account, path, &etag).await?;
+        let rendered = spawn_render(move || nebula_image::render_edit(&orig, &ops, None)).await?;
+        Ok(ImageData::from(rendered))
+    }
+
+    /// 直接把前端给的字节写到云端 `dest`(前端合成文字后上传用)。
+    pub async fn put_bytes(
+        &self,
+        account: &str,
+        dest: &str,
+        bytes: Vec<u8>,
+        mime: &str,
+    ) -> Result<()> {
+        self.provider(account)?
+            .write(dest, bytes::Bytes::from(bytes), Some(mime))
+            .await?;
+        Ok(())
+    }
+
     /// 全分辨率应用编辑操作并按 `format`/`quality` 编码,返回 `(字节, MIME)`。
     /// 保存回云端与下载到本地都复用它。
     pub async fn image_edit_bytes(

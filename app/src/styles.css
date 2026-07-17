@@ -1663,6 +1663,19 @@ body.resizing {
   touch-action: none;
 }
 
+.iv__textinput {
+  position: absolute;
+  z-index: 4;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px dashed rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  padding: 0 4px;
+  outline: none;
+  font-weight: 600;
+  line-height: 1.2;
+  min-width: 60px;
+}
+
 .iv__pencolors {
   display: flex;
   gap: 6px;

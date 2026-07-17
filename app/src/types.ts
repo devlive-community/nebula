@@ -82,6 +82,8 @@ export interface ImageOps {
     color: [number, number, number];
     width: number;
   }[];
+  /** 文字标注(前端 canvas 合成,后端忽略)。坐标 0..1,size 相对图较长边。 */
+  texts?: { x: number; y: number; text: string; color: [number, number, number]; size: number }[];
 }
 
 /** EXIF 摘要(字段全部可选),与 nebula_image::ExifInfo 对应。 */

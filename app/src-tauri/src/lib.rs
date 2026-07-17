@@ -1278,6 +1278,44 @@ async fn image_edit_save(
         .map_err(|e| e.to_string())
 }
 
+/// 全分辨率渲染编辑结果(不缩放),返回 data URL,供前端叠加文字后合成。
+#[tauri::command]
+async fn image_edit_full(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    etag: Option<String>,
+    ops: Ops,
+) -> Result<ImageData, String> {
+    let app = state.inner().clone();
+    app.image_edit_full(&account, &path, etag, ops)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 把前端合成好的字节写回云端 `dest`。
+#[tauri::command]
+async fn put_image_bytes(
+    state: State<'_, App>,
+    account: String,
+    dest: String,
+    bytes: Vec<u8>,
+    content_type: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.put_bytes(&account, &dest, bytes, &content_type)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 把前端合成好的字节写到本地文件 `dest`。
+#[tauri::command]
+async fn save_image_bytes_local(dest: String, bytes: Vec<u8>) -> Result<(), String> {
+    tokio::fs::write(&dest, bytes)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 把编辑结果编码后保存到本地文件(`save.dest` 为本地路径,不回云端)。
 #[tauri::command]
 async fn image_edit_download(
@@ -1464,6 +1502,9 @@ pub fn run() {
             image_edit_preview,
             image_edit_save,
             image_edit_download,
+            image_edit_full,
+            put_image_bytes,
+            save_image_bytes_local,
             get_pref,
             set_pref,
         ])
