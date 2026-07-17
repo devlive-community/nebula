@@ -1657,6 +1657,32 @@ body.resizing {
   color: var(--text-dim);
 }
 
+.iv__strokecanvas {
+  position: absolute;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.iv__pencolors {
+  display: flex;
+  gap: 6px;
+  margin-left: 10px;
+}
+
+.iv__pencolor {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+}
+
+.iv__pencolor--on {
+  border-color: var(--primary);
+  transform: scale(1.15);
+}
+
 .iv__crop-box {
   position: absolute;
   border: 1px solid #fff;

@@ -144,6 +144,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   // 裁剪子模式:cropRect 为相对图片的比例(0..1);imgBox 是图片在舞台里的实际像素框。
   const [cropping, setCropping] = useState(false);
   const [mosaicMode, setMosaicMode] = useState(false);
+  // 画笔标注:颜色(RGB)、相对线宽、正在画的一笔。
+  const [annotating, setAnnotating] = useState(false);
+  const [penColor, setPenColor] = useState<[number, number, number]>([255, 59, 48]);
+  const [penWidth, setPenWidth] = useState(0.008);
+  const strokeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef<[number, number][] | null>(null);
   const [cropRect, setCropRect] = useState({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
   const [imgBox, setImgBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
@@ -234,10 +240,12 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   useEffect(() => {
     if (!editing) return;
     let alive = true;
+    // 标注模式下 strokes 由前端 canvas 实时画,预览图不烧录(避免双重绘制 / 延迟闪烁)。
+    const previewOps = annotating ? { ...ops, strokes: [] } : ops;
     const id = setTimeout(() => {
       setEditBusy(true);
       api
-        .imageEditPreview(account, path, etag, ops, viewportEdge())
+        .imageEditPreview(account, path, etag, previewOps, viewportEdge())
         .then((d) => alive && setEditData(d))
         .catch((e) => alive && setToast(t("预览失败:{msg}", { msg: String(e) })))
         .finally(() => alive && setEditBusy(false));
@@ -246,7 +254,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       alive = false;
       clearTimeout(id);
     };
-  }, [editing, ops, account, path, etag]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editing, ops, account, path, etag, annotating]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!toast) return;
@@ -254,13 +262,13 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     return () => clearTimeout(id);
   }, [toast]);
 
-  // 裁剪时:图片加载 / 窗口尺寸变化后重新测量图片框。
+  // 裁剪 / 马赛克 / 标注时:图片加载 / 窗口尺寸变化后重新测量图片框。
   useEffect(() => {
-    if (!cropping) return;
+    if (!cropping && !mosaicMode && !annotating) return;
     measureImg();
     window.addEventListener("resize", measureImg);
     return () => window.removeEventListener("resize", measureImg);
-  }, [cropping, editData, measureImg]);
+  }, [cropping, mosaicMode, annotating, editData, measureImg]);
 
   const zoomAt = (factor: number, cx: number, cy: number) => {
     setScale((s) => {
@@ -309,6 +317,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setSaveMenu(false);
     setCropping(false);
     setMosaicMode(false);
+    setAnnotating(false);
     resetView();
   };
 
@@ -329,6 +338,86 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setCropRect({ x: 0.35, y: 0.35, w: 0.3, h: 0.3 });
     setToast(t("✓ 已打码"));
   };
+
+  // 画笔标注:canvas 覆盖在图片上,实时画;抬手把这一笔加进 ops.strokes。
+  const startAnnotate = () => {
+    resetView();
+    setAnnotating(true);
+  };
+  const redrawStrokes = useCallback(() => {
+    const cvs = strokeCanvasRef.current;
+    if (!cvs) return;
+    const ctx = cvs.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    const long = Math.max(cvs.width, cvs.height);
+    const drawOne = (
+      pts: [number, number][],
+      color: [number, number, number],
+      width: number,
+    ) => {
+      if (!pts.length) return;
+      const css = `rgb(${color[0]},${color[1]},${color[2]})`;
+      ctx.strokeStyle = css;
+      ctx.fillStyle = css;
+      ctx.lineWidth = width * long;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      if (pts.length === 1) {
+        ctx.beginPath();
+        ctx.arc(pts[0][0] * cvs.width, pts[0][1] * cvs.height, (width * long) / 2, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0] * cvs.width, pts[0][1] * cvs.height);
+      for (const p of pts.slice(1)) ctx.lineTo(p[0] * cvs.width, p[1] * cvs.height);
+      ctx.stroke();
+    };
+    for (const s of ops.strokes ?? []) drawOne(s.points, s.color, s.width);
+    if (drawing.current) drawOne(drawing.current, penColor, penWidth);
+  }, [ops.strokes, penColor, penWidth]);
+
+  const relFromEvent = (e: React.MouseEvent): [number, number] => {
+    const cvs = strokeCanvasRef.current!;
+    const rect = cvs.getBoundingClientRect();
+    return [
+      Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
+      Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
+    ];
+  };
+  const onPenDown = (e: React.MouseEvent) => {
+    drawing.current = [relFromEvent(e)];
+    redrawStrokes();
+  };
+  const onPenMove = (e: React.MouseEvent) => {
+    if (!drawing.current) return;
+    drawing.current.push(relFromEvent(e));
+    redrawStrokes();
+  };
+  const onPenUp = () => {
+    if (drawing.current && drawing.current.length) {
+      pushOps({
+        ...ops,
+        strokes: [
+          ...(ops.strokes ?? []),
+          { points: drawing.current, color: penColor, width: penWidth },
+        ],
+      });
+    }
+    drawing.current = null;
+  };
+
+  // 标注 canvas:随图片框设像素尺寸并重绘。
+  useEffect(() => {
+    if (!annotating) return;
+    const cvs = strokeCanvasRef.current;
+    if (cvs && imgBox.width > 0) {
+      cvs.width = Math.round(imgBox.width);
+      cvs.height = Math.round(imgBox.height);
+      redrawStrokes();
+    }
+  }, [annotating, imgBox, redrawStrokes]);
 
   // 进入裁剪:清掉已有裁剪(显示完整变换图)、复位视图、给个居中初始框。
   const startCrop = () => {
@@ -509,6 +598,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           if (resizeOpen) setResizeOpen(false);
           else if (cropping) setCropping(false);
           else if (mosaicMode) setMosaicMode(false);
+          else if (annotating) setAnnotating(false);
           else if (editing) exitEdit();
           else close();
           break;
@@ -516,7 +606,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, editing, resizeOpen, cropping, mosaicMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [close, editing, resizeOpen, cropping, mosaicMode, annotating]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const exifRows = exif
     ? ([
@@ -577,7 +667,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         </Tooltip>
       </div>
 
-      {editing && !cropping && !mosaicMode && (
+      {editing && !cropping && !mosaicMode && !annotating && (
         <div className="iv__editbar">
           <Tooltip label={t("撤销")}>
             <button className="iv__ebtn" disabled={!canUndo} onClick={undo}>
@@ -643,6 +733,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               onClick={startMosaic}
             >
               <FontAwesomeIcon icon={faTableCells} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("画笔")}>
+            <button
+              className={`iv__ebtn ${ops.strokes?.length ? "iv__ebtn--on" : ""}`}
+              onClick={startAnnotate}
+            >
+              <FontAwesomeIcon icon={faPen} />
             </button>
           </Tooltip>
           <Tooltip label={t("调整尺寸")}>
@@ -836,6 +934,50 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         </div>
       )}
 
+      {editing && annotating && (
+        <div className="iv__editbar">
+          <span className="iv__crop-hint">{t("在图上按住拖动即可画")}</span>
+          <div className="iv__pencolors">
+            {(
+              [
+                [255, 59, 48],
+                [255, 204, 0],
+                [52, 199, 89],
+                [0, 122, 255],
+                [255, 255, 255],
+                [0, 0, 0],
+              ] as [number, number, number][]
+            ).map((c) => (
+              <button
+                key={c.join(",")}
+                className={`iv__pencolor ${penColor.join(",") === c.join(",") ? "iv__pencolor--on" : ""}`}
+                style={{ background: `rgb(${c[0]},${c[1]},${c[2]})` }}
+                onClick={() => setPenColor(c)}
+              />
+            ))}
+          </div>
+          <label className="iv__slider">
+            {t("粗细")}
+            <input
+              type="range"
+              min={2}
+              max={30}
+              value={Math.round(penWidth * 1000)}
+              onChange={(e) => setPenWidth(Number(e.target.value) / 1000)}
+            />
+          </label>
+          <div className="iv__spacer" />
+          <Tooltip label={t("撤销")}>
+            <button className="iv__ebtn" disabled={!canUndo} onClick={undo}>
+              <FontAwesomeIcon icon={faRotateLeft} />
+            </button>
+          </Tooltip>
+          <button className="iv__ebtn" onClick={() => setAnnotating(false)}>
+            {t("完成")}
+          </button>
+        </div>
+      )}
+
       <div
         className="iv__stage"
         ref={stageRef}
@@ -848,7 +990,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       >
         {loading && <div className="iv__status">{t("加载中…")}</div>}
         {error && <div className="iv__status">{t("无法加载该图片")}</div>}
-        {shown && !error && !cropping && !mosaicMode && (
+        {shown && !error && !cropping && !mosaicMode && !annotating && (
           <img
             className="iv__img"
             src={shown.data_url}
@@ -859,6 +1001,35 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               cursor: scale > 1 ? "grab" : "default",
             }}
           />
+        )}
+
+        {shown && !error && annotating && (
+          <div className="iv__croplayer">
+            <img
+              ref={imgRef}
+              className="iv__img"
+              src={shown.data_url}
+              alt={name}
+              draggable={false}
+              onLoad={measureImg}
+            />
+            {imgBox.width > 0 && (
+              <canvas
+                ref={strokeCanvasRef}
+                className="iv__strokecanvas"
+                style={{
+                  left: imgBox.left,
+                  top: imgBox.top,
+                  width: imgBox.width,
+                  height: imgBox.height,
+                }}
+                onMouseDown={onPenDown}
+                onMouseMove={onPenMove}
+                onMouseUp={onPenUp}
+                onMouseLeave={onPenUp}
+              />
+            )}
+          </div>
         )}
 
         {shown && !error && (cropping || mosaicMode) && (

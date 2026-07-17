@@ -38,6 +38,14 @@ pub struct MosaicArea {
     pub h: f32,
 }
 
+/// 一笔画笔标注:折线各点为相对坐标 0..1;`width` 是相对图较长边的线宽比例。
+#[derive(Debug, Clone, Deserialize)]
+pub struct Stroke {
+    pub points: Vec<[f32; 2]>,
+    pub color: [u8; 3],
+    pub width: f32,
+}
+
 /// 一组编辑操作。几何操作先应用,再颜色调整;字段全部可选(默认无变化)。
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Ops {
@@ -84,6 +92,9 @@ pub struct Ops {
     /// 马赛克打码区域(可多个),在几何变换后、调色前应用。
     #[serde(default)]
     pub mosaics: Vec<MosaicArea>,
+    /// 画笔标注(可多笔),在所有处理的最后烧录进图。
+    #[serde(default)]
+    pub strokes: Vec<Stroke>,
 }
 
 impl Ops {
@@ -105,6 +116,7 @@ impl Ops {
             && !self.invert
             && self.resize.is_none()
             && self.mosaics.is_empty()
+            && self.strokes.is_empty()
     }
 }
 
@@ -206,6 +218,55 @@ fn apply_mosaics(img: &DynamicImage, areas: &[MosaicArea]) -> DynamicImage {
     DynamicImage::ImageRgba8(buf)
 }
 
+/// 在 `buf` 上画一个填充圆(不透明覆盖)。
+fn fill_circle(buf: &mut image::RgbaImage, cx: f32, cy: f32, r: f32, color: [u8; 3]) {
+    let (w, h) = (buf.width() as i32, buf.height() as i32);
+    let r2 = r * r;
+    let (x0, x1) = ((cx - r).floor() as i32, (cx + r).ceil() as i32);
+    let (y0, y1) = ((cy - r).floor() as i32, (cy + r).ceil() as i32);
+    for y in y0.max(0)..=y1.min(h - 1) {
+        for x in x0.max(0)..=x1.min(w - 1) {
+            let dx = x as f32 - cx;
+            let dy = y as f32 - cy;
+            if dx * dx + dy * dy <= r2 {
+                buf.put_pixel(
+                    x as u32,
+                    y as u32,
+                    image::Rgba([color[0], color[1], color[2], 255]),
+                );
+            }
+        }
+    }
+}
+
+/// 把画笔标注烧录进图。坐标相对 0..1,线宽相对图较长边的比例。
+fn draw_strokes(img: &DynamicImage, strokes: &[Stroke]) -> DynamicImage {
+    let mut buf = img.to_rgba8();
+    let (w, h) = (buf.width() as f32, buf.height() as f32);
+    let long = w.max(h);
+    for s in strokes {
+        let r = (s.width * long / 2.0).max(0.5);
+        let pts: Vec<(f32, f32)> = s.points.iter().map(|p| (p[0] * w, p[1] * h)).collect();
+        if pts.is_empty() {
+            continue;
+        }
+        // 单点也画一个圆点。
+        fill_circle(&mut buf, pts[0].0, pts[0].1, r, s.color);
+        for seg in pts.windows(2) {
+            let (p0, p1) = (seg[0], seg[1]);
+            let dist = ((p1.0 - p0.0).powi(2) + (p1.1 - p0.1).powi(2)).sqrt();
+            let steps = (dist / (r * 0.5)).ceil().max(1.0) as usize;
+            for i in 1..=steps {
+                let t = i as f32 / steps as f32;
+                let x = p0.0 + (p1.0 - p0.0) * t;
+                let y = p0.1 + (p1.1 - p0.1) * t;
+                fill_circle(&mut buf, x, y, r, s.color);
+            }
+        }
+    }
+    DynamicImage::ImageRgba8(buf)
+}
+
 /// 逐像素调整饱和度与色温。`sat`/`temp` 均为 -100..100。
 fn adjust_color(img: &DynamicImage, sat: i32, temp: i32) -> DynamicImage {
     let mut buf = img.to_rgba8();
@@ -295,6 +356,10 @@ fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
         if (w, h) != (img.width(), img.height()) {
             img = img.resize_exact(w, h, FilterType::Lanczos3);
         }
+    }
+    // 画笔标注最后烧录(相对坐标,不受缩放影响)。
+    if !ops.strokes.is_empty() {
+        img = draw_strokes(&img, &ops.strokes);
     }
     img
 }
@@ -747,6 +812,25 @@ mod tests {
         let rgba = decode(&r.bytes).unwrap().to_rgba8();
         // 区域中心相邻两像素应相等(同一马赛克块)。
         assert_eq!(rgba.get_pixel(50, 50).0, rgba.get_pixel(51, 50).0);
+    }
+
+    #[test]
+    fn stroke_paints_its_color() {
+        let src = png(100, 100); // (50,50) 原始约 Rgb([50,50,128])
+        let ops = Ops {
+            strokes: vec![Stroke {
+                points: vec![[0.2, 0.5], [0.8, 0.5]], // 横穿中线
+                color: [255, 0, 0],
+                width: 0.05,
+            }],
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        let rgba = decode(&r.bytes).unwrap().to_rgba8();
+        // 线经过的中点应为红色。
+        assert_eq!(rgba.get_pixel(50, 50).0, [255, 0, 0, 255]);
+        // 线外(左上角)不受影响。
+        assert_ne!(rgba.get_pixel(2, 2).0, [255, 0, 0, 255]);
     }
 
     #[test]
