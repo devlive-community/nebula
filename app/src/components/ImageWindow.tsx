@@ -164,8 +164,13 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   >("pen");
   const strokeCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<[number, number][] | null>(null);
-  // 文字标注:正在输入的位置(相对 0..1)、草稿文字、是否描边。
-  const [textAt, setTextAt] = useState<{ x: number; y: number } | null>(null);
+  // 文字标注:相对位置(0..1)+ 舞台内像素位置(输入框定位用,不依赖 imgBox)。
+  const [textAt, setTextAt] = useState<{
+    x: number;
+    y: number;
+    px: number;
+    py: number;
+  } | null>(null);
   const [textDraft, setTextDraft] = useState("");
   const [textOutline, setTextOutline] = useState(true);
   // 主预览图片的布局尺寸(不含 transform 缩放),用于文字浮层字号换算。
@@ -545,8 +550,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     }
     if (!mosaicMode && tool === "text") {
       const p = relFromEvent(e);
+      const sr = stageRef.current?.getBoundingClientRect();
       commitText(); // 提交上一个未完成的
-      setTextAt({ x: p[0], y: p[1] });
+      setTextAt({
+        x: p[0],
+        y: p[1],
+        px: sr ? e.clientX - sr.left : 0,
+        py: sr ? e.clientY - sr.top : 0,
+      });
       setTextDraft("");
       return;
     }
@@ -1417,10 +1428,13 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                 value={textDraft}
                 placeholder={t("输入文字")}
                 style={{
-                  left: imgBox.left + textAt.x * imgBox.width,
-                  top: imgBox.top + textAt.y * imgBox.height,
+                  left: textAt.px,
+                  top: textAt.py,
                   color: `rgb(${penColor[0]},${penColor[1]},${penColor[2]})`,
-                  fontSize: penWidth * 4 * Math.max(imgBox.width, imgBox.height),
+                  fontSize: Math.max(
+                    16,
+                    penWidth * 4 * Math.max(imgBox.width, imgBox.height),
+                  ),
                 }}
                 onChange={(e) => setTextDraft(e.target.value)}
                 onKeyDown={(e) => {

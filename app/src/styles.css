@@ -1522,6 +1522,11 @@ body.resizing {
   flex-wrap: nowrap;
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+}
+
+.iv__editbar::-webkit-scrollbar {
+  display: none; /* WebKit */
 }
 
 /* 除 spacer 外都不压缩;放不下就横向滚动,而不是把滑块挤扁 */
