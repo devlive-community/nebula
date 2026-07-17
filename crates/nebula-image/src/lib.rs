@@ -29,6 +29,15 @@ pub struct Resize {
     pub height: u32,
 }
 
+/// 马赛克打码区域,坐标是相对(几何变换后)图的比例 0..1。
+#[derive(Debug, Clone, Deserialize)]
+pub struct MosaicArea {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
 /// 一组编辑操作。几何操作先应用,再颜色调整;字段全部可选(默认无变化)。
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Ops {
@@ -72,6 +81,9 @@ pub struct Ops {
     /// 目标尺寸;设了就在最后把结果缩放到该尺寸。
     #[serde(default)]
     pub resize: Option<Resize>,
+    /// 马赛克打码区域(可多个),在几何变换后、调色前应用。
+    #[serde(default)]
+    pub mosaics: Vec<MosaicArea>,
 }
 
 impl Ops {
@@ -92,6 +104,7 @@ impl Ops {
             && !self.grayscale
             && !self.invert
             && self.resize.is_none()
+            && self.mosaics.is_empty()
     }
 }
 
@@ -140,6 +153,57 @@ fn bilinear(src: &image::RgbaImage, sx: f32, sy: f32) -> image::Rgba<u8> {
         out[c] = (top * (1.0 - fy) + bot * fy).round().clamp(0.0, 255.0) as u8;
     }
     Rgba(out)
+}
+
+/// 对若干矩形区域做块像素化(马赛克打码)。区域坐标是相对图的比例 0..1。
+fn apply_mosaics(img: &DynamicImage, areas: &[MosaicArea]) -> DynamicImage {
+    let mut buf = img.to_rgba8();
+    let (w, h) = (buf.width(), buf.height());
+    for a in areas {
+        let x0 = (a.x.clamp(0.0, 1.0) * w as f32) as u32;
+        let y0 = (a.y.clamp(0.0, 1.0) * h as f32) as u32;
+        let x1 = ((a.x + a.w).clamp(0.0, 1.0) * w as f32) as u32;
+        let y1 = ((a.y + a.h).clamp(0.0, 1.0) * h as f32) as u32;
+        if x1 <= x0 || y1 <= y0 {
+            continue;
+        }
+        // 块大小按区域较短边自适应,至少 4px。
+        let block = (((x1 - x0).min(y1 - y0)) / 10).max(4);
+        let mut by = y0;
+        while by < y1 {
+            let mut bx = x0;
+            while bx < x1 {
+                let (bw, bh) = ((bx + block).min(x1), (by + block).min(y1));
+                // 块内均值。
+                let (mut sr, mut sg, mut sb, mut sa, mut n) = (0u64, 0u64, 0u64, 0u64, 0u64);
+                for yy in by..bh {
+                    for xx in bx..bw {
+                        let p = buf.get_pixel(xx, yy).0;
+                        sr += p[0] as u64;
+                        sg += p[1] as u64;
+                        sb += p[2] as u64;
+                        sa += p[3] as u64;
+                        n += 1;
+                    }
+                }
+                // 块内至少 1 像素,n 恒 ≥ 1。
+                let avg = image::Rgba([
+                    (sr / n) as u8,
+                    (sg / n) as u8,
+                    (sb / n) as u8,
+                    (sa / n) as u8,
+                ]);
+                for yy in by..bh {
+                    for xx in bx..bw {
+                        buf.put_pixel(xx, yy, avg);
+                    }
+                }
+                bx += block;
+            }
+            by += block;
+        }
+    }
+    DynamicImage::ImageRgba8(buf)
 }
 
 /// 逐像素调整饱和度与色温。`sat`/`temp` 均为 -100..100。
@@ -192,6 +256,9 @@ fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
             let h = c.height.min(ih - c.y).max(1);
             img = img.crop_imm(c.x, c.y, w, h);
         }
+    }
+    if !ops.mosaics.is_empty() {
+        img = apply_mosaics(&img, &ops.mosaics);
     }
     if ops.brightness != 0 {
         img = img.brighten(ops.brightness);
@@ -654,6 +721,37 @@ mod tests {
         let r = render_edit(&src, &blur, None).unwrap();
         assert_eq!((r.width, r.height), (32, 32));
         assert!(decode(&r.bytes).is_ok());
+    }
+
+    #[test]
+    fn mosaic_pixelates_a_region() {
+        // 一张每像素都不同的图,对中间区域打码后,区域内相邻像素应出现成块相等。
+        let mut img = RgbImage::new(100, 100);
+        for (x, y, p) in img.enumerate_pixels_mut() {
+            *p = Rgb([(x * 2) as u8, (y * 2) as u8, ((x + y) % 256) as u8]);
+        }
+        let mut out = Cursor::new(Vec::new());
+        DynamicImage::ImageRgb8(img)
+            .write_to(&mut out, ImageFormat::Png)
+            .unwrap();
+        let ops = Ops {
+            mosaics: vec![MosaicArea {
+                x: 0.3,
+                y: 0.3,
+                w: 0.4,
+                h: 0.4,
+            }],
+            ..Default::default()
+        };
+        let r = render_edit(&out.into_inner(), &ops, None).unwrap();
+        let rgba = decode(&r.bytes).unwrap().to_rgba8();
+        // 区域中心相邻两像素应相等(同一马赛克块)。
+        assert_eq!(rgba.get_pixel(50, 50).0, rgba.get_pixel(51, 50).0);
+    }
+
+    #[test]
+    fn mosaics_empty_is_identity() {
+        assert!(Ops::default().mosaics.is_empty() && Ops::default().is_identity());
     }
 
     #[test]

@@ -21,6 +21,7 @@ import {
   faArrowRotateLeft,
   faRightFromBracket,
   faSave,
+  faTableCells,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -142,6 +143,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
   // 裁剪子模式:cropRect 为相对图片的比例(0..1);imgBox 是图片在舞台里的实际像素框。
   const [cropping, setCropping] = useState(false);
+  const [mosaicMode, setMosaicMode] = useState(false);
   const [cropRect, setCropRect] = useState({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
   const [imgBox, setImgBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
@@ -306,7 +308,26 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setEditing(false);
     setSaveMenu(false);
     setCropping(false);
+    setMosaicMode(false);
     resetView();
+  };
+
+  // 马赛克打码:框选区域,应用后加进 ops.mosaics(可连续加多个)。
+  const startMosaic = () => {
+    setCropRect({ x: 0.35, y: 0.35, w: 0.3, h: 0.3 });
+    resetView();
+    setMosaicMode(true);
+  };
+  const applyMosaic = () => {
+    pushOps({
+      ...ops,
+      mosaics: [
+        ...(ops.mosaics ?? []),
+        { x: cropRect.x, y: cropRect.y, w: cropRect.w, h: cropRect.h },
+      ],
+    });
+    setCropRect({ x: 0.35, y: 0.35, w: 0.3, h: 0.3 });
+    setToast(t("✓ 已打码"));
   };
 
   // 进入裁剪:清掉已有裁剪(显示完整变换图)、复位视图、给个居中初始框。
@@ -486,6 +507,8 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           break;
         case "Escape":
           if (resizeOpen) setResizeOpen(false);
+          else if (cropping) setCropping(false);
+          else if (mosaicMode) setMosaicMode(false);
           else if (editing) exitEdit();
           else close();
           break;
@@ -493,7 +516,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, editing, resizeOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [close, editing, resizeOpen, cropping, mosaicMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const exifRows = exif
     ? ([
@@ -554,7 +577,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         </Tooltip>
       </div>
 
-      {editing && !cropping && (
+      {editing && !cropping && !mosaicMode && (
         <div className="iv__editbar">
           <Tooltip label={t("撤销")}>
             <button className="iv__ebtn" disabled={!canUndo} onClick={undo}>
@@ -612,6 +635,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               onClick={startCrop}
             >
               <FontAwesomeIcon icon={faCrop} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("马赛克")}>
+            <button
+              className={`iv__ebtn ${ops.mosaics?.length ? "iv__ebtn--on" : ""}`}
+              onClick={startMosaic}
+            >
+              <FontAwesomeIcon icon={faTableCells} />
             </button>
           </Tooltip>
           <Tooltip label={t("调整尺寸")}>
@@ -792,6 +823,19 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         </div>
       )}
 
+      {editing && mosaicMode && (
+        <div className="iv__editbar">
+          <span className="iv__crop-hint">{t("框选要打码的区域,可连续添加")}</span>
+          <div className="iv__spacer" />
+          <button className="iv__ebtn iv__ebtn--primary" onClick={applyMosaic}>
+            <FontAwesomeIcon icon={faCheck} /> {t("打码")}
+          </button>
+          <button className="iv__ebtn" onClick={() => setMosaicMode(false)}>
+            {t("完成")}
+          </button>
+        </div>
+      )}
+
       <div
         className="iv__stage"
         ref={stageRef}
@@ -804,7 +848,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       >
         {loading && <div className="iv__status">{t("加载中…")}</div>}
         {error && <div className="iv__status">{t("无法加载该图片")}</div>}
-        {shown && !error && !cropping && (
+        {shown && !error && !cropping && !mosaicMode && (
           <img
             className="iv__img"
             src={shown.data_url}
@@ -817,7 +861,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           />
         )}
 
-        {shown && !error && cropping && (
+        {shown && !error && (cropping || mosaicMode) && (
           <div
             className="iv__croplayer"
             onMouseMove={onCropMove}

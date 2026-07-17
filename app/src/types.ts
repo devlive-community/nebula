@@ -73,6 +73,7 @@ export interface ImageOps {
   grayscale?: boolean;
   invert?: boolean;
   resize?: { width: number; height: number } | null;
+  mosaics?: { x: number; y: number; w: number; h: number }[];
 }
 
 /** EXIF 摘要(字段全部可选),与 nebula_image::ExifInfo 对应。 */
