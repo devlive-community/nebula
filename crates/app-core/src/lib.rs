@@ -35,7 +35,7 @@ use provider_tencent::TencentProvider;
 
 pub use breakdown::{ClassStat, StorageBreakdown};
 pub use error::{AppError, Result};
-pub use imaging::{ExifInfo, ImageData};
+pub use imaging::{CropRect, EditSave, ExifInfo, ImageData, Ops};
 pub use integrity::{verify_bytes, Integrity};
 pub use limits::TransferLimits;
 pub use nebula_provider::{

@@ -7,9 +7,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, Bookmark, ExifInfo, FolderStats, ImageData, IncompleteUpload, Integrity,
-    Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview,
-    TransferRecord,
+    AccountInfo, App, Bookmark, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload,
+    Integrity, Ops, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown,
+    TextPreview, TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -1246,6 +1246,38 @@ async fn image_exif(
         .map_err(|e| e.to_string())
 }
 
+/// 编辑预览:在缓存原图上应用操作并缩到 `max_edge`,返回内联 data URL。
+#[tauri::command]
+async fn image_edit_preview(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    etag: Option<String>,
+    ops: Ops,
+    max_edge: u32,
+) -> Result<ImageData, String> {
+    let app = state.inner().clone();
+    app.image_edit_preview(&account, &path, etag, ops, max_edge)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 保存编辑结果回云端(`dest == path` 覆盖,否则另存为新对象)。
+#[tauri::command]
+async fn image_edit_save(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    etag: Option<String>,
+    ops: Ops,
+    save: EditSave,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.image_edit_save(&account, &path, etag, ops, save)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 读取一个界面偏好(主题 / 视图 / 语言 / 侧栏宽度)。
 #[tauri::command]
 fn get_pref(state: State<'_, App>, key: String) -> Option<String> {
@@ -1409,6 +1441,8 @@ pub fn run() {
             image_view,
             image_thumb,
             image_exif,
+            image_edit_preview,
+            image_edit_save,
             get_pref,
             set_pref,
         ])

@@ -11,7 +11,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::{App, AppError, Result};
 
-pub use nebula_image::ExifInfo;
+pub use nebula_image::{CropRect, ExifInfo, Ops};
+
+/// 保存编辑结果的目标:写到哪、什么格式、什么画质。
+#[derive(Debug, Clone, Deserialize)]
+pub struct EditSave {
+    /// 目标对象路径(等于源路径即覆盖原图)。
+    pub dest: String,
+    /// `png` 或 `jpeg`。
+    pub format: String,
+    /// JPEG 画质 1..100(PNG 忽略)。
+    pub quality: u8,
+}
 
 /// 交给前端的一张渲染好的图:内嵌 data URL + 展示尺寸 + 原图尺寸。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,9 +110,77 @@ impl App {
         Ok(info)
     }
 
+    /// 编辑预览:在缓存的原图上应用操作 → 缩到 `max_edge` → 返回 data URL。
+    /// 用缓存原图,拖滑块 / 旋转时无需反复下载。
+    pub async fn image_edit_preview(
+        &self,
+        account: &str,
+        path: &str,
+        etag: Option<String>,
+        ops: Ops,
+        max_edge: u32,
+    ) -> Result<ImageData> {
+        let orig = self.original_bytes(account, path, &etag).await?;
+        let rendered =
+            spawn_render(move || nebula_image::render_edit(&orig, &ops, Some(max_edge))).await?;
+        Ok(ImageData::from(rendered))
+    }
+
+    /// 保存编辑结果:全分辨率应用操作 → 按 `format`/`quality` 编码 → 写回云端 `dest`
+    /// (`dest == path` 即覆盖原图;否则另存为新对象)。
+    pub async fn image_edit_save(
+        &self,
+        account: &str,
+        path: &str,
+        etag: Option<String>,
+        ops: Ops,
+        save: EditSave,
+    ) -> Result<()> {
+        let orig = self.original_bytes(account, path, &etag).await?;
+        let EditSave {
+            dest,
+            format,
+            quality,
+        } = save;
+        let (bytes, mime) = tokio::task::spawn_blocking(move || {
+            nebula_image::encode_edit(&orig, &ops, &format, quality)
+        })
+        .await
+        .map_err(|e| AppError::Image(e.to_string()))?
+        .map_err(|e| AppError::Image(e.to_string()))?;
+        self.provider(account)?
+            .write(&dest, bytes::Bytes::from(bytes), Some(&mime))
+            .await?;
+        Ok(())
+    }
+
     /// 下载对象原始字节。
     async fn fetch_bytes(&self, account: &str, path: &str) -> Result<Vec<u8>> {
         Ok(self.provider(account)?.read(path).await?.to_vec())
+    }
+
+    /// 取原图字节:命中磁盘缓存直接读,否则下载并缓存(编辑时反复用)。
+    async fn original_bytes(
+        &self,
+        account: &str,
+        path: &str,
+        etag: &Option<String>,
+    ) -> Result<Vec<u8>> {
+        if let Some(dir) = self.cache_dir.get() {
+            let file = dir
+                .join("orig")
+                .join(format!("{:016x}.bin", digest(account, path, etag, "orig")));
+            if let Ok(bytes) = std::fs::read(&file) {
+                return Ok(bytes);
+            }
+            let bytes = self.fetch_bytes(account, path).await?;
+            if let Some(parent) = file.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(&file, &bytes);
+            return Ok(bytes);
+        }
+        self.fetch_bytes(account, path).await
     }
 
     /// 某个渲染变体的缓存文件路径;未设缓存目录时返回 `None`(直接走渲染)。
@@ -113,12 +192,10 @@ impl App {
         variant: &str,
     ) -> Option<PathBuf> {
         let dir = self.cache_dir.get()?;
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        account.hash(&mut h);
-        path.hash(&mut h);
-        etag.hash(&mut h);
-        variant.hash(&mut h);
-        Some(dir.join("images").join(format!("{:016x}.json", h.finish())))
+        Some(dir.join("images").join(format!(
+            "{:016x}.json",
+            digest(account, path, etag, variant)
+        )))
     }
 
     fn cache_get<T: DeserializeOwned>(
@@ -151,6 +228,16 @@ impl App {
             let _ = std::fs::write(file, bytes);
         }
     }
+}
+
+/// (账号 + 路径 + ETag + 变体)的稳定哈希,用作缓存文件名。
+fn digest(account: &str, path: &str, etag: &Option<String>, variant: &str) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    account.hash(&mut h);
+    path.hash(&mut h);
+    etag.hash(&mut h);
+    variant.hash(&mut h);
+    h.finish()
 }
 
 /// 在阻塞线程池上跑图片渲染(解码/缩放是 CPU 密集,别占住 async 线程),并把两层错误摊平。

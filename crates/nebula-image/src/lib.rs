@@ -9,9 +9,93 @@ use std::io::Cursor;
 
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageFormat, ImageReader};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub use exif::{read as read_exif, ExifInfo};
+
+/// 裁剪矩形,坐标是「摆正后的原图」像素。
+#[derive(Debug, Clone, Deserialize)]
+pub struct CropRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// 一组编辑操作。几何操作先应用,再颜色调整;字段全部可选(默认无变化)。
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Ops {
+    #[serde(default)]
+    pub crop: Option<CropRect>,
+    /// 旋转角度,仅取 0 / 90 / 180 / 270。
+    #[serde(default)]
+    pub rotate: i32,
+    #[serde(default)]
+    pub flip_h: bool,
+    #[serde(default)]
+    pub flip_v: bool,
+    /// 亮度增量,-100..100。
+    #[serde(default)]
+    pub brightness: i32,
+    /// 对比度,-100..100(正数增强)。
+    #[serde(default)]
+    pub contrast: f32,
+    #[serde(default)]
+    pub grayscale: bool,
+    #[serde(default)]
+    pub invert: bool,
+}
+
+impl Ops {
+    /// 是否为「无任何改动」(用于保存前提示 / 跳过)。
+    pub fn is_identity(&self) -> bool {
+        self.crop.is_none()
+            && self.rotate % 360 == 0
+            && !self.flip_h
+            && !self.flip_v
+            && self.brightness == 0
+            && self.contrast == 0.0
+            && !self.grayscale
+            && !self.invert
+    }
+}
+
+/// 依次应用编辑操作:裁剪 → 旋转 → 翻转 → 亮度 → 对比度 → 灰度 → 反相。
+fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
+    if let Some(c) = &ops.crop {
+        let (iw, ih) = (img.width(), img.height());
+        if c.x < iw && c.y < ih {
+            let w = c.width.min(iw - c.x).max(1);
+            let h = c.height.min(ih - c.y).max(1);
+            img = img.crop_imm(c.x, c.y, w, h);
+        }
+    }
+    img = match ((ops.rotate % 360) + 360) % 360 {
+        90 => img.rotate90(),
+        180 => img.rotate180(),
+        270 => img.rotate270(),
+        _ => img,
+    };
+    if ops.flip_h {
+        img = img.fliph();
+    }
+    if ops.flip_v {
+        img = img.flipv();
+    }
+    if ops.brightness != 0 {
+        img = img.brighten(ops.brightness);
+    }
+    if ops.contrast != 0.0 {
+        img = img.adjust_contrast(ops.contrast);
+    }
+    if ops.grayscale {
+        img = img.grayscale();
+    }
+    if ops.invert {
+        img.invert();
+    }
+    img
+}
 
 /// 处理出错。任何一步失败都归到这里,调用方可回退到「让前端直接用预签名原图」。
 #[derive(Debug, thiserror::Error)]
@@ -127,6 +211,57 @@ pub fn render_thumb(bytes: &[u8], size: u32) -> Result<Rendered> {
     })
 }
 
+/// 渲染一张「编辑预览」图:摆正 → 应用编辑操作 → 可选缩到 `max_edge` → 编码展示。
+pub fn render_edit(bytes: &[u8], ops: &Ops, max_edge: Option<u32>) -> Result<Rendered> {
+    let mut img = apply_ops(
+        apply_orientation(decode(bytes)?, exif::orientation(bytes)),
+        ops,
+    );
+    let (full_w, full_h) = (img.width(), img.height());
+    if let Some(me) = max_edge {
+        if me > 0 && full_w.max(full_h) > me {
+            img = img.resize(me, me, FilterType::Lanczos3);
+        }
+    }
+    let (bytes, mime) = encode_display(&img)?;
+    Ok(Rendered {
+        bytes,
+        mime,
+        width: img.width(),
+        height: img.height(),
+        orig_width: full_w,
+        orig_height: full_h,
+    })
+}
+
+/// 应用编辑操作后按指定格式全分辨率编码,用于保存回云端。
+///
+/// `format` 取 `png` 或 `jpeg`(其余按 `jpeg`);`quality` 仅 JPEG 用(1..100)。
+pub fn encode_edit(
+    bytes: &[u8],
+    ops: &Ops,
+    format: &str,
+    quality: u8,
+) -> Result<(Vec<u8>, String)> {
+    let img = apply_ops(
+        apply_orientation(decode(bytes)?, exif::orientation(bytes)),
+        ops,
+    );
+    let mut out = Cursor::new(Vec::new());
+    if format.eq_ignore_ascii_case("png") {
+        img.write_to(&mut out, ImageFormat::Png)
+            .map_err(|e| ImageError::Encode(e.to_string()))?;
+        Ok((out.into_inner(), "image/png".into()))
+    } else {
+        let q = quality.clamp(1, 100);
+        let rgb = img.to_rgb8();
+        let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, q);
+        enc.encode_image(&rgb)
+            .map_err(|e| ImageError::Encode(e.to_string()))?;
+        Ok((out.into_inner(), "image/jpeg".into()))
+    }
+}
+
 /// 只读尺寸 / 格式(不解码全部像素)。
 pub fn meta(bytes: &[u8]) -> Result<ImageMeta> {
     let reader = ImageReader::new(Cursor::new(bytes))
@@ -223,5 +358,74 @@ mod tests {
         let src = png(16, 16);
         let e = read_exif(&src);
         assert!(e.make.is_none() && e.gps_lat.is_none());
+    }
+
+    #[test]
+    fn edit_rotate90_swaps_dimensions() {
+        let src = png(800, 300);
+        let ops = Ops {
+            rotate: 90,
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        assert_eq!((r.width, r.height), (300, 800));
+    }
+
+    #[test]
+    fn edit_crop_produces_cropped_size() {
+        let src = png(400, 400);
+        let ops = Ops {
+            crop: Some(CropRect {
+                x: 50,
+                y: 60,
+                width: 100,
+                height: 120,
+            }),
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        assert_eq!((r.width, r.height), (100, 120));
+    }
+
+    #[test]
+    fn edit_crop_clamps_to_bounds() {
+        let src = png(100, 100);
+        // 越界的裁剪框应被夹到图内,不 panic。
+        let ops = Ops {
+            crop: Some(CropRect {
+                x: 80,
+                y: 80,
+                width: 999,
+                height: 999,
+            }),
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        assert_eq!((r.width, r.height), (20, 20));
+    }
+
+    #[test]
+    fn encode_edit_png_and_jpeg_are_decodable() {
+        let src = png(64, 48);
+        let ops = Ops {
+            grayscale: true,
+            ..Default::default()
+        };
+        let (png_bytes, mime) = encode_edit(&src, &ops, "png", 90).unwrap();
+        assert_eq!(mime, "image/png");
+        assert!(decode(&png_bytes).is_ok());
+        let (jpg_bytes, mime) = encode_edit(&src, &ops, "jpeg", 90).unwrap();
+        assert_eq!(mime, "image/jpeg");
+        assert!(decode(&jpg_bytes).is_ok());
+    }
+
+    #[test]
+    fn ops_identity_detection() {
+        assert!(Ops::default().is_identity());
+        assert!(!Ops {
+            rotate: 90,
+            ..Default::default()
+        }
+        .is_identity());
     }
 }
