@@ -647,13 +647,15 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           </Tooltip>
           <div className="iv__spacer" />
           <div className="iv__savewrap">
-            <button
-              className="iv__ebtn iv__ebtn--primary"
-              disabled={saving}
-              onClick={() => setSaveMenu((v) => !v)}
-            >
-              <FontAwesomeIcon icon={faSave} /> {saving ? t("保存中…") : t("保存")}
-            </button>
+            <Tooltip label={saving ? t("保存中…") : t("保存")}>
+              <button
+                className="iv__ebtn iv__ebtn--primary"
+                disabled={saving}
+                onClick={() => setSaveMenu((v) => !v)}
+              >
+                <FontAwesomeIcon icon={saving ? faSpinner : faSave} spin={saving} />
+              </button>
+            </Tooltip>
             {saveMenu && (
               <div className="iv__savemenu iv__savemenu--wide">
                 <div className="iv__saveopt">
