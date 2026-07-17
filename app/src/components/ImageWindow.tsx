@@ -8,13 +8,19 @@ import {
   faCircleInfo,
   faArrowsRotate,
   faPen,
-  faFloppyDisk,
   faSpinner,
   faCrop,
   faCheck,
   faExpand,
   faRotateLeft,
   faRotateRight,
+  faArrowsLeftRight,
+  faArrowsUpDown,
+  faDroplet,
+  faCircleHalfStroke,
+  faArrowRotateLeft,
+  faRightFromBracket,
+  faSave,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -554,48 +560,62 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               <FontAwesomeIcon icon={faRotateRight} />
             </button>
           </Tooltip>
-          <button
-            className="iv__ebtn"
-            onClick={() => pushOps({ ...ops, rotate: ((ops.rotate ?? 0) + 90) % 360 })}
-          >
-            <FontAwesomeIcon icon={faRotate} /> {t("旋转")}
-          </button>
-          <button
-            className={`iv__ebtn ${ops.flip_h ? "iv__ebtn--on" : ""}`}
-            onClick={() => pushOps({ ...ops, flip_h: !ops.flip_h })}
-          >
-            {t("水平翻转")}
-          </button>
-          <button
-            className={`iv__ebtn ${ops.flip_v ? "iv__ebtn--on" : ""}`}
-            onClick={() => pushOps({ ...ops, flip_v: !ops.flip_v })}
-          >
-            {t("垂直翻转")}
-          </button>
-          <button
-            className={`iv__ebtn ${ops.grayscale ? "iv__ebtn--on" : ""}`}
-            onClick={() => pushOps({ ...ops, grayscale: !ops.grayscale })}
-          >
-            {t("灰度")}
-          </button>
-          <button
-            className={`iv__ebtn ${ops.invert ? "iv__ebtn--on" : ""}`}
-            onClick={() => pushOps({ ...ops, invert: !ops.invert })}
-          >
-            {t("反相")}
-          </button>
-          <button
-            className={`iv__ebtn ${ops.crop ? "iv__ebtn--on" : ""}`}
-            onClick={startCrop}
-          >
-            <FontAwesomeIcon icon={faCrop} /> {t("裁剪")}
-          </button>
-          <button
-            className={`iv__ebtn ${ops.resize ? "iv__ebtn--on" : ""}`}
-            onClick={openResize}
-          >
-            <FontAwesomeIcon icon={faExpand} /> {t("调整尺寸")}
-          </button>
+          <Tooltip label={t("旋转")}>
+            <button
+              className="iv__ebtn"
+              onClick={() => pushOps({ ...ops, rotate: ((ops.rotate ?? 0) + 90) % 360 })}
+            >
+              <FontAwesomeIcon icon={faRotate} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("水平翻转")}>
+            <button
+              className={`iv__ebtn ${ops.flip_h ? "iv__ebtn--on" : ""}`}
+              onClick={() => pushOps({ ...ops, flip_h: !ops.flip_h })}
+            >
+              <FontAwesomeIcon icon={faArrowsLeftRight} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("垂直翻转")}>
+            <button
+              className={`iv__ebtn ${ops.flip_v ? "iv__ebtn--on" : ""}`}
+              onClick={() => pushOps({ ...ops, flip_v: !ops.flip_v })}
+            >
+              <FontAwesomeIcon icon={faArrowsUpDown} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("灰度")}>
+            <button
+              className={`iv__ebtn ${ops.grayscale ? "iv__ebtn--on" : ""}`}
+              onClick={() => pushOps({ ...ops, grayscale: !ops.grayscale })}
+            >
+              <FontAwesomeIcon icon={faDroplet} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("反相")}>
+            <button
+              className={`iv__ebtn ${ops.invert ? "iv__ebtn--on" : ""}`}
+              onClick={() => pushOps({ ...ops, invert: !ops.invert })}
+            >
+              <FontAwesomeIcon icon={faCircleHalfStroke} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("裁剪")}>
+            <button
+              className={`iv__ebtn ${ops.crop ? "iv__ebtn--on" : ""}`}
+              onClick={startCrop}
+            >
+              <FontAwesomeIcon icon={faCrop} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("调整尺寸")}>
+            <button
+              className={`iv__ebtn ${ops.resize ? "iv__ebtn--on" : ""}`}
+              onClick={openResize}
+            >
+              <FontAwesomeIcon icon={faExpand} />
+            </button>
+          </Tooltip>
           <label className="iv__slider">
             {t("亮度")}
             <input
@@ -620,9 +640,11 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               }
             />
           </label>
-          <button className="iv__ebtn" onClick={resetOps}>
-            {t("重置")}
-          </button>
+          <Tooltip label={t("重置")}>
+            <button className="iv__ebtn" onClick={resetOps}>
+              <FontAwesomeIcon icon={faArrowRotateLeft} />
+            </button>
+          </Tooltip>
           <div className="iv__spacer" />
           <div className="iv__savewrap">
             <button
@@ -630,7 +652,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               disabled={saving}
               onClick={() => setSaveMenu((v) => !v)}
             >
-              <FontAwesomeIcon icon={faFloppyDisk} /> {saving ? t("保存中…") : t("保存")}
+              <FontAwesomeIcon icon={faSave} /> {saving ? t("保存中…") : t("保存")}
             </button>
             {saveMenu && (
               <div className="iv__savemenu iv__savemenu--wide">
@@ -669,9 +691,11 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               </div>
             )}
           </div>
-          <button className="iv__ebtn" onClick={exitEdit}>
-            {t("退出编辑")}
-          </button>
+          <Tooltip label={t("退出编辑")}>
+            <button className="iv__ebtn" onClick={exitEdit}>
+              <FontAwesomeIcon icon={faRightFromBracket} />
+            </button>
+          </Tooltip>
         </div>
       )}
 
