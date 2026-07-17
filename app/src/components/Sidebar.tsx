@@ -9,6 +9,7 @@ import {
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { Logo } from "./Logo";
+import { Tooltip } from "./Tooltip";
 import { vendorMeta } from "../vendors";
 import { useI18n } from "../i18n";
 import type { AccountInfo } from "../types";
@@ -68,26 +69,28 @@ export function Sidebar({
               <span className="account-item__name" title={acc.id}>
                 {acc.id}
               </span>
-              <button
-                className="account-item__action"
-                data-tooltip={t("编辑账号")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(acc.id);
-                }}
-              >
-                <FontAwesomeIcon icon={faPen} />
-              </button>
-              <button
-                className="account-item__action account-item__action--danger"
-                data-tooltip={t("移除账号")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove(acc.id);
-                }}
-              >
-                <FontAwesomeIcon icon={faXmark} />
-              </button>
+              <Tooltip label={t("编辑账号")}>
+                <button
+                  className="account-item__action"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(acc.id);
+                  }}
+                >
+                  <FontAwesomeIcon icon={faPen} />
+                </button>
+              </Tooltip>
+              <Tooltip label={t("移除账号")}>
+                <button
+                  className="account-item__action account-item__action--danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(acc.id);
+                  }}
+                >
+                  <FontAwesomeIcon icon={faXmark} />
+                </button>
+              </Tooltip>
             </div>
           );
         })}
@@ -102,7 +105,7 @@ export function Sidebar({
           <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} />{" "}
           {theme === "dark" ? t("浅色") : t("深色")}
         </button>
-        <button className="btn" onClick={onSettings} data-tooltip={t("设置")}>
+        <button className="btn" onClick={onSettings} title={t("设置")}>
           <FontAwesomeIcon icon={faGear} /> {t("设置")}
         </button>
       </div>

@@ -14,6 +14,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { formatBytes } from "../util";
+import { Tooltip } from "./Tooltip";
 import type { ExifInfo, ImageData, ImageOps } from "../types";
 
 interface Props {
@@ -87,16 +88,15 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     document.title = name;
   }, [name]);
 
-  // 独立窗口跟随应用主题(从 SQLite 读偏好并设 data-theme)。
+  // 独立窗口跟随应用主题:设 data-theme(webview 内容)+ 窗口原生主题(标题栏)。
   useEffect(() => {
     api
       .getPref("theme")
-      .then((th) =>
-        document.documentElement.setAttribute(
-          "data-theme",
-          th === "light" ? "light" : "dark",
-        ),
-      )
+      .then((th) => {
+        const theme = th === "light" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", theme);
+        void getCurrentWindow().setTheme(theme);
+      })
       .catch(() => {});
   }, []);
 
@@ -284,59 +284,44 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           {name}
         </span>
         <div className="iv__spacer" />
-        <button
-          className="iv__btn"
-          data-tooltip={t("缩小")}
-          data-tooltip-below=""
-          onClick={() => zoomAt(1 / 1.2, 0, 0)}
-        >
-          <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
-        </button>
+        <Tooltip label={t("缩小")} side="bottom">
+          <button className="iv__btn" onClick={() => zoomAt(1 / 1.2, 0, 0)}>
+            <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
+          </button>
+        </Tooltip>
         <span className="iv__zoom">{Math.round(scale * 100)}%</span>
-        <button
-          className="iv__btn"
-          data-tooltip={t("放大")}
-          data-tooltip-below=""
-          onClick={() => zoomAt(1.2, 0, 0)}
-        >
-          <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
-        </button>
-        <button
-          className="iv__btn"
-          data-tooltip={t("复位")}
-          data-tooltip-below=""
-          onClick={resetView}
-        >
-          <FontAwesomeIcon icon={faArrowsRotate} />
-        </button>
-        {!editing && (
-          <button
-            className={`iv__btn ${showInfo ? "iv__btn--on" : ""}`}
-            data-tooltip={t("信息")}
-            data-tooltip-below=""
-            onClick={() => setShowInfo((v) => !v)}
-          >
-            <FontAwesomeIcon icon={faCircleInfo} />
+        <Tooltip label={t("放大")} side="bottom">
+          <button className="iv__btn" onClick={() => zoomAt(1.2, 0, 0)}>
+            <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
           </button>
+        </Tooltip>
+        <Tooltip label={t("复位")} side="bottom">
+          <button className="iv__btn" onClick={resetView}>
+            <FontAwesomeIcon icon={faArrowsRotate} />
+          </button>
+        </Tooltip>
+        {!editing && (
+          <Tooltip label={t("信息")} side="bottom">
+            <button
+              className={`iv__btn ${showInfo ? "iv__btn--on" : ""}`}
+              onClick={() => setShowInfo((v) => !v)}
+            >
+              <FontAwesomeIcon icon={faCircleInfo} />
+            </button>
+          </Tooltip>
         )}
         {!editing && (
-          <button
-            className="iv__btn"
-            data-tooltip={t("编辑")}
-            data-tooltip-below=""
-            onClick={enterEdit}
-          >
-            <FontAwesomeIcon icon={faPen} />
-          </button>
+          <Tooltip label={t("编辑")} side="bottom">
+            <button className="iv__btn" onClick={enterEdit}>
+              <FontAwesomeIcon icon={faPen} />
+            </button>
+          </Tooltip>
         )}
-        <button
-          className="iv__btn"
-          data-tooltip={t("关闭")}
-          data-tooltip-below=""
-          onClick={close}
-        >
-          <FontAwesomeIcon icon={faXmark} />
-        </button>
+        <Tooltip label={t("关闭")} side="bottom">
+          <button className="iv__btn" onClick={close}>
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
+        </Tooltip>
       </div>
 
       {editing && (

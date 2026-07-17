@@ -11,6 +11,7 @@ import {
   faUpload,
 } from "@fortawesome/free-solid-svg-icons";
 import { useI18n } from "../i18n";
+import { Tooltip } from "./Tooltip";
 
 interface Props {
   canGoUp: boolean;
@@ -57,11 +58,11 @@ export function Toolbar({
         className="btn"
         disabled={!canGoUp}
         onClick={onUp}
-        data-tooltip={t("上一层")}
+        title={t("上一层")}
       >
         <FontAwesomeIcon icon={faArrowUp} /> {t("上一层")}
       </button>
-      <button className="btn" onClick={onRefresh} data-tooltip={t("刷新")}>
+      <button className="btn" onClick={onRefresh} title={t("刷新")}>
         <FontAwesomeIcon icon={faRotateRight} /> {t("刷新")}
       </button>
       <div className="toolbar__search">
@@ -81,18 +82,16 @@ export function Toolbar({
       </div>
       <div className="toolbar__spacer" />
       {busy && <span className="toolbar__busy">{t("处理中…")}</span>}
-      <button
-        className="btn"
-        onClick={onToggleView}
-        title={view === "list" ? t("网格视图") : t("列表视图")}
-      >
-        <FontAwesomeIcon icon={view === "list" ? faTableCells : faList} />
-      </button>
+      <Tooltip label={view === "list" ? t("网格视图") : t("列表视图")}>
+        <button className="btn" onClick={onToggleView}>
+          <FontAwesomeIcon icon={view === "list" ? faTableCells : faList} />
+        </button>
+      </Tooltip>
       {atRoot ? (
         <button
           className="btn btn--primary"
           onClick={onNewBucket}
-          data-tooltip={t("新建一个 Bucket")}
+          title={t("新建一个 Bucket")}
         >
           <FontAwesomeIcon icon={faDatabase} /> {t("新建 Bucket")}
         </button>
@@ -102,7 +101,7 @@ export function Toolbar({
             className="btn"
             disabled={!canUpload}
             onClick={onNewFolder}
-            data-tooltip={t("在当前目录新建文件夹")}
+            title={t("在当前目录新建文件夹")}
           >
             <FontAwesomeIcon icon={faFolderPlus} /> {t("新建文件夹")}
           </button>
@@ -110,7 +109,7 @@ export function Toolbar({
             className="btn"
             disabled={!canUpload}
             onClick={onUploadFolder}
-            data-tooltip={t("上传文件夹到当前目录")}
+            title={t("上传文件夹到当前目录")}
           >
             <FontAwesomeIcon icon={faFolderOpen} /> {t("上传文件夹")}
           </button>
@@ -118,7 +117,7 @@ export function Toolbar({
             className="btn btn--primary"
             disabled={!canUpload}
             onClick={onUpload}
-            data-tooltip={t("上传文件到当前目录")}
+            title={t("上传文件到当前目录")}
           >
             <FontAwesomeIcon icon={faUpload} /> {t("上传")}
           </button>

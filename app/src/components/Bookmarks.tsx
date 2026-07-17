@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBookmark, faStar, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { useI18n } from "../i18n";
+import { Tooltip } from "./Tooltip";
 import type { Bookmark } from "../types";
 
 interface Props {
@@ -42,13 +43,11 @@ export function Bookmarks({
 
   return (
     <div className="bookmarks" ref={ref}>
-      <button
-        className="btn"
-        data-tooltip={t("收藏夹")}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <FontAwesomeIcon icon={faBookmark} />
-      </button>
+      <Tooltip label={t("收藏夹")} side="bottom">
+        <button className="btn" onClick={() => setOpen((o) => !o)}>
+          <FontAwesomeIcon icon={faBookmark} />
+        </button>
+      </Tooltip>
       {open && (
         <div className="bookmarks__menu">
           <button
@@ -78,13 +77,14 @@ export function Bookmarks({
                     <span className="bookmarks__acct">{b.account}</span>
                     <span className="bookmarks__path">{b.path || "/"}</span>
                   </button>
-                  <button
-                    className="bookmarks__remove"
-                    data-tooltip={t("移除")}
-                    onClick={() => onRemove(b.account, b.path)}
-                  >
-                    <FontAwesomeIcon icon={faXmark} />
-                  </button>
+                  <Tooltip label={t("移除")}>
+                    <button
+                      className="bookmarks__remove"
+                      onClick={() => onRemove(b.account, b.path)}
+                    >
+                      <FontAwesomeIcon icon={faXmark} />
+                    </button>
+                  </Tooltip>
                 </div>
               ))
             )}

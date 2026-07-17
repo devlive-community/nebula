@@ -6,6 +6,8 @@
   "permissions": [
     "core:default",
     "core:webview:allow-create-webview-window",
+    "core:window:allow-close",
+    "core:window:allow-set-theme",
     "dialog:default",
     "updater:default",
     "process:default"
