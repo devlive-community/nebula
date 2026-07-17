@@ -402,6 +402,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const opsIdentity =
     !ops.crop &&
     (ops.rotate ?? 0) % 360 === 0 &&
+    !ops.straighten &&
     !ops.flip_h &&
     !ops.flip_v &&
     !ops.brightness &&
@@ -616,6 +617,18 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               <FontAwesomeIcon icon={faExpand} />
             </button>
           </Tooltip>
+          <label className="iv__slider">
+            {t("拉直")}
+            <input
+              type="range"
+              min={-45}
+              max={45}
+              value={ops.straighten ?? 0}
+              onChange={(e) =>
+                pushOps({ ...ops, straighten: Number(e.target.value) }, "straighten")
+              }
+            />
+          </label>
           <label className="iv__slider">
             {t("亮度")}
             <input

@@ -84,6 +84,7 @@ export const EN: Record<string, string> = {
   应用裁剪: "Apply crop",
   撤销: "Undo",
   重做: "Redo",
+  拉直: "Straighten",
   调整尺寸: "Resize",
   宽: "Width",
   高: "Height",

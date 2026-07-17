@@ -60,6 +60,7 @@ export interface ImageData {
 export interface ImageOps {
   crop?: { x: number; y: number; width: number; height: number } | null;
   rotate?: number;
+  straighten?: number;
   flip_h?: boolean;
   flip_v?: boolean;
   brightness?: number;

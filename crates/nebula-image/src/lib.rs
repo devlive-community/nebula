@@ -37,6 +37,9 @@ pub struct Ops {
     /// 旋转角度,仅取 0 / 90 / 180 / 270。
     #[serde(default)]
     pub rotate: i32,
+    /// 微调 / 拉直角度(度,顺时针为正),用于校正倾斜;保持画布尺寸,转出去的边角透明。
+    #[serde(default)]
+    pub straighten: f32,
     #[serde(default)]
     pub flip_h: bool,
     #[serde(default)]
@@ -61,6 +64,7 @@ impl Ops {
     pub fn is_identity(&self) -> bool {
         self.crop.is_none()
             && self.rotate % 360 == 0
+            && self.straighten == 0.0
             && !self.flip_h
             && !self.flip_v
             && self.brightness == 0
@@ -71,7 +75,54 @@ impl Ops {
     }
 }
 
-/// 依次应用编辑操作:旋转 → 翻转 → 裁剪 → 亮度 → 对比度 → 灰度 → 反相。
+/// 绕图中心按 `degrees`(顺时针为正)旋转任意角度,保持画布尺寸;转出画布的边角填透明。
+///
+/// 反向映射 + 双线性插值:对输出每个像素,反旋转到源坐标采样。主要用于「拉直」小角度倾斜。
+fn rotate_arbitrary(img: &DynamicImage, degrees: f32) -> DynamicImage {
+    use image::RgbaImage;
+    let src = img.to_rgba8();
+    let (w, h) = (src.width(), src.height());
+    let (cx, cy) = (w as f32 / 2.0, h as f32 / 2.0);
+    let theta = degrees.to_radians();
+    let (sin, cos) = theta.sin_cos();
+    let mut out = RgbaImage::new(w, h);
+    for oy in 0..h {
+        for ox in 0..w {
+            let dx = ox as f32 - cx;
+            let dy = oy as f32 - cy;
+            // 反向:输出=源顺时针转 θ,故源坐标=输出逆时针转 θ。
+            let sx = cos * dx + sin * dy + cx;
+            let sy = -sin * dx + cos * dy + cy;
+            let px = bilinear(&src, sx, sy);
+            out.put_pixel(ox, oy, px);
+        }
+    }
+    DynamicImage::ImageRgba8(out)
+}
+
+/// 在 `src` 的浮点坐标 `(sx, sy)` 处双线性采样;越界返回透明。
+fn bilinear(src: &image::RgbaImage, sx: f32, sy: f32) -> image::Rgba<u8> {
+    use image::Rgba;
+    let (w, h) = (src.width() as i32, src.height() as i32);
+    let x0 = sx.floor() as i32;
+    let y0 = sy.floor() as i32;
+    if x0 < 0 || y0 < 0 || x0 + 1 >= w || y0 + 1 >= h {
+        return Rgba([0, 0, 0, 0]);
+    }
+    let fx = sx - x0 as f32;
+    let fy = sy - y0 as f32;
+    let p = |x: i32, y: i32| src.get_pixel(x as u32, y as u32).0;
+    let (p00, p10, p01, p11) = (p(x0, y0), p(x0 + 1, y0), p(x0, y0 + 1), p(x0 + 1, y0 + 1));
+    let mut out = [0u8; 4];
+    for c in 0..4 {
+        let top = p00[c] as f32 * (1.0 - fx) + p10[c] as f32 * fx;
+        let bot = p01[c] as f32 * (1.0 - fx) + p11[c] as f32 * fx;
+        out[c] = (top * (1.0 - fy) + bot * fy).round().clamp(0.0, 255.0) as u8;
+    }
+    Rgba(out)
+}
+
+/// 依次应用编辑操作:旋转 → 翻转 → 拉直 → 裁剪 → 亮度 → 对比度 → 灰度 → 反相。
 ///
 /// 裁剪放在旋转 / 翻转**之后**,裁剪坐标基于变换后的图 —— 前端在预览图上画框即所见即所裁。
 fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
@@ -86,6 +137,9 @@ fn apply_ops(mut img: DynamicImage, ops: &Ops) -> DynamicImage {
     }
     if ops.flip_v {
         img = img.flipv();
+    }
+    if ops.straighten != 0.0 {
+        img = rotate_arbitrary(&img, ops.straighten);
     }
     if let Some(c) = &ops.crop {
         let (iw, ih) = (img.width(), img.height());
@@ -444,6 +498,32 @@ mod tests {
         };
         let r = render_edit(&src, &ops, None).unwrap();
         assert_eq!((r.width, r.height), (200, 400));
+    }
+
+    #[test]
+    fn straighten_keeps_size_and_transparent_corners() {
+        let src = png(200, 200);
+        let ops = Ops {
+            straighten: 20.0,
+            ..Default::default()
+        };
+        let r = render_edit(&src, &ops, None).unwrap();
+        // 保持画布尺寸。
+        assert_eq!((r.width, r.height), (200, 200));
+        // 旋转后有透明边角 → 输出为 PNG。
+        assert_eq!(r.mime, "image/png");
+        // 左上角像素被转出画布,应为透明。
+        let out = decode(&r.bytes).unwrap().to_rgba8();
+        assert_eq!(out.get_pixel(0, 0).0[3], 0);
+    }
+
+    #[test]
+    fn straighten_zero_is_identity() {
+        assert!(Ops {
+            straighten: 0.0,
+            ..Default::default()
+        }
+        .is_identity());
     }
 
     #[test]
