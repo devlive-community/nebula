@@ -25,6 +25,7 @@ import {
   faSquare,
   faArrowRight,
   faFont,
+  faEyeDropper,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -151,7 +152,9 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const [annotating, setAnnotating] = useState(false);
   const [penColor, setPenColor] = useState<[number, number, number]>([255, 59, 48]);
   const [penWidth, setPenWidth] = useState(0.008);
-  const [tool, setTool] = useState<"pen" | "rect" | "arrow" | "text">("pen");
+  const [tool, setTool] = useState<
+    "pen" | "rect" | "arrow" | "text" | "eyedropper"
+  >("pen");
   const strokeCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<[number, number][] | null>(null);
   // 文字标注:正在输入的位置(相对 0..1)与草稿文字。
@@ -454,9 +457,36 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setTextDraft("");
   };
 
+  // 吸管:从当前预览图相对坐标处取颜色作画笔色,取完切回画笔。
+  const pickColorAt = async (rx: number, ry: number) => {
+    const src = shown?.data_url;
+    if (!src) return;
+    const img = new Image();
+    await new Promise((res) => {
+      img.onload = () => res(null);
+      img.src = src;
+    });
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(img, 0, 0);
+    const x = Math.min(c.width - 1, Math.floor(rx * c.width));
+    const y = Math.min(c.height - 1, Math.floor(ry * c.height));
+    const d = ctx.getImageData(x, y, 1, 1).data;
+    setPenColor([d[0], d[1], d[2]]);
+    setTool("pen");
+  };
+
   // 画笔 / 马赛克是自由折线;矩形 / 箭头是两点拖拽;文字是点一下放输入框。
   const freehand = mosaicMode || tool === "pen";
   const onPenDown = (e: React.MouseEvent) => {
+    if (!mosaicMode && tool === "eyedropper") {
+      const p = relFromEvent(e);
+      void pickColorAt(p[0], p[1]);
+      return;
+    }
     if (!mosaicMode && tool === "text") {
       const p = relFromEvent(e);
       commitText(); // 提交上一个未完成的
@@ -1121,6 +1151,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               <FontAwesomeIcon icon={faFont} />
             </button>
           </Tooltip>
+          <Tooltip label={t("吸管取色")}>
+            <button
+              className={`iv__ebtn ${tool === "eyedropper" ? "iv__ebtn--on" : ""}`}
+              onClick={() => setTool("eyedropper")}
+            >
+              <FontAwesomeIcon icon={faEyeDropper} />
+            </button>
+          </Tooltip>
           <div className="iv__pencolors">
             {(
               [
@@ -1139,6 +1177,13 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                 onClick={() => setPenColor(c)}
               />
             ))}
+            <span
+              className="iv__pencolor-current"
+              title={t("当前颜色")}
+              style={{
+                background: `rgb(${penColor[0]},${penColor[1]},${penColor[2]})`,
+              }}
+            />
           </div>
           <label className="iv__slider">
             {t("粗细")}

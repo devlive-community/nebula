@@ -1696,6 +1696,14 @@ body.resizing {
   transform: scale(1.15);
 }
 
+.iv__pencolor-current {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--primary);
+  margin-left: 4px;
+}
+
 .iv__crop-box {
   position: absolute;
   border: 1px solid #fff;
