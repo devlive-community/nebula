@@ -26,6 +26,7 @@ import {
   faArrowRight,
   faFont,
   faEyeDropper,
+  faListOl,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -159,7 +160,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   const [penColor, setPenColor] = useState<[number, number, number]>([255, 59, 48]);
   const [penWidth, setPenWidth] = useState(0.008);
   const [tool, setTool] = useState<
-    "pen" | "rect" | "arrow" | "text" | "eyedropper"
+    "pen" | "rect" | "arrow" | "text" | "eyedropper" | "number"
   >("pen");
   const strokeCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<[number, number][] | null>(null);
@@ -435,6 +436,21 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         ctx.fillStyle = rgb(tx.color);
         ctx.fillText(tx.text, x, y);
       }
+      for (const b of ops.badges ?? []) {
+        const cx = b.x * cvs.width;
+        const cy = b.y * cvs.height;
+        const r = (b.size * long) / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = rgb(b.color);
+        ctx.fill();
+        ctx.fillStyle = contrastColor(b.color);
+        ctx.font = `bold ${Math.round(r * 1.2)}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(b.n), cx, cy);
+        ctx.textAlign = "left";
+      }
       if (drawing.current) {
         const css = rgb(penColor);
         if (tool === "pen") drawOne(drawing.current, css, penWidth);
@@ -442,7 +458,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           drawShape(tool, drawing.current[0], drawing.current[1], css, penWidth);
       }
     }
-  }, [ops.strokes, ops.shapes, ops.texts, penColor, penWidth, mosaicMode, tool]);
+  }, [ops.strokes, ops.shapes, ops.texts, ops.badges, penColor, penWidth, mosaicMode, tool]);
 
   const relFromEvent = (e: React.MouseEvent): [number, number] => {
     const cvs = strokeCanvasRef.current!;
@@ -501,6 +517,23 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     if (!mosaicMode && tool === "eyedropper") {
       const p = relFromEvent(e);
       void pickColorAt(p[0], p[1]);
+      return;
+    }
+    if (!mosaicMode && tool === "number") {
+      const p = relFromEvent(e);
+      pushOps({
+        ...ops,
+        badges: [
+          ...(ops.badges ?? []),
+          {
+            x: p[0],
+            y: p[1],
+            n: (ops.badges?.length ?? 0) + 1,
+            color: penColor,
+            size: penWidth * 6,
+          },
+        ],
+      });
       return;
     }
     if (!mosaicMode && tool === "text") {
@@ -703,6 +736,21 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       ctx.fillStyle = `rgb(${tx.color[0]},${tx.color[1]},${tx.color[2]})`;
       ctx.fillText(tx.text, x, y);
     }
+    for (const b of ops.badges ?? []) {
+      const cx = b.x * canvas.width;
+      const cy = b.y * canvas.height;
+      const r = (b.size * long) / 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${b.color[0]},${b.color[1]},${b.color[2]})`;
+      ctx.fill();
+      ctx.fillStyle = contrastColor(b.color);
+      ctx.font = `bold ${Math.round(r * 1.2)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(b.n), cx, cy);
+      ctx.textAlign = "left";
+    }
     const mime = mimeOf(format);
     const blob: Blob = await new Promise((res) =>
       canvas.toBlob((b) => res(b!), mime, quality / 100),
@@ -721,7 +769,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setSaving(true);
     const dest = overwrite ? path : editedPath(path, format);
     try {
-      if (ops.texts?.length) {
+      if (ops.texts?.length || ops.badges?.length) {
         const { bytes, mime } = await compositeTexts();
         await api.putImageBytes(account, dest, bytes, mime);
       } else {
@@ -752,7 +800,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     if (typeof dest !== "string") return;
     setSaving(true);
     try {
-      if (ops.texts?.length) {
+      if (ops.texts?.length || ops.badges?.length) {
         const { bytes } = await compositeTexts();
         await api.saveImageBytesLocal(dest, bytes);
       } else {
@@ -1175,6 +1223,14 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               <FontAwesomeIcon icon={faFont} />
             </button>
           </Tooltip>
+          <Tooltip label={t("序号")}>
+            <button
+              className={`iv__ebtn ${tool === "number" ? "iv__ebtn--on" : ""}`}
+              onClick={() => setTool("number")}
+            >
+              <FontAwesomeIcon icon={faListOl} />
+            </button>
+          </Tooltip>
           <Tooltip label={t("吸管取色")}>
             <button
               className={`iv__ebtn ${tool === "eyedropper" ? "iv__ebtn--on" : ""}`}
@@ -1288,6 +1344,27 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                   {tx.text}
                 </span>
               ))}
+            {editing &&
+              (ops.badges ?? []).map((b, i) => {
+                const d = b.size * Math.max(mainImg.w, mainImg.h);
+                return (
+                  <span
+                    key={`b${i}`}
+                    className="iv__badgemark"
+                    style={{
+                      left: `${b.x * 100}%`,
+                      top: `${b.y * 100}%`,
+                      width: d,
+                      height: d,
+                      fontSize: d * 0.6,
+                      background: `rgb(${b.color[0]},${b.color[1]},${b.color[2]})`,
+                      color: contrastColor(b.color),
+                    }}
+                  >
+                    {b.n}
+                  </span>
+                );
+              })}
           </div>
         )}
 

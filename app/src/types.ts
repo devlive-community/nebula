@@ -91,6 +91,8 @@ export interface ImageOps {
     size: number;
     outline?: boolean;
   }[];
+  /** 序号标记(前端合成)。圆点 + 数字,坐标 0..1,size 为相对直径。 */
+  badges?: { x: number; y: number; n: number; color: [number, number, number]; size: number }[];
 }
 
 /** EXIF 摘要(字段全部可选),与 nebula_image::ExifInfo 对应。 */

@@ -1897,6 +1897,19 @@ body.resizing {
   user-select: none;
 }
 
+.iv__badgemark {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
 .iv__status {
   color: var(--text-dim);
   font-size: 14px;
