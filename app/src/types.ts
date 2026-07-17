@@ -56,6 +56,18 @@ export interface ImageData {
   orig_height: number;
 }
 
+/** 图片编辑操作(与 app_core::Ops 对应)。几何操作先应用,再颜色调整。 */
+export interface ImageOps {
+  crop?: { x: number; y: number; width: number; height: number } | null;
+  rotate?: number;
+  flip_h?: boolean;
+  flip_v?: boolean;
+  brightness?: number;
+  contrast?: number;
+  grayscale?: boolean;
+  invert?: boolean;
+}
+
 /** EXIF 摘要(字段全部可选),与 nebula_image::ExifInfo 对应。 */
 export interface ExifInfo {
   make?: string | null;

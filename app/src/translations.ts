@@ -73,6 +73,24 @@ export const EN: Record<string, string> = {
   焦距: "Focal length",
   在地图上查看: "View on map",
 
+  // 图片编辑器
+  编辑: "Edit",
+  水平翻转: "Flip H",
+  垂直翻转: "Flip V",
+  灰度: "Grayscale",
+  反相: "Invert",
+  亮度: "Brightness",
+  对比度: "Contrast",
+  重置: "Reset",
+  退出编辑: "Exit",
+  "保存中…": "Saving…",
+  另存为新对象: "Save as new object",
+  覆盖原图: "Overwrite original",
+  没有改动: "No changes",
+  "✓ 已覆盖保存": "✓ Saved (overwritten)",
+  "✓ 已另存为 {name}": "✓ Saved as {name}",
+  保存失败: "Save failed",
+
   // 对象 ACL / 公共直链
   复制公共链接: "Copy public link",
   设为公开读: "Make public",

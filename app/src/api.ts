@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Bookmark, Entry, ExifInfo, FolderStats, ImageData, IncompleteUpload, Integrity, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Bookmark, Entry, ExifInfo, FolderStats, ImageData, ImageOps, IncompleteUpload, Integrity, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -299,6 +299,31 @@ export const imageThumb = (
 
 export const imageExif = (account: string, path: string, etag: string | null) =>
   invoke<ExifInfo>("image_exif", { account, path, etag });
+
+export const imageEditPreview = (
+  account: string,
+  path: string,
+  etag: string | null,
+  ops: ImageOps,
+  maxEdge: number,
+) => invoke<ImageData>("image_edit_preview", { account, path, etag, ops, maxEdge });
+
+export const imageEditSave = (
+  account: string,
+  path: string,
+  etag: string | null,
+  ops: ImageOps,
+  dest: string,
+  format: string,
+  quality: number,
+) =>
+  invoke<void>("image_edit_save", {
+    account,
+    path,
+    etag,
+    ops,
+    save: { dest, format, quality },
+  });
 
 export const copy = (account: string, from: string, to: string) =>
   invoke<void>("copy", { account, from, to });
