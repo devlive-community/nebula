@@ -28,6 +28,8 @@ import {
   faEyeDropper,
   faListOl,
   faScissors,
+  faEraser,
+  faWandMagicSparkles,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -144,6 +146,18 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   // AI 抠图:插件装了才显示按钮;mattedBytes 是去背景后的透明 PNG(直接存,绕过 ops 管线)。
   const [mattingAvail, setMattingAvail] = useState(false);
   const [mattedBytes, setMattedBytes] = useState<number[] | null>(null);
+  // 局部擦除(魔术棒 / 橡皮擦):在全分辨率 canvas 上把像素改成透明,结果同样走 mattedBytes。
+  const [erasing, setErasing] = useState(false);
+  const [eraseTool, setEraseTool] = useState<"wand" | "eraser">("wand");
+  const [tolerance, setTolerance] = useState(32);
+  const eraseCanvasRef = useRef<HTMLCanvasElement>(null);
+  const eraseDown = useRef(false);
+  const eraseLast = useRef<[number, number] | null>(null);
+  // DOM 的 ImageData(canvas 像素),用 ReturnType 取,避免与 types.ImageData 同名冲突。
+  const eraseUndo = useRef<
+    ReturnType<CanvasRenderingContext2D["getImageData"]>[]
+  >([]);
+  const [eraseCanUndo, setEraseCanUndo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMenu, setSaveMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -321,7 +335,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
   // 覆盖层模式(裁剪 / 马赛克 / 标注)下,舞台不响应缩放 / 平移 / 双击,
   // 避免绘制点击被当成缩放 / 双击导致图片被放大。
-  const overlayMode = cropping || annotating || mosaicMode;
+  const overlayMode = cropping || annotating || mosaicMode || erasing;
   const onWheel = (e: React.WheelEvent) => {
     if (overlayMode) return;
     e.preventDefault();
@@ -363,6 +377,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setCropping(false);
     setMosaicMode(false);
     setAnnotating(false);
+    setErasing(false);
     setMattedBytes(null);
     resetView();
   };
@@ -395,6 +410,192 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       setToast(t("去背景失败:{msg}", { msg: String(e) }));
     }
     setEditBusy(false);
+  };
+
+  // 进入局部擦除:载入全分辨率底图(已擦过的用 mattedBytes,否则应用当前 ops 的全图)到 canvas。
+  const startErase = () => {
+    resetView();
+    setErasing(true);
+  };
+  useEffect(() => {
+    if (!erasing) return;
+    let alive = true;
+    setEditBusy(true);
+    const draw = (url: string) => {
+      const img = new Image();
+      img.onload = () => {
+        if (!alive) return;
+        const cvs = eraseCanvasRef.current;
+        if (cvs) {
+          cvs.width = img.naturalWidth;
+          cvs.height = img.naturalHeight;
+          const ctx = cvs.getContext("2d");
+          if (ctx) {
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            ctx.drawImage(img, 0, 0);
+          }
+        }
+        eraseUndo.current = [];
+        setEraseCanUndo(false);
+        setEditBusy(false);
+      };
+      img.onerror = () => alive && setEditBusy(false);
+      img.src = url;
+    };
+    if (mattedBytes) {
+      const blob = new Blob([new Uint8Array(mattedBytes)], { type: "image/png" });
+      draw(URL.createObjectURL(blob));
+    } else {
+      api
+        .imageEditFull(account, path, etag, ops)
+        .then((full) => alive && draw(full.data_url))
+        .catch(() => alive && setEditBusy(false));
+    }
+    return () => {
+      alive = false;
+    };
+  }, [erasing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 事件坐标 → canvas 内部(全分辨率)像素坐标。
+  const eraseXY = (e: React.MouseEvent): [number, number] | null => {
+    const cvs = eraseCanvasRef.current;
+    if (!cvs) return null;
+    const r = cvs.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return null;
+    const x = Math.round(((e.clientX - r.left) / r.width) * cvs.width);
+    const y = Math.round(((e.clientY - r.top) / r.height) * cvs.height);
+    return [
+      Math.min(cvs.width - 1, Math.max(0, x)),
+      Math.min(cvs.height - 1, Math.max(0, y)),
+    ];
+  };
+  // 操作前把当前画面压入撤销栈(限深 12)。
+  const pushEraseUndo = () => {
+    const cvs = eraseCanvasRef.current;
+    const ctx = cvs?.getContext("2d");
+    if (!cvs || !ctx) return;
+    eraseUndo.current.push(ctx.getImageData(0, 0, cvs.width, cvs.height));
+    if (eraseUndo.current.length > 12) eraseUndo.current.shift();
+    setEraseCanUndo(true);
+  };
+  const undoErase = () => {
+    const cvs = eraseCanvasRef.current;
+    const ctx = cvs?.getContext("2d");
+    const prev = eraseUndo.current.pop();
+    if (cvs && ctx && prev) ctx.putImageData(prev, 0, 0);
+    setEraseCanUndo(eraseUndo.current.length > 0);
+  };
+
+  // 橡皮擦:在两点之间用 destination-out 画一段透明的粗线。
+  const eraseStroke = (from: [number, number], to: [number, number]) => {
+    const cvs = eraseCanvasRef.current;
+    const ctx = cvs?.getContext("2d");
+    if (!cvs || !ctx) return;
+    const radius = Math.max(1, penWidth * Math.max(cvs.width, cvs.height));
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.fillStyle = "rgba(0,0,0,1)";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = radius * 2;
+    ctx.beginPath();
+    ctx.moveTo(from[0], from[1]);
+    ctx.lineTo(to[0], to[1]);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(to[0], to[1], radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  // 魔术棒:从点击点向外泛洪,把颜色相近且相连的像素设为透明(容差 0..100)。
+  const magicWand = (sx: number, sy: number) => {
+    const cvs = eraseCanvasRef.current;
+    const ctx = cvs?.getContext("2d");
+    if (!cvs || !ctx) return;
+    const w = cvs.width;
+    const h = cvs.height;
+    const image = ctx.getImageData(0, 0, w, h);
+    const d = image.data;
+    const start = (sy * w + sx) * 4;
+    if (d[start + 3] === 0) return; // 已透明
+    const tr = d[start];
+    const tg = d[start + 1];
+    const tb = d[start + 2];
+    // 容差按 RGB 曼哈顿距离(最大 765)缩放。
+    const limit = (tolerance / 100) * 765;
+    const seen = new Uint8Array(w * h);
+    const stack = [sy * w + sx];
+    while (stack.length) {
+      const p = stack.pop()!;
+      if (seen[p]) continue;
+      seen[p] = 1;
+      const i = p * 4;
+      if (d[i + 3] === 0) continue;
+      const dist =
+        Math.abs(d[i] - tr) + Math.abs(d[i + 1] - tg) + Math.abs(d[i + 2] - tb);
+      if (dist > limit) continue;
+      d[i + 3] = 0; // 透明
+      const x = p % w;
+      const y = (p - x) / w;
+      if (x > 0) stack.push(p - 1);
+      if (x < w - 1) stack.push(p + 1);
+      if (y > 0) stack.push(p - w);
+      if (y < h - 1) stack.push(p + w);
+    }
+    ctx.putImageData(image, 0, 0);
+  };
+
+  const onEraseDown = (e: React.MouseEvent) => {
+    const p = eraseXY(e);
+    if (!p) return;
+    pushEraseUndo();
+    if (eraseTool === "wand") {
+      magicWand(p[0], p[1]);
+      return;
+    }
+    eraseDown.current = true;
+    eraseLast.current = p;
+    eraseStroke(p, p);
+  };
+  const onEraseMove = (e: React.MouseEvent) => {
+    if (eraseTool !== "eraser" || !eraseDown.current) return;
+    const p = eraseXY(e);
+    if (!p) return;
+    eraseStroke(eraseLast.current ?? p, p);
+    eraseLast.current = p;
+  };
+  const onEraseUp = () => {
+    eraseDown.current = false;
+    eraseLast.current = null;
+  };
+
+  // 完成擦除:把 canvas 导出成透明 PNG,接管为当前结果(走 mattedBytes 的保存路径)。
+  const commitErase = async () => {
+    const cvs = eraseCanvasRef.current;
+    if (!cvs) {
+      setErasing(false);
+      return;
+    }
+    const blob: Blob | null = await new Promise((res) =>
+      cvs.toBlob((b) => res(b), "image/png"),
+    );
+    if (blob) {
+      const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
+      const url = URL.createObjectURL(blob);
+      resetOps();
+      setEditData({
+        data_url: url,
+        width: cvs.width,
+        height: cvs.height,
+        orig_width: cvs.width,
+        orig_height: cvs.height,
+      });
+      setMattedBytes(bytes);
+      setFormat("png");
+    }
+    setErasing(false);
   };
 
   // 马赛克打码:像画笔一样在图上涂抹,涂过的地方打码。
@@ -906,6 +1107,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
           else if (cropping) setCropping(false);
           else if (mosaicMode) setMosaicMode(false);
           else if (annotating) setAnnotating(false);
+          else if (erasing) setErasing(false);
           else if (editing) exitEdit();
           else close();
           break;
@@ -913,7 +1115,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, editing, resizeOpen, cropping, mosaicMode, annotating]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [close, editing, resizeOpen, cropping, mosaicMode, annotating, erasing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const exifRows = exif
     ? ([
@@ -974,7 +1176,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         </Tooltip>
       </div>
 
-      {editing && !cropping && !mosaicMode && !annotating && (
+      {editing && !cropping && !mosaicMode && !annotating && !erasing && (
         <div className="iv__editbar">
           <Tooltip label={t("撤销")}>
             <button className="iv__ebtn" disabled={!canUndo} onClick={undo}>
@@ -1069,6 +1271,11 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               </button>
             </Tooltip>
           )}
+          <Tooltip label={t("擦除")}>
+            <button className="iv__ebtn" disabled={editBusy} onClick={startErase}>
+              <FontAwesomeIcon icon={faEraser} />
+            </button>
+          </Tooltip>
           <label className="iv__slider">
             {t("拉直")}
             <input
@@ -1370,6 +1577,73 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
         </div>
       )}
 
+      {editing && erasing && (
+        <div className="iv__editbar">
+          <Tooltip label={t("魔术棒(点一下去一片)")}>
+            <button
+              className={`iv__ebtn ${eraseTool === "wand" ? "iv__ebtn--on" : ""}`}
+              onClick={() => setEraseTool("wand")}
+            >
+              <FontAwesomeIcon icon={faWandMagicSparkles} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("橡皮擦(涂抹擦除)")}>
+            <button
+              className={`iv__ebtn ${eraseTool === "eraser" ? "iv__ebtn--on" : ""}`}
+              onClick={() => setEraseTool("eraser")}
+            >
+              <FontAwesomeIcon icon={faEraser} />
+            </button>
+          </Tooltip>
+          {eraseTool === "wand" ? (
+            <label className="iv__slider">
+              {t("容差")}
+              <input
+                type="range"
+                min={1}
+                max={100}
+                value={tolerance}
+                onChange={(e) => setTolerance(Number(e.target.value))}
+              />
+            </label>
+          ) : (
+            <label className="iv__slider">
+              {t("粗细")}
+              <input
+                type="range"
+                min={2}
+                max={60}
+                value={Math.round(penWidth * 1000)}
+                onChange={(e) => setPenWidth(Number(e.target.value) / 1000)}
+              />
+            </label>
+          )}
+          <span className="iv__crop-hint">
+            {eraseTool === "wand" ? t("点击要去掉的区域") : t("在图上按住涂抹擦除")}
+          </span>
+          <div className="iv__spacer" />
+          <Tooltip label={t("撤销")}>
+            <button
+              className="iv__ebtn"
+              disabled={!eraseCanUndo}
+              onClick={undoErase}
+            >
+              <FontAwesomeIcon icon={faRotateLeft} />
+            </button>
+          </Tooltip>
+          <button
+            className="iv__ebtn iv__ebtn--primary"
+            disabled={editBusy}
+            onClick={commitErase}
+          >
+            {t("完成")}
+          </button>
+          <button className="iv__ebtn" onClick={() => setErasing(false)}>
+            {t("取消")}
+          </button>
+        </div>
+      )}
+
       <div
         className="iv__stage"
         ref={stageRef}
@@ -1386,7 +1660,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       >
         {loading && <div className="iv__status">{t("加载中…")}</div>}
         {error && <div className="iv__status">{t("无法加载该图片")}</div>}
-        {shown && !error && !cropping && !mosaicMode && !annotating && (
+        {shown && !error && !cropping && !mosaicMode && !annotating && !erasing && (
           <div
             className="iv__imgwrap"
             style={{
@@ -1505,6 +1779,25 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                 }}
               />
             )}
+          </div>
+        )}
+
+        {shown && !error && erasing && (
+          <div
+            className="iv__croplayer"
+            style={{ cursor: eraseTool === "wand" ? "cell" : "crosshair" }}
+            onMouseDown={onEraseDown}
+            onMouseMove={onEraseMove}
+            onMouseUp={onEraseUp}
+            onMouseLeave={onEraseUp}
+          >
+            <div className="iv__cropimgwrap">
+              <canvas
+                ref={eraseCanvasRef}
+                className="iv__img iv__erasecanvas"
+                draggable={false}
+              />
+            </div>
           </div>
         )}
 
