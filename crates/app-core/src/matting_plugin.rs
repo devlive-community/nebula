@@ -1,7 +1,8 @@
 //! AI 抠图插件的下载 / 安装 / 状态。
 //!
 //! 「插件式」:默认不含 ONNX Runtime;用户在设置里启用后,下载模型 + 平台对应的
-//! 运行时库到 `plugin_dir/matting/`,重启后由 [`crate::App::init_matting`] 加载。
+//! 运行时库到 `plugin_dir/matting/`。运行时库只在实际调用 [`crate::App::remove_background`]
+//! 时懒加载,绝不在应用启动时加载——不兼容的动态库可能直接让进程崩溃。
 //!
 //! 注意:运行时库的下载 URL、ONNX Runtime 版本、包内库路径是与 `ort` 绑定的工程细节,
 //! **需在各平台真机验证并按需调整**(此处填的是合理默认值)。
@@ -79,13 +80,14 @@ impl App {
         )
     }
 
-    /// 应用启动时:若插件已安装,用下载的库初始化 ONNX Runtime。
-    pub fn init_matting(&self) {
-        if let Some(dylib) = self.matting_dylib_path() {
-            if dylib.exists() {
-                let _ = nebula_matting::init(&dylib);
-            }
-        }
+    /// 懒加载 ONNX Runtime(仅在实际用到「去背景」时调用)。失败返回错误,不 panic。
+    /// 注意:加载不兼容的动态库理论上可能崩溃,故绝不在应用启动时调用。
+    fn ensure_matting_init(&self) -> Result<()> {
+        let dylib = self
+            .matting_dylib_path()
+            .filter(|p| p.exists())
+            .ok_or_else(|| AppError::InvalidInput("matting plugin not installed".into()))?;
+        nebula_matting::init(&dylib).map_err(|e| AppError::Image(e.to_string()))
     }
 
     /// 安装插件:下载模型 + 运行时库(解压提取库),`progress(done, total)` 报总进度。
@@ -133,6 +135,7 @@ impl App {
 
     /// 对一张图去背景,返回透明背景 PNG 字节。插件未安装 / 未初始化则报错。
     pub async fn remove_background(&self, account: &str, path: &str) -> Result<Vec<u8>> {
+        self.ensure_matting_init()?;
         let model = self
             .matting_model_path()
             .filter(|p| p.exists())

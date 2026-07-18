@@ -1459,9 +1459,9 @@ pub fn run() {
             if let Ok(cache) = app.path().app_cache_dir() {
                 core.set_cache_dir(cache.join("nebula"));
             }
-            // 插件(AI 抠图的模型 + 运行时库)放数据目录,持久保存;已安装则初始化。
+            // 插件(AI 抠图的模型 + 运行时库)放数据目录,持久保存。
+            // 运行时库只在实际用到「去背景」时才懒加载,避免不兼容的库让应用起不来。
             core.set_plugin_dir(dir.join("plugins"));
-            core.init_matting();
             app.manage(core);
             app.manage(Transfers::default());
             Ok(())
