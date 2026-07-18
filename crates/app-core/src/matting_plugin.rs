@@ -81,6 +81,25 @@ impl App {
         )
     }
 
+    /// 诊断日志:同时写 stderr 和 `plugin_dir/matting.log`,GUI 启动看不到终端时也能取证。
+    fn matting_log(&self, msg: &str) {
+        eprintln!("[matting] {msg}");
+        if let Some(dir) = self.plugin_dir.get() {
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join("matting.log"))
+            {
+                use std::io::Write;
+                let _ = writeln!(f, "{ts} {msg}");
+            }
+        }
+    }
+
     /// 懒加载 ONNX Runtime(仅在实际用到「去背景」时调用)。失败返回错误,不 panic。
     /// 注意:加载不兼容的动态库理论上可能崩溃,故绝不在应用启动时调用。
     fn ensure_matting_init(&self) -> Result<()> {
@@ -136,26 +155,36 @@ impl App {
 
     /// 对一张图去背景,返回透明背景 PNG 字节。插件未安装 / 未初始化则报错。
     pub async fn remove_background(&self, account: &str, path: &str) -> Result<Vec<u8>> {
-        eprintln!("[matting] init runtime…");
+        let dylib = self.matting_dylib_path();
+        let dylib_len = dylib
+            .as_ref()
+            .and_then(|p| std::fs::metadata(p).ok())
+            .map(|m| m.len())
+            .unwrap_or(0);
+        self.matting_log(&format!("start; dylib={dylib:?} ({dylib_len} bytes)"));
+        self.matting_log("init runtime…");
         self.ensure_matting_init()?;
         let model = self
             .matting_model_path()
             .filter(|p| p.exists())
             .ok_or_else(|| AppError::InvalidInput("matting plugin not installed".into()))?;
         let model_bytes = std::fs::read(model)?;
-        eprintln!(
-            "[matting] model {} bytes; fetching source image",
+        self.matting_log(&format!(
+            "runtime ok; model {} bytes; fetching source image",
             model_bytes.len()
-        );
+        ));
         let img = self.provider(account)?.read(path).await?.to_vec();
-        eprintln!("[matting] source {} bytes; running inference", img.len());
+        self.matting_log(&format!(
+            "source {} bytes; calling inference (session build + run)",
+            img.len()
+        ));
         let out = tokio::task::spawn_blocking(move || {
             nebula_matting::remove_background(&model_bytes, &img)
         })
         .await
         .map_err(|e| AppError::Image(e.to_string()))?
         .map_err(|e| AppError::Image(e.to_string()))?;
-        eprintln!("[matting] done, {} bytes PNG", out.len());
+        self.matting_log(&format!("done, {} bytes PNG", out.len()));
         Ok(out)
     }
 }
