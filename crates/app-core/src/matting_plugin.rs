@@ -4,8 +4,8 @@
 //! 运行时库到 `plugin_dir/matting/`。运行时库只在实际调用 [`crate::App::remove_background`]
 //! 时懒加载,绝不在应用启动时加载——不兼容的动态库可能直接让进程崩溃。
 //!
-//! 注意:运行时库的下载 URL、ONNX Runtime 版本、包内库路径是与 `ort` 绑定的工程细节,
-//! **需在各平台真机验证并按需调整**(此处填的是合理默认值)。
+//! ONNX Runtime 版本(1.22.0)已与 `ort-sys` 2.0.0-rc.10 的 `ONNXRUNTIME_VERSION`(API 22)对齐;
+//! 三平台发布包 URL 均已核对可下载。升级 `ort` 时同步改 [`ORT_VERSION`]。
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -17,8 +17,9 @@ use crate::{App, AppError, Result};
 
 /// u2netp 显著性模型(~4.6 MB)。
 const MODEL_URL: &str = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx";
-/// 与 `ort` 2.0.0-rc.10 兼容的 ONNX Runtime 版本(真机需核对)。
-const ORT_VERSION: &str = "1.16.3";
+/// 与 `ort` 2.0.0-rc.10 匹配的 ONNX Runtime 版本。
+/// 必须与 `ort-sys` 的 `ONNXRUNTIME_VERSION`(API 版本 22)一致,否则 Session 创建会卡死 / 失败。
+const ORT_VERSION: &str = "1.22.0";
 
 /// 当前平台的运行时库文件名(下载解压后统一命名)。
 fn dylib_name() -> &'static str {
@@ -209,6 +210,11 @@ fn extract_runtime(archive: &Path, dest: &Path, is_zip: bool) -> Result<()> {
         let mut tar = tar::Archive::new(gz);
         for entry in tar.entries().map_err(|e| AppError::Image(e.to_string()))? {
             let mut entry = entry.map_err(|e| AppError::Image(e.to_string()))?;
+            // 只要常规文件:`libonnxruntime.dylib` 是指向带版本号真实库的软链,
+            // 软链项 read 出 0 字节会写出坏库,必须跳过。
+            if !entry.header().entry_type().is_file() {
+                continue;
+            }
             let name = entry
                 .path()
                 .map(|p| p.to_string_lossy().to_string())
