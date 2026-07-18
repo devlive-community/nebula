@@ -27,6 +27,7 @@ import {
   faFont,
   faEyeDropper,
   faListOl,
+  faScissors,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -127,6 +128,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   };
   const resetOps = () => {
     lastCoalesce.current = null;
+    setMattedBytes(null);
     setHist({ stack: [{}], idx: 0 });
   };
   const undo = () => {
@@ -139,6 +141,9 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   };
   const [editData, setEditData] = useState<ImageData | null>(null);
   const [editBusy, setEditBusy] = useState(false);
+  // AI 抠图:插件装了才显示按钮;mattedBytes 是去背景后的透明 PNG(直接存,绕过 ops 管线)。
+  const [mattingAvail, setMattingAvail] = useState(false);
+  const [mattedBytes, setMattedBytes] = useState<number[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMenu, setSaveMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -254,6 +259,10 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
   }, [account, path, etag]);
 
   useEffect(() => {
+    api.mattingInstalled().then(setMattingAvail).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!showInfo) return;
     setExif(null);
     let alive = true;
@@ -268,7 +277,8 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
   // 编辑中:操作变化后(防抖)向 Rust 要预览。渲染期间显示「处理中…」。
   useEffect(() => {
-    if (!editing) return;
+    // 去背景结果不是 ops 管线产物,预览由 mattedBytes 直接给,别让管线覆盖它。
+    if (!editing || mattedBytes) return;
     let alive = true;
     // 标注模式下 strokes / shapes 由前端 canvas 实时画,预览图不烧录(避免双重绘制 / 延迟闪烁)。
     const previewOps = annotating ? { ...ops, strokes: [], shapes: [] } : ops;
@@ -284,7 +294,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
       alive = false;
       clearTimeout(id);
     };
-  }, [editing, ops, account, path, etag, annotating]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editing, ops, account, path, etag, annotating, mattedBytes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!toast) return;
@@ -353,7 +363,38 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setCropping(false);
     setMosaicMode(false);
     setAnnotating(false);
+    setMattedBytes(null);
     resetView();
+  };
+
+  // AI 去背景:Rust 用本地模型抠图,返回透明 PNG 字节。结果作为当前预览,保存时直接写这些字节。
+  const applyMatting = async () => {
+    setEditBusy(true);
+    try {
+      const bytes = await api.removeBackground(account, path);
+      const blob = new Blob([new Uint8Array(bytes)], { type: "image/png" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      await new Promise((res, rej) => {
+        img.onload = () => res(null);
+        img.onerror = rej;
+        img.src = url;
+      });
+      resetOps();
+      setEditData({
+        data_url: url,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        orig_width: img.naturalWidth,
+        orig_height: img.naturalHeight,
+      });
+      setMattedBytes(bytes);
+      setFormat("png"); // 透明背景必须用 PNG
+      setToast(t("✓ 已去除背景"));
+    } catch (e) {
+      setToast(t("去背景失败:{msg}", { msg: String(e) }));
+    }
+    setEditBusy(false);
   };
 
   // 马赛克打码:像画笔一样在图上涂抹,涂过的地方打码。
@@ -779,7 +820,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
 
   const save = async (overwrite: boolean) => {
     setSaveMenu(false);
-    if (opsIdentity && overwrite && format === defaultFormat(name)) {
+    if (!mattedBytes && opsIdentity && overwrite && format === defaultFormat(name)) {
       // 覆盖原图且无任何改动、格式也没变 → 没意义。
       setToast(t("没有改动"));
       return;
@@ -787,7 +828,10 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     setSaving(true);
     const dest = overwrite ? path : editedPath(path, format);
     try {
-      if (ops.texts?.length || ops.badges?.length) {
+      if (mattedBytes) {
+        // 去背景结果:直接写透明 PNG,不走 ops 管线。
+        await api.putImageBytes(account, dest, mattedBytes, "image/png");
+      } else if (ops.texts?.length || ops.badges?.length) {
         const { bytes, mime } = await compositeTexts();
         await api.putImageBytes(account, dest, bytes, mime);
       } else {
@@ -818,7 +862,9 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
     if (typeof dest !== "string") return;
     setSaving(true);
     try {
-      if (ops.texts?.length || ops.badges?.length) {
+      if (mattedBytes) {
+        await api.saveImageBytesLocal(dest, mattedBytes);
+      } else if (ops.texts?.length || ops.badges?.length) {
         const { bytes } = await compositeTexts();
         await api.saveImageBytesLocal(dest, bytes);
       } else {
@@ -1012,6 +1058,17 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
               <FontAwesomeIcon icon={faExpand} />
             </button>
           </Tooltip>
+          {mattingAvail && (
+            <Tooltip label={t("去背景")}>
+              <button
+                className={`iv__ebtn ${mattedBytes ? "iv__ebtn--on" : ""}`}
+                disabled={editBusy}
+                onClick={applyMatting}
+              >
+                <FontAwesomeIcon icon={faScissors} />
+              </button>
+            </Tooltip>
+          )}
           <label className="iv__slider">
             {t("拉直")}
             <input
