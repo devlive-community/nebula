@@ -45,12 +45,28 @@ fn runtime_archive() -> (String, bool) {
     }
 }
 
-/// 解压后判断某个成员是不是我们要的运行时库(`lib/` 下、名字含 onnxruntime 的动态库)。
+/// 解压后成功提取的库最小合理体积(真实库都 > 10 MB;软链 / 坏文件会远小于此)。
+const MIN_LIB_BYTES: u64 = 1_000_000;
+
+/// 判断归档成员是不是要提取的主运行时库。只认文件名以 onnxruntime/libonnxruntime
+/// 开头、带平台扩展名的主库本体;三平台归档结构不同,必须精确排除这些同名干扰项:
+///
+/// - macOS:`libonnxruntime.1.22.0.dylib.dSYM/…/DWARF/libonnxruntime.…dylib`(调试符号,同名);
+/// - Windows:`onnxruntime.pdb`(调试符号);
+/// - 三平台:`*_providers_shared.*`(provider 插件库)。
 fn is_runtime_lib(name: &str) -> bool {
     let n = name.to_ascii_lowercase();
-    n.contains("onnxruntime")
-        && (n.ends_with(".dll") || n.contains(".dylib") || n.contains(".so"))
-        && !n.contains("providers") // 排除 provider 插件库
+    if n.contains(".dsym") || n.contains("dwarf") || n.ends_with(".pdb") {
+        return false; // 调试符号
+    }
+    let base = n.rsplit(['/', '\\']).next().unwrap_or(n.as_str());
+    if !base.starts_with("onnxruntime") && !base.starts_with("libonnxruntime") {
+        return false;
+    }
+    if base.contains("providers") {
+        return false; // provider 插件库
+    }
+    base.contains(".dll") || base.contains(".dylib") || base.contains(".so")
 }
 
 impl App {
@@ -218,7 +234,7 @@ async fn download_to<F: Fn(u64, u64)>(
     Ok(())
 }
 
-/// 从下载的压缩包里提取 ONNX Runtime 库到 `dest`。
+/// 从下载的压缩包里提取 ONNX Runtime 库到 `dest`,并校验体积合理(防止提取到软链 / 坏文件)。
 fn extract_runtime(archive: &Path, dest: &Path, is_zip: bool) -> Result<()> {
     let f = std::fs::File::open(archive)?;
     if is_zip {
@@ -227,11 +243,14 @@ fn extract_runtime(archive: &Path, dest: &Path, is_zip: bool) -> Result<()> {
             let mut entry = zip
                 .by_index(i)
                 .map_err(|e| AppError::Image(e.to_string()))?;
+            if !entry.is_file() {
+                continue;
+            }
             let name = entry.name().to_string();
             if is_runtime_lib(&name) {
                 let mut out = std::fs::File::create(dest)?;
                 std::io::copy(&mut entry, &mut out)?;
-                return Ok(());
+                return verify_lib_size(dest);
             }
         }
     } else {
@@ -252,11 +271,65 @@ fn extract_runtime(archive: &Path, dest: &Path, is_zip: bool) -> Result<()> {
                 let mut buf = Vec::new();
                 entry.read_to_end(&mut buf)?;
                 std::fs::write(dest, buf)?;
-                return Ok(());
+                return verify_lib_size(dest);
             }
         }
     }
     Err(AppError::Image(
         "onnxruntime library not found in archive".into(),
     ))
+}
+
+/// 提取后校验:真实运行时库都很大(> 1 MB),过小说明取到了软链 / 坏文件。
+fn verify_lib_size(dest: &Path) -> Result<()> {
+    let len = std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0);
+    if len < MIN_LIB_BYTES {
+        let _ = std::fs::remove_file(dest);
+        return Err(AppError::Image(format!(
+            "extracted runtime library looks corrupt ({len} bytes)"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_runtime_lib;
+
+    // 文件清单取自 onnxruntime v1.22.0 官方发布包。名字过滤放行「像主库」的成员;
+    // 真实文件与软链(如 Linux 的 .so / .so.1)都放行,再由提取时的 is_file 跳过软链。
+
+    #[test]
+    fn accepts_real_main_library_each_platform() {
+        assert!(is_runtime_lib(
+            "onnxruntime-osx-universal2-1.22.0/lib/libonnxruntime.1.22.0.dylib"
+        ));
+        assert!(is_runtime_lib(
+            "onnxruntime-linux-x64-1.22.0/lib/libonnxruntime.so.1.22.0"
+        ));
+        assert!(is_runtime_lib(
+            "onnxruntime-win-x64-1.22.0/lib/onnxruntime.dll"
+        ));
+    }
+
+    #[test]
+    fn rejects_debug_symbols() {
+        // macOS 的 .dSYM 里有同名 dylib;Windows 的 .pdb。都不能当库提取。
+        assert!(!is_runtime_lib(
+            "onnxruntime-osx-universal2-1.22.0/lib/libonnxruntime.1.22.0.dylib.dSYM/Contents/Resources/DWARF/libonnxruntime.1.22.0.dylib"
+        ));
+        assert!(!is_runtime_lib(
+            "onnxruntime-win-x64-1.22.0/lib/onnxruntime.pdb"
+        ));
+    }
+
+    #[test]
+    fn rejects_provider_plugins() {
+        assert!(!is_runtime_lib(
+            "onnxruntime-linux-x64-1.22.0/lib/libonnxruntime_providers_shared.so"
+        ));
+        assert!(!is_runtime_lib(
+            "onnxruntime-win-x64-1.22.0/lib/onnxruntime_providers_shared.dll"
+        ));
+    }
 }
