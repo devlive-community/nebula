@@ -32,17 +32,34 @@ fn dylib_name() -> &'static str {
     }
 }
 
-/// 当前平台的 ONNX Runtime 官方发布包 URL + 解压时匹配库文件的关键片段。
-fn runtime_archive() -> (String, bool) {
-    // 返回 (url, is_zip)。
+/// 当前平台 + 架构的 ONNX Runtime 官方发布包 URL,以及是否 zip(否则 tgz)。
+/// 覆盖:Windows x64/arm64、macOS(universal2,含 Intel 与 Apple Silicon)、Linux x64/arm64。
+/// 返回 `None` 表示该平台 / 架构没有官方预编译包(如 32 位),插件不可用。
+fn runtime_archive() -> Option<(String, bool)> {
     let v = ORT_VERSION;
-    if cfg!(target_os = "windows") {
-        (format!("https://github.com/microsoft/onnxruntime/releases/download/v{v}/onnxruntime-win-x64-{v}.zip"), true)
+    let base = "https://github.com/microsoft/onnxruntime/releases/download";
+    let (slug, is_zip) = if cfg!(target_os = "windows") {
+        match () {
+            _ if cfg!(target_arch = "x86_64") => (format!("onnxruntime-win-x64-{v}"), true),
+            _ if cfg!(target_arch = "aarch64") => (format!("onnxruntime-win-arm64-{v}"), true),
+            _ => return None,
+        }
     } else if cfg!(target_os = "macos") {
-        (format!("https://github.com/microsoft/onnxruntime/releases/download/v{v}/onnxruntime-osx-universal2-{v}.tgz"), false)
+        // universal2 同时含 x86_64 与 arm64。
+        (format!("onnxruntime-osx-universal2-{v}"), false)
+    } else if cfg!(target_os = "linux") {
+        match () {
+            _ if cfg!(target_arch = "x86_64") => (format!("onnxruntime-linux-x64-{v}"), false),
+            _ if cfg!(target_arch = "aarch64") => (format!("onnxruntime-linux-aarch64-{v}"), false),
+            _ => return None,
+        }
     } else {
-        (format!("https://github.com/microsoft/onnxruntime/releases/download/v{v}/onnxruntime-linux-x64-{v}.tgz"), false)
-    }
+        return None;
+    };
+    Some((
+        format!("{base}/v{v}/{slug}.{}", if is_zip { "zip" } else { "tgz" }),
+        is_zip,
+    ))
 }
 
 /// 解压后成功提取的库最小合理体积(真实库都 > 10 MB;软链 / 坏文件会远小于此)。
@@ -133,7 +150,11 @@ impl App {
             .ok_or_else(|| AppError::InvalidInput("plugin dir not set".into()))?;
         std::fs::create_dir_all(&dir)?;
 
-        let (rt_url, is_zip) = runtime_archive();
+        let (rt_url, is_zip) = runtime_archive().ok_or_else(|| {
+            AppError::InvalidInput(
+                "AI matting is not available on this platform / architecture".into(),
+            )
+        })?;
 
         // 先探两个下载的总大小,合并成一个进度。
         let model_total = content_length(MODEL_URL).await.unwrap_or(0);
