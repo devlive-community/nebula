@@ -53,7 +53,9 @@ pub fn init(dylib_path: impl AsRef<Path>) -> Result<(), MattingError> {
 
 /// 去背景:输入图片字节 + 模型字节,返回透明背景的 PNG 字节。
 pub fn remove_background(model_bytes: &[u8], img_bytes: &[u8]) -> Result<Vec<u8>, MattingError> {
+    eprintln!("[matting] building session…");
     let mut session = ort::session::Session::builder()?.commit_from_memory(model_bytes)?;
+    eprintln!("[matting] session ready; decoding image");
 
     let img =
         image::load_from_memory(img_bytes).map_err(|e| MattingError::Decode(e.to_string()))?;
@@ -81,7 +83,9 @@ pub fn remove_background(model_bytes: &[u8], img_bytes: &[u8]) -> Result<Vec<u8>
     }
 
     let tensor = ort::value::Tensor::from_array(([1usize, 3, SIZE, SIZE], input))?;
+    eprintln!("[matting] running inference ({ow}x{oh})…");
     let outputs = session.run(ort::inputs![tensor])?;
+    eprintln!("[matting] inference done; compositing");
     let (_shape, pred) = outputs[0].try_extract_tensor::<f32>()?;
 
     // 后处理:d0 掩码归一化到 0..1。

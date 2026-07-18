@@ -135,17 +135,27 @@ impl App {
 
     /// 对一张图去背景,返回透明背景 PNG 字节。插件未安装 / 未初始化则报错。
     pub async fn remove_background(&self, account: &str, path: &str) -> Result<Vec<u8>> {
+        eprintln!("[matting] init runtime…");
         self.ensure_matting_init()?;
         let model = self
             .matting_model_path()
             .filter(|p| p.exists())
             .ok_or_else(|| AppError::InvalidInput("matting plugin not installed".into()))?;
         let model_bytes = std::fs::read(model)?;
+        eprintln!(
+            "[matting] model {} bytes; fetching source image",
+            model_bytes.len()
+        );
         let img = self.provider(account)?.read(path).await?.to_vec();
-        tokio::task::spawn_blocking(move || nebula_matting::remove_background(&model_bytes, &img))
-            .await
-            .map_err(|e| AppError::Image(e.to_string()))?
-            .map_err(|e| AppError::Image(e.to_string()))
+        eprintln!("[matting] source {} bytes; running inference", img.len());
+        let out = tokio::task::spawn_blocking(move || {
+            nebula_matting::remove_background(&model_bytes, &img)
+        })
+        .await
+        .map_err(|e| AppError::Image(e.to_string()))?
+        .map_err(|e| AppError::Image(e.to_string()))?;
+        eprintln!("[matting] done, {} bytes PNG", out.len());
+        Ok(out)
     }
 }
 
