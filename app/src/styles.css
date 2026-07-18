@@ -339,6 +339,7 @@ body.resizing {
   padding: 7px 14px;
   border-radius: 8px;
   font-size: 13px;
+  white-space: nowrap;
   transition: background 0.12s, border-color 0.12s, opacity 0.12s;
 }
 
@@ -2825,6 +2826,10 @@ input[type="range"]:disabled {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.plugin-card__head .btn {
+  flex: none;
 }
 
 .plugin-card__title {
