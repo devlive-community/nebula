@@ -2811,3 +2811,81 @@ input[type="range"]:disabled {
     opacity: 1;
   }
 }
+
+/* 设置里的插件卡片 */
+.plugin-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+}
+
+.plugin-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plugin-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.plugin-card__desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 3px;
+  max-width: 320px;
+}
+
+.plugin-card__state {
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.plugin-card__progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.plugin-card__bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-elev-2);
+  overflow: hidden;
+}
+
+.plugin-card__fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.15s linear;
+}
+
+.plugin-card__pct {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.plugin-card__restart {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.plugin-card__error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--danger);
+  word-break: break-word;
+}

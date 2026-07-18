@@ -420,3 +420,15 @@ export const getPref = (key: string) => invoke<string | null>("get_pref", { key 
 
 export const setPref = (key: string, value: string) =>
   invoke<void>("set_pref", { key, value });
+
+// AI 抠图插件(去背景)
+export const mattingInstalled = () => invoke<boolean>("matting_installed");
+
+export const installMattingPlugin = () =>
+  invoke<void>("install_matting_plugin");
+
+export const uninstallMattingPlugin = () =>
+  invoke<void>("uninstall_matting_plugin");
+
+export const removeBackground = (account: string, path: string) =>
+  invoke<number[]>("remove_background", { account, path });

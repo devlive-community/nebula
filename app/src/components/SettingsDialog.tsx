@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Settings } from "../types";
 import { Select } from "./Select";
+import { MattingPluginCard } from "./MattingPluginCard";
 import { useI18n } from "../i18n";
 import { LOCALES } from "../locales";
 
@@ -65,6 +66,11 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
               onChange={(e) => setRateLimit(Number(e.target.value))}
             />
           </label>
+
+          <div className="field">
+            <span>{t("插件")}</span>
+            <MattingPluginCard />
+          </div>
         </div>
         <div className="modal__footer">
           <button className="btn" onClick={onClose}>

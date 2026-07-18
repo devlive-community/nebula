@@ -245,6 +245,14 @@ export const EN: Record<string, string> = {
   语言: "Language",
   中文: "中文",
   English: "English",
+  插件: "Plugins",
+  "AI 抠图(去背景)": "AI background removal",
+  "下载本地模型,一键去掉图片背景。约 20 MB,首次需下载。":
+    "Download a local model to cut out backgrounds. ~20 MB, downloaded once.",
+  启用: "Enable",
+  卸载: "Uninstall",
+  "安装完成,重启应用后生效。": "Installed — restart the app to take effect.",
+  立即重启: "Restart now",
 
   // 对话框
   文件夹名称: "Folder name",
