@@ -1308,6 +1308,43 @@ async fn put_image_bytes(
         .map_err(|e| e.to_string())
 }
 
+/// AI 抠图插件是否已安装。
+#[tauri::command]
+fn matting_installed(state: State<'_, App>) -> bool {
+    state.matting_installed()
+}
+
+/// 安装 AI 抠图插件:下载模型 + 运行时库,进度经 `matting-progress` 事件推送。
+#[tauri::command]
+async fn install_matting_plugin(app: AppHandle, state: State<'_, App>) -> Result<(), String> {
+    let core = state.inner().clone();
+    let handle = app.clone();
+    core.install_matting(move |done, total| {
+        let _ = handle.emit("matting-progress", (done, total));
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// 卸载 AI 抠图插件。
+#[tauri::command]
+fn uninstall_matting_plugin(state: State<'_, App>) -> Result<(), String> {
+    state.uninstall_matting().map_err(|e| e.to_string())
+}
+
+/// 去背景:返回透明背景 PNG 的字节(前端预览 / 保存)。
+#[tauri::command]
+async fn remove_background(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<Vec<u8>, String> {
+    let core = state.inner().clone();
+    core.remove_background(&account, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 把前端合成好的字节写到本地文件 `dest`。
 #[tauri::command]
 async fn save_image_bytes_local(dest: String, bytes: Vec<u8>) -> Result<(), String> {
@@ -1422,6 +1459,9 @@ pub fn run() {
             if let Ok(cache) = app.path().app_cache_dir() {
                 core.set_cache_dir(cache.join("nebula"));
             }
+            // 插件(AI 抠图的模型 + 运行时库)放数据目录,持久保存;已安装则初始化。
+            core.set_plugin_dir(dir.join("plugins"));
+            core.init_matting();
             app.manage(core);
             app.manage(Transfers::default());
             Ok(())
@@ -1505,6 +1545,10 @@ pub fn run() {
             image_edit_full,
             put_image_bytes,
             save_image_bytes_local,
+            matting_installed,
+            install_matting_plugin,
+            uninstall_matting_plugin,
+            remove_background,
             get_pref,
             set_pref,
         ])

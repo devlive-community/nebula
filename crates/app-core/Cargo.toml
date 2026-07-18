@@ -12,6 +12,7 @@ publish = false
 cloud-core = { path = "../cloud-core" }
 nebula-provider = { path = "../nebula-provider" }
 nebula-image = { path = "../nebula-image" }
+nebula-matting = { path = "../nebula-matting" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
 provider-tencent = { path = "../providers/provider-tencent" }
 provider-huawei = { path = "../providers/provider-huawei" }
@@ -27,6 +28,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 rusqlite = { version = "0.32", features = ["bundled"] }
+# 插件下载(AI 抠图的模型 + ONNX Runtime 运行时库)。
+reqwest = { workspace = true }
+flate2 = "1"
+tar = "0.4"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 # 各平台原生后端:macOS Keychain / Windows Credential / Linux 内核 keyutils
 # (linux-native 为纯 Rust,不依赖 libdbus / openssl 等系统库,CI 可直接编译)。
 keyring = { version = "3", default-features = false, features = [

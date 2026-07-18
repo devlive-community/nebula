@@ -14,6 +14,7 @@ mod error;
 mod imaging;
 mod integrity;
 mod limits;
+mod matting_plugin;
 mod preview;
 mod secret;
 mod settings;
@@ -220,6 +221,8 @@ pub struct App {
     limits: TransferLimits,
     /// 图片缓存目录(渲染变体落盘);由 Tauri 层用 app_cache_dir 设置。所有克隆共享。
     cache_dir: Arc<std::sync::OnceLock<std::path::PathBuf>>,
+    /// 插件安装目录(AI 抠图的模型 + ONNX Runtime 库)。持久,不随缓存清理。
+    plugin_dir: Arc<std::sync::OnceLock<std::path::PathBuf>>,
 }
 
 impl Default for App {
@@ -230,6 +233,7 @@ impl Default for App {
             secrets: Arc::new(MemorySecrets::default()),
             limits: TransferLimits::default(),
             cache_dir: Arc::new(std::sync::OnceLock::new()),
+            plugin_dir: Arc::new(std::sync::OnceLock::new()),
         }
     }
 }
@@ -257,6 +261,7 @@ impl App {
             secrets,
             limits: TransferLimits::default(),
             cache_dir: Arc::new(std::sync::OnceLock::new()),
+            plugin_dir: Arc::new(std::sync::OnceLock::new()),
         };
         app.load_persisted()?;
         // 应用持久化的限速设置。
