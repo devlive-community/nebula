@@ -106,6 +106,11 @@ impl App {
         self.matting_dir().map(|d| d.join(dylib_name()))
     }
 
+    /// 当前平台 / 架构是否有官方预编译运行时可下载(决定是否显示「启用」)。
+    pub fn matting_supported(&self) -> bool {
+        runtime_archive().is_some()
+    }
+
     /// 插件是否已安装(模型 + 运行时库都在)。
     pub fn matting_installed(&self) -> bool {
         matches!(

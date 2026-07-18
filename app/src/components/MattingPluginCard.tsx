@@ -10,6 +10,7 @@ import { useI18n } from "../i18n";
  */
 export function MattingPluginCard() {
   const { t } = useI18n();
+  const [supported, setSupported] = useState(true);
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
@@ -20,6 +21,7 @@ export function MattingPluginCard() {
   const unlisten = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    api.mattingSupported().then(setSupported).catch(() => setSupported(true));
     api.mattingInstalled().then(setInstalled).catch(() => setInstalled(false));
     return () => unlisten.current?.();
   }, []);
@@ -72,7 +74,10 @@ export function MattingPluginCard() {
             {t("下载本地模型,一键去掉图片背景。约 20 MB,首次需下载。")}
           </div>
         </div>
-        {installed === false && !busy && (
+        {!supported && (
+          <span className="plugin-card__state">{t("本平台暂不支持")}</span>
+        )}
+        {supported && installed === false && !busy && (
           <button className="btn btn--primary" onClick={install}>
             {t("启用")}
           </button>

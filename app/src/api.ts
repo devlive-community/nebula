@@ -422,6 +422,8 @@ export const setPref = (key: string, value: string) =>
   invoke<void>("set_pref", { key, value });
 
 // AI 抠图插件(去背景)
+export const mattingSupported = () => invoke<boolean>("matting_supported");
+
 export const mattingInstalled = () => invoke<boolean>("matting_installed");
 
 export const installMattingPlugin = () =>

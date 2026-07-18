@@ -254,6 +254,7 @@ export const EN: Record<string, string> = {
     "Download a local model to cut out backgrounds. ~20 MB, downloaded once.",
   启用: "Enable",
   卸载: "Uninstall",
+  本平台暂不支持: "Not available on this platform",
   "安装完成,重启应用后生效。": "Installed — restart the app to take effect.",
   立即重启: "Restart now",
 

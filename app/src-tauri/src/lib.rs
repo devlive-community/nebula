@@ -1308,6 +1308,12 @@ async fn put_image_bytes(
         .map_err(|e| e.to_string())
 }
 
+/// 当前平台 / 架构是否支持 AI 抠图(有官方预编译运行时可下载)。
+#[tauri::command]
+fn matting_supported(state: State<'_, App>) -> bool {
+    state.matting_supported()
+}
+
 /// AI 抠图插件是否已安装。
 #[tauri::command]
 fn matting_installed(state: State<'_, App>) -> bool {
@@ -1545,6 +1551,7 @@ pub fn run() {
             image_edit_full,
             put_image_bytes,
             save_image_bytes_local,
+            matting_supported,
             matting_installed,
             install_matting_plugin,
             uninstall_matting_plugin,
