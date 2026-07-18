@@ -1,0 +1,16 @@
+[package]
+name = "nebula-matting"
+version.workspace = true
+description = "AI background removal for Nebula (ONNX Runtime via ort, loaded dynamically as an optional plugin)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+# load-dynamic:编译期不链接 ONNX Runtime,运行时按插件下载的库路径加载。
+# 默认构建 / CI 无需 ONNX Runtime 库即可编译。
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["load-dynamic", "ndarray"] }
+image = "0.25"
+thiserror = { workspace = true }
