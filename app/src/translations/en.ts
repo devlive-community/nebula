@@ -103,7 +103,10 @@ export const EN: Record<string, string> = {
   容差: "Tolerance",
   点击要去掉的区域: "Click the area to remove",
   在图上按住涂抹擦除: "Press and drag to erase",
-  // PDF 页面编辑器
+  // PDF 页面编辑器 / 阅读器
+  上一页: "Previous page",
+  下一页: "Next page",
+  "双击阅读 · 单击选择 · 拖拽重排": "Double-click to read · click to select · drag to reorder",
   向左旋转: "Rotate left",
   向右旋转: "Rotate right",
   删除选中页: "Delete selected",

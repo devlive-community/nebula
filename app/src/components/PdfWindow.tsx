@@ -9,6 +9,10 @@ import {
   faRotateRight,
   faObjectGroup,
   faCheckDouble,
+  faChevronLeft,
+  faChevronRight,
+  faMagnifyingGlassPlus,
+  faMagnifyingGlassMinus,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -65,12 +69,17 @@ export function PdfWindow({ account, path, name }: Props) {
   const [saveMenu, setSaveMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  // 阅读视图:reader 为正在阅读的页在 pages 里的下标(null = 缩略图管理视图)。
+  const [reader, setReader] = useState<number | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [readerBusy, setReaderBusy] = useState(false);
 
   // 源文档:0 = 主文档(云端 path),1.. = 合并进来的本地 PDF 字节。
   const docs = useRef<Uint8Array[]>([]);
   // pdf.js 文档句柄,与 docs 索引一一对应(渲染缩略图用)。
   const pdfDocs = useRef<pdfjs.PDFDocumentProxy[]>([]);
   const dragFrom = useRef<number | null>(null);
+  const readerCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const close = useCallback(() => void getCurrentWindow().close(), []);
 
@@ -166,6 +175,80 @@ export function PdfWindow({ account, path, name }: Props) {
     const id = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // 阅读视图:把当前页按 zoom 高清渲染到画布(旋转用 pdf.js viewport,文字清晰)。
+  useEffect(() => {
+    if (reader === null) return;
+    const item = pages[reader];
+    if (!item) return;
+    let alive = true;
+    setReaderBusy(true);
+    (async () => {
+      try {
+        const pdf = pdfDocs.current[item.doc];
+        if (!pdf) return;
+        const page = await pdf.getPage(item.page + 1);
+        const base = page.getViewport({ scale: 1, rotation: item.rotate });
+        // 适配窗口宽度(减去边距)后再乘用户 zoom;限个上限防超大页。
+        const avail = Math.min(window.innerWidth - 80, 1400);
+        const fit = Math.min(2.5, Math.max(0.4, avail / base.width));
+        const dpr = window.devicePixelRatio || 1;
+        const viewport = page.getViewport({
+          scale: fit * zoom * dpr,
+          rotation: item.rotate,
+        });
+        const canvas = readerCanvasRef.current;
+        if (!canvas || !alive) return;
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        canvas.style.width = `${Math.ceil(viewport.width / dpr)}px`;
+        canvas.style.height = `${Math.ceil(viewport.height / dpr)}px`;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+      } catch {
+        /* 渲染失败忽略 */
+      } finally {
+        if (alive) setReaderBusy(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [reader, zoom, pages]);
+
+  const openReader = (index: number) => {
+    setZoom(1);
+    setReader(index);
+  };
+  const readerNav = useCallback(
+    (delta: number) => {
+      setReader((r) => {
+        if (r === null) return r;
+        const next = r + delta;
+        if (next < 0 || next >= pages.length) return r;
+        setZoom(1);
+        return next;
+      });
+    },
+    [pages.length],
+  );
+
+  // 阅读视图键盘:方向键翻页、+/- 缩放、Esc 退出。
+  useEffect(() => {
+    if (reader === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown")
+        readerNav(1);
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp")
+        readerNav(-1);
+      else if (e.key === "+" || e.key === "=") setZoom((z) => Math.min(4, z + 0.2));
+      else if (e.key === "-") setZoom((z) => Math.max(0.4, z - 0.2));
+      else if (e.key === "Escape") setReader(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [reader, readerNav]);
 
   const toggleSelect = (id: string) => {
     setSelected((s) => {
@@ -372,7 +455,7 @@ export function PdfWindow({ account, path, name }: Props) {
           <span className="pv__hint">
             {selected.size
               ? t("已选 {n} 页 · 拖拽可重排", { n: String(selected.size) })
-              : t("点击选择 · 拖拽重排 · 旋转/删除作用于选中页")}
+              : t("双击阅读 · 单击选择 · 拖拽重排")}
           </span>
         </div>
       )}
@@ -395,6 +478,7 @@ export function PdfWindow({ account, path, name }: Props) {
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => onDrop(i)}
                   onClick={() => toggleSelect(p.id)}
+                  onDoubleClick={() => openReader(i)}
                 >
                   <div className="pv__thumb">
                     {url ? (
@@ -417,6 +501,67 @@ export function PdfWindow({ account, path, name }: Props) {
             })}
           </div>
         )}
+
+        {reader !== null && (
+          <div className="pv__reader" onClick={() => setReader(null)}>
+            <div className="pv__reader-toolbar" onClick={(e) => e.stopPropagation()}>
+              <Tooltip label={t("上一页")}>
+                <button
+                  className="pv__btn"
+                  disabled={reader <= 0}
+                  onClick={() => readerNav(-1)}
+                >
+                  <FontAwesomeIcon icon={faChevronLeft} />
+                </button>
+              </Tooltip>
+              <span className="pv__reader-pos">
+                {reader + 1} / {pages.length}
+              </span>
+              <Tooltip label={t("下一页")}>
+                <button
+                  className="pv__btn"
+                  disabled={reader >= pages.length - 1}
+                  onClick={() => readerNav(1)}
+                >
+                  <FontAwesomeIcon icon={faChevronRight} />
+                </button>
+              </Tooltip>
+              <span className="pv__reader-gap" />
+              <Tooltip label={t("缩小")}>
+                <button
+                  className="pv__btn"
+                  onClick={() => setZoom((z) => Math.max(0.4, z - 0.2))}
+                >
+                  <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
+                </button>
+              </Tooltip>
+              <span className="pv__reader-zoom">{Math.round(zoom * 100)}%</span>
+              <Tooltip label={t("放大")}>
+                <button
+                  className="pv__btn"
+                  onClick={() => setZoom((z) => Math.min(4, z + 0.2))}
+                >
+                  <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
+                </button>
+              </Tooltip>
+              <span className="pv__reader-gap" />
+              <Tooltip label={t("关闭")}>
+                <button className="pv__btn" onClick={() => setReader(null)}>
+                  <FontAwesomeIcon icon={faXmark} />
+                </button>
+              </Tooltip>
+            </div>
+            <div className="pv__reader-stage" onClick={(e) => e.stopPropagation()}>
+              {readerBusy && (
+                <div className="pv__reader-busy">
+                  <FontAwesomeIcon icon={faSpinner} spin />
+                </div>
+              )}
+              <canvas ref={readerCanvasRef} className="pv__reader-canvas" />
+            </div>
+          </div>
+        )}
+
         {toast && <div className="pv__toast">{toast}</div>}
       </div>
     </div>
