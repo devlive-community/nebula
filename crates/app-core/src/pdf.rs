@@ -3,7 +3,7 @@
 //! 前端负责 pdf.js 渲染缩略图与交互;所有结构解析 / 组装(删除 / 重排 / 旋转 / 合并 /
 //! 提取)都在 Rust 侧完成,大文件也不阻塞界面。
 
-use nebula_pdf::{Assembly, PdfInfo};
+use nebula_pdf::{Assembly, PageNumbers, PdfInfo};
 
 use crate::{App, AppError, Result};
 
@@ -72,5 +72,28 @@ impl App {
         asm: Assembly,
     ) -> Result<Vec<u8>> {
         self.pdf_assemble(account, path, sources, asm).await
+    }
+
+    /// 先按清单组装当前工作集,再加页码,写回 `dest`(`dest == path` 覆盖,否则另存)。
+    /// 这样页码与编辑器里的重排 / 删除 / 合并一致。
+    pub async fn pdf_number(
+        &self,
+        account: &str,
+        path: &str,
+        sources: Vec<Vec<u8>>,
+        asm: Assembly,
+        opts: PageNumbers,
+        dest: &str,
+    ) -> Result<()> {
+        let assembled = self.pdf_assemble(account, path, sources, asm).await?;
+        let out =
+            tokio::task::spawn_blocking(move || nebula_pdf::add_page_numbers(&assembled, &opts))
+                .await
+                .map_err(|e| AppError::Image(e.to_string()))?
+                .map_err(|e| AppError::Image(e.to_string()))?;
+        self.provider(account)?
+            .write(dest, bytes::Bytes::from(out), Some("application/pdf"))
+            .await?;
+        Ok(())
     }
 }

@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 
 use app_core::{
     AccountInfo, App, Assembly, Bookmark, EditSave, ExifInfo, FolderStats, ImageData,
-    IncompleteUpload, Integrity, Ops, Page, PdfInfo, RenamePlan, RenameRule, SearchResult,
-    Settings, StorageBreakdown, TextPreview, TransferRecord,
+    IncompleteUpload, Integrity, Ops, Page, PageNumbers, PdfInfo, RenamePlan, RenameRule,
+    SearchResult, Settings, StorageBreakdown, TextPreview, TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -1403,6 +1403,23 @@ async fn pdf_save(
         .map_err(|e| e.to_string())
 }
 
+/// 给 PDF 加页码并写回云端(`dest == path` 覆盖,否则另存)。
+#[tauri::command]
+async fn pdf_number(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    sources: Vec<Vec<u8>>,
+    asm: Assembly,
+    opts: PageNumbers,
+    dest: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.pdf_number(&account, &path, sources, asm, opts, &dest)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 组装 PDF 并写到本地文件(下载,不回云端)。
 #[tauri::command]
 async fn pdf_download(
@@ -1623,6 +1640,7 @@ pub fn run() {
             pdf_info,
             pdf_bytes,
             pdf_save,
+            pdf_number,
             pdf_download,
             remove_background,
             get_pref,

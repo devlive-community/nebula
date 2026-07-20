@@ -3195,3 +3195,74 @@ input[type="range"]:disabled {
   color: #fff;
   font-size: 22px;
 }
+
+/* 加页码对话框 */
+.pv__modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.pv__modal {
+  width: 320px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.pv__modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.pv__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.pv__field select,
+.pv__field input {
+  flex: 1;
+  max-width: 190px;
+  padding: 6px 8px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.pv__field-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 2px 0 14px;
+}
+
+.pv__modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pv__modal-actions .pv__btn {
+  width: auto;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--bg-elev-2);
+}
+
+.pv__modal-actions .pv__btn--primary {
+  background: var(--primary);
+  color: #fff;
+}

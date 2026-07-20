@@ -447,6 +447,15 @@ export const pdfDownload = (
   dest: string,
 ) => invoke<void>("pdf_download", { account, path, sources, asm, dest });
 
+export const pdfNumber = (
+  account: string,
+  path: string,
+  sources: number[][],
+  asm: import("./types").PdfAssembly,
+  opts: import("./types").PdfPageNumbers,
+  dest: string,
+) => invoke<void>("pdf_number", { account, path, sources, asm, opts, dest });
+
 // AI 抠图插件(去背景)
 export const mattingSupported = () => invoke<boolean>("matting_supported");
 

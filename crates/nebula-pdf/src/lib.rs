@@ -65,6 +65,33 @@ pub struct Assembly {
     pub pages: Vec<PageSpec>,
 }
 
+/// 页码 / 页眉页脚数字的摆放位置(相对页面可见方向)。
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NumberPos {
+    TopLeft,
+    TopCenter,
+    TopRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+}
+
+/// 加页码的参数。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PageNumbers {
+    /// 起始编号(第一页显示的数字)。
+    pub start: i64,
+    pub position: NumberPos,
+    /// 字号(pt)。
+    pub size: f32,
+    /// 到页边的距离(pt)。
+    pub margin: f32,
+    /// 格式串,`{n}` 替换为页码;默认 `{n}`。
+    #[serde(default)]
+    pub format: String,
+}
+
 /// 读取 PDF 的页面概览(页数、每页尺寸与旋转)。
 pub fn info(bytes: &[u8]) -> Result<PdfInfo> {
     let doc = Document::load_mem(bytes)?;
@@ -206,6 +233,158 @@ pub fn assemble(docs: &[&[u8]], asm: &Assembly) -> Result<Vec<u8>> {
     out.save_to(&mut buf)
         .map_err(|e| PdfError::Save(e.to_string()))?;
     Ok(buf)
+}
+
+/// 给每页叠加页码(Helvetica 标准字体,无需嵌入)。返回新 PDF 字节。
+///
+/// 处理:页面 `/Rotate` 旋转(数字始终按可见方向正立)、内容流图形状态隔离
+/// (用 q/Q 包裹,不受原内容残留状态影响)、`/Resources` 继承的固化。
+pub fn add_page_numbers(bytes: &[u8], opts: &PageNumbers) -> Result<Vec<u8>> {
+    let mut doc = Document::load_mem(bytes)?;
+    let size = if opts.size > 0.0 { opts.size } else { 12.0 };
+    let margin = if opts.margin > 0.0 { opts.margin } else { 24.0 };
+    let fmt = if opts.format.is_empty() {
+        "{n}"
+    } else {
+        opts.format.as_str()
+    };
+
+    // 一个共享的标准字体对象。
+    let mut font = Dictionary::new();
+    font.set("Type", Object::Name(b"Font".to_vec()));
+    font.set("Subtype", Object::Name(b"Type1".to_vec()));
+    font.set("BaseFont", Object::Name(b"Helvetica".to_vec()));
+    let font_id = doc.add_object(Object::Dictionary(font));
+
+    let page_ids: Vec<ObjectId> = doc.get_pages().into_values().collect();
+    for (i, page_id) in page_ids.iter().enumerate() {
+        let num = opts.start + i as i64;
+        let text = fmt.replace("{n}", &num.to_string());
+
+        let (w, h) = page_size(&doc, *page_id).unwrap_or((595.0, 842.0));
+        let rotate = page_rotation(&doc, *page_id);
+        // 旋转后可见尺寸:90/270 时宽高互换。
+        let (vis_w, vis_h) = if rotate == 90 || rotate == 270 {
+            (h, w)
+        } else {
+            (w, h)
+        };
+        // Helvetica 平均字宽约 0.5em,估算文本宽度用于居中 / 右对齐。
+        let text_w = text.chars().count() as f32 * size * 0.5;
+        let (top, right, center) = pos_flags(opts.position);
+        let x = if center {
+            (vis_w - text_w) / 2.0
+        } else if right {
+            vis_w - margin - text_w
+        } else {
+            margin
+        };
+        let y = if top { vis_h - margin - size } else { margin };
+
+        let cm = rotation_cm(rotate, w, h);
+        let esc = escape_pdf_text(&text);
+        let content = format!(
+            "Q q {cm} BT /Fnb {size} Tf {x:.2} {y:.2} Td ({esc}) Tj ET Q",
+            cm = cm,
+            size = size,
+            x = x,
+            y = y,
+            esc = esc,
+        );
+        let lead_id = doc.add_object(lopdf::Stream::new(Dictionary::new(), b"q".to_vec()));
+        let tail_id = doc.add_object(lopdf::Stream::new(Dictionary::new(), content.into_bytes()));
+
+        append_contents(&mut doc, *page_id, lead_id, tail_id);
+        ensure_font(&mut doc, *page_id, font_id);
+    }
+
+    let mut buf = Vec::new();
+    doc.save_to(&mut buf)
+        .map_err(|e| PdfError::Save(e.to_string()))?;
+    Ok(buf)
+}
+
+/// (top, right, center) 布尔标志。
+fn pos_flags(p: NumberPos) -> (bool, bool, bool) {
+    use NumberPos::*;
+    match p {
+        TopLeft => (true, false, false),
+        TopCenter => (true, false, true),
+        TopRight => (true, true, false),
+        BottomLeft => (false, false, false),
+        BottomCenter => (false, false, true),
+        BottomRight => (false, true, false),
+    }
+}
+
+/// 把「可见方向坐标」映射回页面基坐标的 CTM(cm 操作符串,含末尾空格)。
+fn rotation_cm(rotate: i64, w: f32, h: f32) -> String {
+    match rotate {
+        90 => format!("0 1 -1 0 {w} 0 cm ", w = w),
+        180 => format!("-1 0 0 -1 {w} {h} cm ", w = w, h = h),
+        270 => format!("0 -1 1 0 0 {h} cm ", h = h),
+        _ => String::new(),
+    }
+}
+
+/// PDF 字面字符串转义:`\`、`(`、`)`。
+fn escape_pdf_text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '(' => out.push_str("\\("),
+            ')' => out.push_str("\\)"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// 把「前置 q」与「叠加文字」两个流并入页面 /Contents(包裹隔离原内容状态)。
+fn append_contents(doc: &mut Document, page_id: ObjectId, lead: ObjectId, tail: ObjectId) {
+    let existing: Vec<Object> = match doc
+        .get_object(page_id)
+        .ok()
+        .and_then(|o| o.as_dict().ok())
+        .and_then(|d| d.get(b"Contents").ok())
+    {
+        Some(Object::Reference(r)) => vec![Object::Reference(*r)],
+        Some(Object::Array(a)) => a.clone(),
+        _ => Vec::new(),
+    };
+    let mut kids = Vec::with_capacity(existing.len() + 2);
+    kids.push(Object::Reference(lead));
+    kids.extend(existing);
+    kids.push(Object::Reference(tail));
+    if let Ok(dict) = doc.get_object_mut(page_id).and_then(|o| o.as_dict_mut()) {
+        dict.set("Contents", Object::Array(kids));
+    }
+}
+
+/// 确保页面 /Resources 里有我们的字体 /Fnb(固化继承的 Resources,避免污染共享对象)。
+fn ensure_font(doc: &mut Document, page_id: ObjectId, font_id: ObjectId) {
+    // 取本页有效的 Resources(inline / 引用 / 继承),克隆成独立字典。
+    let mut res = match inherited(doc, page_id, b"Resources") {
+        Some(Object::Dictionary(d)) => d,
+        _ => Dictionary::new(),
+    };
+    // 取或建 /Font 子字典(可能是引用)。
+    let mut fonts = match res.get(b"Font") {
+        Ok(Object::Dictionary(d)) => d.clone(),
+        Ok(Object::Reference(r)) => doc
+            .get_object(*r)
+            .ok()
+            .and_then(|o| o.as_dict().ok())
+            .cloned()
+            .unwrap_or_default(),
+        _ => Dictionary::new(),
+    };
+    fonts.set("Fnb", Object::Reference(font_id));
+    res.set("Font", Object::Dictionary(fonts));
+    if let Ok(dict) = doc.get_object_mut(page_id).and_then(|o| o.as_dict_mut()) {
+        dict.set("Resources", Object::Dictionary(res));
+    }
 }
 
 /// 把挂在祖先 Pages 节点上的可继承属性(MediaBox / CropBox / Resources / Rotate)
@@ -360,5 +539,25 @@ mod tests {
             assemble(&[&pdf], &Assembly { pages: vec![] }),
             Err(PdfError::Empty)
         ));
+    }
+
+    #[test]
+    fn page_numbers_produce_valid_pdf() {
+        let pdf = make_pdf(&[(300, 400), (300, 400), (300, 400)]);
+        let opts = PageNumbers {
+            start: 1,
+            position: NumberPos::BottomCenter,
+            size: 12.0,
+            margin: 24.0,
+            format: "第 {n} 页".into(),
+        };
+        let out = add_page_numbers(&pdf, &opts).unwrap();
+        // 仍是有效 PDF、页数不变、尺寸不变。
+        let got = info(&out).unwrap();
+        assert_eq!(got.pages.len(), 3);
+        assert_eq!(got.pages[0].width as i64, 300);
+        // 输出应包含我们写入的字体基名与文本绘制操作符。
+        let s = String::from_utf8_lossy(&out);
+        assert!(s.contains("Helvetica"));
     }
 }

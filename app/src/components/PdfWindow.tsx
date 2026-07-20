@@ -14,6 +14,7 @@ import {
   faChevronRight,
   faMagnifyingGlassPlus,
   faMagnifyingGlassMinus,
+  faListOl,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -22,7 +23,7 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { Tooltip } from "./Tooltip";
-import type { PdfAssembly } from "../types";
+import type { PdfAssembly, PdfNumberPos, PdfPageNumbers } from "../types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -74,6 +75,12 @@ export function PdfWindow({ account, path, name }: Props) {
   const [reader, setReader] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [readerBusy, setReaderBusy] = useState(false);
+  // 加页码对话框。
+  const [numOpen, setNumOpen] = useState(false);
+  const [numPos, setNumPos] = useState<PdfNumberPos>("bottom_center");
+  const [numStart, setNumStart] = useState(1);
+  const [numFormat, setNumFormat] = useState("{n}");
+  const [numSize, setNumSize] = useState(12);
 
   // 源文档:0 = 主文档(云端 path),1.. = 合并进来的本地 PDF 字节。
   const docs = useRef<Uint8Array[]>([]);
@@ -368,6 +375,29 @@ export function PdfWindow({ account, path, name }: Props) {
     setSaving(false);
   };
 
+  // 加页码:先组装当前工作集,再叠页码,另存为新对象。
+  const applyNumbers = async () => {
+    if (!pages.length) return;
+    setNumOpen(false);
+    setSaving(true);
+    const opts: PdfPageNumbers = {
+      start: numStart,
+      position: numPos,
+      size: numSize,
+      margin: 24,
+      format: numFormat || "{n}",
+    };
+    const dot = path.lastIndexOf(".");
+    const dest = `${dot > 0 ? path.slice(0, dot) : path}-numbered.pdf`;
+    try {
+      await api.pdfNumber(account, path, sourceBytes(), buildAssembly(), opts, dest);
+      setToast(t("✓ 已加页码,另存为 {name}", { name: baseName(dest) }));
+    } catch (e) {
+      setToast(t("保存失败:{msg}", { msg: String(e) }));
+    }
+    setSaving(false);
+  };
+
   const save = async (overwrite: boolean) => {
     setSaveMenu(false);
     if (!pages.length) {
@@ -487,6 +517,11 @@ export function PdfWindow({ account, path, name }: Props) {
               <FontAwesomeIcon icon={faObjectGroup} />
             </button>
           </Tooltip>
+          <Tooltip label={t("加页码")}>
+            <button className="pv__tbtn" onClick={() => setNumOpen(true)}>
+              <FontAwesomeIcon icon={faListOl} />
+            </button>
+          </Tooltip>
           <div className="pv__spacer" />
           <span className="pv__hint">
             {selected.size
@@ -594,6 +629,67 @@ export function PdfWindow({ account, path, name }: Props) {
                 </div>
               )}
               <canvas ref={readerCanvasRef} className="pv__reader-canvas" />
+            </div>
+          </div>
+        )}
+
+        {numOpen && (
+          <div className="pv__modal-back" onClick={() => setNumOpen(false)}>
+            <div className="pv__modal" onClick={(e) => e.stopPropagation()}>
+              <div className="pv__modal-title">{t("加页码")}</div>
+              <label className="pv__field">
+                <span>{t("位置")}</span>
+                <select
+                  value={numPos}
+                  onChange={(e) => setNumPos(e.target.value as PdfNumberPos)}
+                >
+                  <option value="bottom_center">{t("底部居中")}</option>
+                  <option value="bottom_right">{t("底部右")}</option>
+                  <option value="bottom_left">{t("底部左")}</option>
+                  <option value="top_center">{t("顶部居中")}</option>
+                  <option value="top_right">{t("顶部右")}</option>
+                  <option value="top_left">{t("顶部左")}</option>
+                </select>
+              </label>
+              <label className="pv__field">
+                <span>{t("起始编号")}</span>
+                <input
+                  type="number"
+                  value={numStart}
+                  onChange={(e) => setNumStart(Number(e.target.value))}
+                />
+              </label>
+              <label className="pv__field">
+                <span>{t("字号")}</span>
+                <input
+                  type="number"
+                  min={6}
+                  max={72}
+                  value={numSize}
+                  onChange={(e) => setNumSize(Number(e.target.value))}
+                />
+              </label>
+              <label className="pv__field">
+                <span>{t("格式")}</span>
+                <input
+                  type="text"
+                  value={numFormat}
+                  placeholder="{n}"
+                  onChange={(e) => setNumFormat(e.target.value)}
+                />
+              </label>
+              <div className="pv__field-hint">{t("{n} 代表页码,如「第 {n} 页」")}</div>
+              <div className="pv__modal-actions">
+                <button className="pv__btn" onClick={() => setNumOpen(false)}>
+                  {t("取消")}
+                </button>
+                <button
+                  className="pv__btn pv__btn--primary"
+                  onClick={applyNumbers}
+                >
+                  {t("生成新文件")}
+                </button>
+              </div>
             </div>
           </div>
         )}

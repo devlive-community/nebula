@@ -80,6 +80,24 @@ export interface PdfAssembly {
   pages: PdfPageSpec[];
 }
 
+/** 页码位置(与 nebula_pdf::NumberPos 对应,snake_case)。 */
+export type PdfNumberPos =
+  | "top_left"
+  | "top_center"
+  | "top_right"
+  | "bottom_left"
+  | "bottom_center"
+  | "bottom_right";
+
+/** 加页码参数(与 nebula_pdf::PageNumbers 对应)。 */
+export interface PdfPageNumbers {
+  start: number;
+  position: PdfNumberPos;
+  size: number;
+  margin: number;
+  format: string;
+}
+
 /** 图片编辑操作(与 app_core::Ops 对应)。几何操作先应用,再颜色调整。 */
 export interface ImageOps {
   crop?: { x: number; y: number; width: number; height: number } | null;
