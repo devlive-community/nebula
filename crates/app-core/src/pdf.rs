@@ -22,6 +22,15 @@ impl App {
         Ok(self.provider(account)?.read(path).await?.to_vec())
     }
 
+    /// 抽取 PDF 每页纯文本(用于复制 / 导出 txt)。
+    pub async fn pdf_text(&self, account: &str, path: &str) -> Result<Vec<String>> {
+        let bytes = self.provider(account)?.read(path).await?.to_vec();
+        tokio::task::spawn_blocking(move || nebula_pdf::extract_text(&bytes))
+            .await
+            .map_err(|e| AppError::Image(e.to_string()))?
+            .map_err(|e| AppError::Image(e.to_string()))
+    }
+
     /// 读入主文档 + 合并源,按清单组装,返回输出字节。
     ///
     /// `sources` 是除主文档外要合并进来的其它 PDF 的**原始字节**(与 `Assembly::pages`

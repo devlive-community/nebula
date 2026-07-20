@@ -431,6 +431,9 @@ export const pdfInfo = (account: string, path: string) =>
 export const pdfBytes = (account: string, path: string) =>
   invoke<number[]>("pdf_bytes", { account, path });
 
+export const pdfText = (account: string, path: string) =>
+  invoke<string[]>("pdf_text", { account, path });
+
 export const pdfSave = (
   account: string,
   path: string,

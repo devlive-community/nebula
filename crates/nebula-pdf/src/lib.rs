@@ -111,6 +111,22 @@ pub struct Watermark {
     pub tile: bool,
 }
 
+/// 抽取整份 PDF 的纯文本,按页返回(下标即 0 起页序;无文字层的页为空串)。
+///
+/// 注意:扫描件(纯图片)没有文字层,抽出来会是空的——这属正常。
+pub fn extract_text(bytes: &[u8]) -> Result<Vec<String>> {
+    let doc = Document::load_mem(bytes)?;
+    // get_pages() 的键是 1 起页码;按页码升序逐页抽取。
+    let mut nums: Vec<u32> = doc.get_pages().into_keys().collect();
+    nums.sort_unstable();
+    let mut out = Vec::with_capacity(nums.len());
+    for n in nums {
+        let text = doc.extract_text(&[n]).unwrap_or_default();
+        out.push(text.trim().to_string());
+    }
+    Ok(out)
+}
+
 /// 读取 PDF 的页面概览(页数、每页尺寸与旋转)。
 pub fn info(bytes: &[u8]) -> Result<PdfInfo> {
     let doc = Document::load_mem(bytes)?;
@@ -704,6 +720,15 @@ mod tests {
         assert_eq!(got.pages[0].width as i64, 400);
         let s = String::from_utf8_lossy(&out);
         assert!(s.contains("ExtGState"));
+    }
+
+    #[test]
+    fn extract_text_returns_one_entry_per_page() {
+        // make_pdf 的页无文字层,应得到与页数一致的空串向量。
+        let pdf = make_pdf(&[(200, 300), (200, 300), (200, 300)]);
+        let pages = extract_text(&pdf).unwrap();
+        assert_eq!(pages.len(), 3);
+        assert!(pages.iter().all(|p| p.is_empty()));
     }
 
     #[test]

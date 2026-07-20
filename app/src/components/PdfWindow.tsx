@@ -16,6 +16,9 @@ import {
   faMagnifyingGlassMinus,
   faListOl,
   faStamp,
+  faFileLines,
+  faCopy,
+  faDownload,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -94,6 +97,9 @@ export function PdfWindow({ account, path, name }: Props) {
   const [wmAngle, setWmAngle] = useState(45);
   const [wmSize, setWmSize] = useState(48);
   const [wmTile, setWmTile] = useState(true);
+  // 文本提取面板。
+  const [textPages, setTextPages] = useState<string[] | null>(null);
+  const [textBusy, setTextBusy] = useState(false);
 
   // 源文档:0 = 主文档(云端 path),1.. = 合并进来的本地 PDF 字节。
   const docs = useRef<Uint8Array[]>([]);
@@ -438,6 +444,48 @@ export function PdfWindow({ account, path, name }: Props) {
     setSaving(false);
   };
 
+  // 提取文本(作用于云端原文档)。
+  const extractText = async () => {
+    setTextBusy(true);
+    setTextPages([]);
+    try {
+      const t2 = await api.pdfText(account, path);
+      setTextPages(t2);
+    } catch (e) {
+      setTextPages(null);
+      setToast(t("提取文本失败:{msg}", { msg: String(e) }));
+    }
+    setTextBusy(false);
+  };
+  const joinedText = () =>
+    (textPages ?? [])
+      .map((tx, i) => `— ${t("第 {n} 页", { n: String(i + 1) })} —\n${tx}`)
+      .join("\n\n");
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(joinedText());
+      setToast(t("✓ 已复制全部文本"));
+    } catch {
+      setToast(t("复制失败"));
+    }
+  };
+  const exportText = async () => {
+    const dot = path.lastIndexOf(".");
+    const suggested = `${baseName(dot > 0 ? path.slice(0, dot) : path)}.txt`;
+    const dest = await saveDialog({
+      defaultPath: suggested,
+      filters: [{ name: "Text", extensions: ["txt"] }],
+    });
+    if (typeof dest !== "string") return;
+    try {
+      const bytes = Array.from(new TextEncoder().encode(joinedText()));
+      await api.saveImageBytesLocal(dest, bytes);
+      setToast(t("✓ 已导出到本地"));
+    } catch (e) {
+      setToast(t("保存失败:{msg}", { msg: String(e) }));
+    }
+  };
+
   const save = async (overwrite: boolean) => {
     setSaveMenu(false);
     if (!pages.length) {
@@ -565,6 +613,11 @@ export function PdfWindow({ account, path, name }: Props) {
           <Tooltip label={t("加水印")}>
             <button className="pv__tbtn" onClick={() => setWmOpen(true)}>
               <FontAwesomeIcon icon={faStamp} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("提取文本")}>
+            <button className="pv__tbtn" onClick={extractText}>
+              <FontAwesomeIcon icon={faFileLines} />
             </button>
           </Tooltip>
           <div className="pv__spacer" />
@@ -801,6 +854,48 @@ export function PdfWindow({ account, path, name }: Props) {
                   {t("生成新文件")}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {textPages !== null && (
+          <div className="pv__textpanel">
+            <div className="pv__textbar">
+              <span className="pv__texttitle">{t("提取文本")}</span>
+              <div className="pv__spacer" />
+              <Tooltip label={t("复制全部")}>
+                <button className="pv__btn" onClick={copyText} disabled={textBusy}>
+                  <FontAwesomeIcon icon={faCopy} />
+                </button>
+              </Tooltip>
+              <Tooltip label={t("导出 txt")}>
+                <button className="pv__btn" onClick={exportText} disabled={textBusy}>
+                  <FontAwesomeIcon icon={faDownload} />
+                </button>
+              </Tooltip>
+              <Tooltip label={t("关闭")}>
+                <button className="pv__btn" onClick={() => setTextPages(null)}>
+                  <FontAwesomeIcon icon={faXmark} />
+                </button>
+              </Tooltip>
+            </div>
+            <div className="pv__textbody">
+              {textBusy && (
+                <div className="pv__textbusy">
+                  <FontAwesomeIcon icon={faSpinner} spin /> {t("提取中…")}
+                </div>
+              )}
+              {!textBusy &&
+                textPages.map((tx, i) => (
+                  <div key={i} className="pv__textpage">
+                    <div className="pv__textpageno">
+                      {t("第 {n} 页", { n: String(i + 1) })}
+                    </div>
+                    <pre className="pv__textcontent">
+                      {tx || t("(本页无文字层)")}
+                    </pre>
+                  </div>
+                ))}
             </div>
           </div>
         )}

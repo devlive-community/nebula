@@ -1403,6 +1403,19 @@ async fn pdf_save(
         .map_err(|e| e.to_string())
 }
 
+/// 抽取 PDF 每页纯文本。
+#[tauri::command]
+async fn pdf_text(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<Vec<String>, String> {
+    let app = state.inner().clone();
+    app.pdf_text(&account, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 给 PDF 加页码并写回云端(`dest == path` 覆盖,否则另存)。
 #[tauri::command]
 async fn pdf_number(
@@ -1656,6 +1669,7 @@ pub fn run() {
             read_file_bytes,
             pdf_info,
             pdf_bytes,
+            pdf_text,
             pdf_save,
             pdf_number,
             pdf_watermark,
