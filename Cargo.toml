@@ -37,6 +37,9 @@ members = [
     # AI 抠图(去背景),ort 运行时动态加载,作为可选插件
     "crates/nebula-matting",
 
+    # PDF 页面操作(纯 Rust lopdf,无原生依赖)
+    "crates/nebula-pdf",
+
     # App 业务逻辑(框架无关,App 私有)
     "crates/app-core",
 

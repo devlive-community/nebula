@@ -7,9 +7,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, Bookmark, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload,
-    Integrity, Ops, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown,
-    TextPreview, TransferRecord,
+    AccountInfo, App, Assembly, Bookmark, EditSave, ExifInfo, FolderStats, ImageData,
+    IncompleteUpload, Integrity, Ops, Page, PdfInfo, RenamePlan, RenameRule, SearchResult,
+    Settings, StorageBreakdown, TextPreview, TransferRecord,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -1359,6 +1359,64 @@ async fn save_image_bytes_local(dest: String, bytes: Vec<u8>) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
+/// 读取 PDF 页面概览(页数 / 每页尺寸 / 旋转)。
+#[tauri::command]
+async fn pdf_info(state: State<'_, App>, account: String, path: String) -> Result<PdfInfo, String> {
+    let app = state.inner().clone();
+    app.pdf_info(&account, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 取 PDF 原始字节(前端 pdf.js 渲染缩略图 / 预览)。
+#[tauri::command]
+async fn pdf_bytes(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<Vec<u8>, String> {
+    let app = state.inner().clone();
+    app.pdf_bytes(&account, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 按清单组装 PDF 并写回云端(`dest == path` 覆盖,否则另存)。
+#[tauri::command]
+async fn pdf_save(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    sources: Vec<String>,
+    asm: Assembly,
+    dest: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.pdf_save(&account, &path, sources, asm, &dest)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 组装 PDF 并写到本地文件(下载,不回云端)。
+#[tauri::command]
+async fn pdf_download(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    sources: Vec<String>,
+    asm: Assembly,
+    dest: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    let bytes = app
+        .pdf_assemble_bytes(&account, &path, sources, asm)
+        .await
+        .map_err(|e| e.to_string())?;
+    tokio::fs::write(&dest, bytes)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 把编辑结果编码后保存到本地文件(`save.dest` 为本地路径,不回云端)。
 #[tauri::command]
 async fn image_edit_download(
@@ -1555,6 +1613,10 @@ pub fn run() {
             matting_installed,
             install_matting_plugin,
             uninstall_matting_plugin,
+            pdf_info,
+            pdf_bytes,
+            pdf_save,
+            pdf_download,
             remove_background,
             get_pref,
             set_pref,

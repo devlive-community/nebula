@@ -1,0 +1,15 @@
+[package]
+name = "nebula-pdf"
+version.workspace = true
+description = "Pure-Rust PDF page operations for Nebula's editor: info / reorder / delete / rotate / merge / extract (no native deps)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+# 纯 Rust PDF 解析 / 改写,无 C / 原生依赖,CI 可直接编译。
+lopdf = "0.44"
+serde = { workspace = true }
+thiserror = { workspace = true }

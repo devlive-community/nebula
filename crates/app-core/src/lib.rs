@@ -15,6 +15,7 @@ mod imaging;
 mod integrity;
 mod limits;
 mod matting_plugin;
+mod pdf;
 mod preview;
 mod secret;
 mod settings;
@@ -39,6 +40,7 @@ pub use error::{AppError, Result};
 pub use imaging::{CropRect, EditSave, ExifInfo, ImageData, Ops};
 pub use integrity::{verify_bytes, Integrity};
 pub use limits::TransferLimits;
+pub use nebula_pdf::{Assembly, PageInfo, PageSpec, PdfInfo};
 pub use nebula_provider::{
     ByteStream, Capabilities, EntryKind, IncompleteUpload, Page, ProgressFn,
 };

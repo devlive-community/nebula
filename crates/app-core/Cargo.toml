@@ -13,6 +13,7 @@ cloud-core = { path = "../cloud-core" }
 nebula-provider = { path = "../nebula-provider" }
 nebula-image = { path = "../nebula-image" }
 nebula-matting = { path = "../nebula-matting" }
+nebula-pdf = { path = "../nebula-pdf" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
 provider-tencent = { path = "../providers/provider-tencent" }
 provider-huawei = { path = "../providers/provider-huawei" }
