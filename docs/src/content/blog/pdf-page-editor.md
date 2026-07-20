@@ -154,6 +154,33 @@ pub fn extract_text(bytes: &[u8]) -> Result<Vec<String>> {
 
 要真正读出扫描件的文字得上 OCR(光学字符识别),那是另一条重得多的路(需要模型 + 渲染成图),不在这个纯 lopdf 的轻量功能范围里。
 
+## 压缩瘦身:省的是云存储费
+
+作为对象存储管理器,PDF 体积直接对应**存储与流量费**。很多 PDF 其实很「胖」:内容流没压缩、编辑历史留下一堆没人引用的孤儿对象、交叉引用表是老式明文。lopdf 能一次收拾干净:
+
+```rust
+pub fn compress(bytes: &[u8]) -> Result<(Vec<u8>, usize, usize)> {
+    let mut doc = Document::load_mem(bytes)?;
+    // 1) 压缩所有尚未带 Filter 的流(FlateDecode)
+    for (_id, obj) in doc.objects.iter_mut() {
+        if let Object::Stream(s) = obj { let _ = s.compress(); }
+    }
+    // 2) 剪掉没被引用的孤儿对象
+    doc.prune_objects();
+    doc.renumber_objects();
+    // 3) 用对象流 + 交叉引用流保存,把大量小对象打包压缩
+    let opts = SaveOptions::builder()
+        .use_object_streams(true).use_xref_streams(true)
+        .compression_level(9).build();
+    doc.save_with_options(&mut buf, opts)?;
+    ...
+}
+```
+
+三招叠加:**流压缩**减小内容体积、**剪枝**去掉冗余对象、**对象流 / 交叉引用流**(PDF 1.5+ 特性)把成百上千个小间接对象打包进一个压缩流,省掉每个对象的头尾开销。
+
+一个诚实的兜底:对**已经高度优化**的 PDF,加对象流的固定开销可能反而让文件变大。所以我们比较瘦身结果与普通保存,**取较小者**;若压不动就如实告诉用户「已是最优」,并把压缩前后的体积对比显示出来,省了多少一目了然。
+
 ## 数据流小结
 
 ```

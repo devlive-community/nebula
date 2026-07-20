@@ -19,6 +19,7 @@ import {
   faFileLines,
   faCopy,
   faDownload,
+  faCompress,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -26,6 +27,7 @@ import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import * as api from "../api";
 import { useI18n } from "../i18n";
+import { formatBytes } from "../util";
 import { Tooltip } from "./Tooltip";
 import type {
   PdfAssembly,
@@ -444,6 +446,30 @@ export function PdfWindow({ account, path, name }: Props) {
     setSaving(false);
   };
 
+  // 压缩瘦身(作用于云端原文档,另存为新对象)。
+  const compress = async () => {
+    setSaving(true);
+    const dot = path.lastIndexOf(".");
+    const dest = `${dot > 0 ? path.slice(0, dot) : path}-compressed.pdf`;
+    try {
+      const [orig, next] = await api.pdfCompress(account, path, dest);
+      const saved = orig - next;
+      const pct = orig > 0 ? Math.round((saved / orig) * 100) : 0;
+      setToast(
+        saved > 0
+          ? t("✓ 已压缩:{a} → {b}(省 {p}%)", {
+              a: formatBytes(orig),
+              b: formatBytes(next),
+              p: String(pct),
+            })
+          : t("已是最优,无可压缩空间"),
+      );
+    } catch (e) {
+      setToast(t("保存失败:{msg}", { msg: String(e) }));
+    }
+    setSaving(false);
+  };
+
   // 提取文本(作用于云端原文档)。
   const extractText = async () => {
     setTextBusy(true);
@@ -618,6 +644,11 @@ export function PdfWindow({ account, path, name }: Props) {
           <Tooltip label={t("提取文本")}>
             <button className="pv__tbtn" onClick={extractText}>
               <FontAwesomeIcon icon={faFileLines} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("压缩瘦身")}>
+            <button className="pv__tbtn" disabled={saving} onClick={compress}>
+              <FontAwesomeIcon icon={faCompress} />
             </button>
           </Tooltip>
           <div className="pv__spacer" />

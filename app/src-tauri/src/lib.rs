@@ -1416,6 +1416,20 @@ async fn pdf_text(
         .map_err(|e| e.to_string())
 }
 
+/// 压缩瘦身 PDF 并写回云端;返回 `[原大小, 新大小]` 字节数。
+#[tauri::command]
+async fn pdf_compress(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    dest: String,
+) -> Result<(usize, usize), String> {
+    let app = state.inner().clone();
+    app.pdf_compress(&account, &path, &dest)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 给 PDF 加页码并写回云端(`dest == path` 覆盖,否则另存)。
 #[tauri::command]
 async fn pdf_number(
@@ -1670,6 +1684,7 @@ pub fn run() {
             pdf_info,
             pdf_bytes,
             pdf_text,
+            pdf_compress,
             pdf_save,
             pdf_number,
             pdf_watermark,

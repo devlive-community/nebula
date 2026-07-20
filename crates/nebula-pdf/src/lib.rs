@@ -127,6 +127,44 @@ pub fn extract_text(bytes: &[u8]) -> Result<Vec<String>> {
     Ok(out)
 }
 
+/// 压缩瘦身:压缩所有未压缩的流、剪除未被引用的对象,并用对象流 + 交叉引用流保存。
+///
+/// 返回 `(新字节, 原大小, 新大小)`。对已高度压缩的 PDF 收益有限,属正常。
+pub fn compress(bytes: &[u8]) -> Result<(Vec<u8>, usize, usize)> {
+    let orig = bytes.len();
+    let mut doc = Document::load_mem(bytes)?;
+
+    // 1) 逐个压缩尚未带 Filter 的流(内容流 / 图片等)。
+    for (_id, obj) in doc.objects.iter_mut() {
+        if let Object::Stream(stream) = obj {
+            let _ = stream.compress();
+        }
+    }
+    // 2) 剪除没有被引用到的孤儿对象。
+    doc.prune_objects();
+    doc.renumber_objects();
+
+    // 3) 用对象流 + 交叉引用流(PDF 1.5+)保存,把大量小对象打包压缩。
+    let options = lopdf::SaveOptions::builder()
+        .use_object_streams(true)
+        .use_xref_streams(true)
+        .compression_level(9)
+        .build();
+    let mut buf = Vec::new();
+    doc.save_with_options(&mut buf, options)
+        .map_err(|e| PdfError::Save(e.to_string()))?;
+
+    // 若「瘦身」反而更大(小文件加对象流开销),退回普通保存取较小者。
+    if buf.len() >= orig {
+        let mut plain = Vec::new();
+        if doc.save_to(&mut plain).is_ok() && plain.len() < buf.len() {
+            buf = plain;
+        }
+    }
+    let new = buf.len();
+    Ok((buf, orig, new))
+}
+
 /// 读取 PDF 的页面概览(页数、每页尺寸与旋转)。
 pub fn info(bytes: &[u8]) -> Result<PdfInfo> {
     let doc = Document::load_mem(bytes)?;
@@ -720,6 +758,18 @@ mod tests {
         assert_eq!(got.pages[0].width as i64, 400);
         let s = String::from_utf8_lossy(&out);
         assert!(s.contains("ExtGState"));
+    }
+
+    #[test]
+    fn compress_keeps_pages_and_reports_sizes() {
+        let pdf = make_pdf(&[(300, 400), (300, 400)]);
+        let (out, orig, new) = compress(&pdf).unwrap();
+        assert_eq!(orig, pdf.len());
+        assert_eq!(new, out.len());
+        // 压缩后仍是有效 PDF、页数不变。
+        let got = info(&out).unwrap();
+        assert_eq!(got.pages.len(), 2);
+        assert_eq!(got.pages[0].width as i64, 300);
     }
 
     #[test]

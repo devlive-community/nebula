@@ -434,6 +434,10 @@ export const pdfBytes = (account: string, path: string) =>
 export const pdfText = (account: string, path: string) =>
   invoke<string[]>("pdf_text", { account, path });
 
+/** 压缩瘦身,返回 [原大小, 新大小] 字节数。 */
+export const pdfCompress = (account: string, path: string, dest: string) =>
+  invoke<[number, number]>("pdf_compress", { account, path, dest });
+
 export const pdfSave = (
   account: string,
   path: string,

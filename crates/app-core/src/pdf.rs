@@ -31,6 +31,24 @@ impl App {
             .map_err(|e| AppError::Image(e.to_string()))
     }
 
+    /// 压缩瘦身 PDF,写回 `dest`,返回 `(原大小, 新大小)` 字节数。
+    pub async fn pdf_compress(
+        &self,
+        account: &str,
+        path: &str,
+        dest: &str,
+    ) -> Result<(usize, usize)> {
+        let bytes = self.provider(account)?.read(path).await?.to_vec();
+        let (out, orig, new) = tokio::task::spawn_blocking(move || nebula_pdf::compress(&bytes))
+            .await
+            .map_err(|e| AppError::Image(e.to_string()))?
+            .map_err(|e| AppError::Image(e.to_string()))?;
+        self.provider(account)?
+            .write(dest, bytes::Bytes::from(out), Some("application/pdf"))
+            .await?;
+        Ok((orig, new))
+    }
+
     /// 读入主文档 + 合并源,按清单组装,返回输出字节。
     ///
     /// `sources` 是除主文档外要合并进来的其它 PDF 的**原始字节**(与 `Assembly::pages`
