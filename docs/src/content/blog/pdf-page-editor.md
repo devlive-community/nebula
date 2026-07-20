@@ -135,6 +135,25 @@ fn ensure_resource(doc, page_id, category, key, id) {
 
 值得一提:**这两个功能都作用于「组装后的当前工作集」**,而不是云端原文件——即先跑一遍 `assemble`(你在编辑器里的重排 / 删除 / 合并结果),再往上叠页码 / 水印。所见即所得。
 
+## 提取文本:把文字层抠出来
+
+PDF 不只是像素,大多数(非扫描件)带一层**可提取的文字**。lopdf 的 `extract_text` 能按页把它抠出来:
+
+```rust
+pub fn extract_text(bytes: &[u8]) -> Result<Vec<String>> {
+    let doc = Document::load_mem(bytes)?;
+    let mut nums: Vec<u32> = doc.get_pages().into_keys().collect();
+    nums.sort_unstable();                       // get_pages 的键是 1 起页码
+    nums.iter()
+        .map(|n| Ok(doc.extract_text(&[*n]).unwrap_or_default().trim().to_string()))
+        .collect()
+}
+```
+
+按页返回而不是糊成一大坨,前端就能带页码展示、复制或导出成 txt。一个要向用户讲清楚的点:**扫描件(纯图片)没有文字层,抽出来是空的**——这不是 bug,是这份 PDF 本来就没有文字可提。面板会把这种页明确标注为「本页无文字层」,而不是让人以为出错了。
+
+要真正读出扫描件的文字得上 OCR(光学字符识别),那是另一条重得多的路(需要模型 + 渲染成图),不在这个纯 lopdf 的轻量功能范围里。
+
 ## 数据流小结
 
 ```
