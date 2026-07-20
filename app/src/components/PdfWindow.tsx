@@ -15,6 +15,7 @@ import {
   faMagnifyingGlassPlus,
   faMagnifyingGlassMinus,
   faListOl,
+  faStamp,
 } from "@fortawesome/free-solid-svg-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -23,7 +24,12 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { Tooltip } from "./Tooltip";
-import type { PdfAssembly, PdfNumberPos, PdfPageNumbers } from "../types";
+import type {
+  PdfAssembly,
+  PdfNumberPos,
+  PdfPageNumbers,
+  PdfWatermark,
+} from "../types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -81,6 +87,13 @@ export function PdfWindow({ account, path, name }: Props) {
   const [numStart, setNumStart] = useState(1);
   const [numFormat, setNumFormat] = useState("{n}");
   const [numSize, setNumSize] = useState(12);
+  // 水印对话框。
+  const [wmOpen, setWmOpen] = useState(false);
+  const [wmText, setWmText] = useState("");
+  const [wmOpacity, setWmOpacity] = useState(20);
+  const [wmAngle, setWmAngle] = useState(45);
+  const [wmSize, setWmSize] = useState(48);
+  const [wmTile, setWmTile] = useState(true);
 
   // 源文档:0 = 主文档(云端 path),1.. = 合并进来的本地 PDF 字节。
   const docs = useRef<Uint8Array[]>([]);
@@ -398,6 +411,33 @@ export function PdfWindow({ account, path, name }: Props) {
     setSaving(false);
   };
 
+  // 加水印:组装当前工作集 → 叠文字水印 → 另存为新对象。
+  const applyWatermark = async () => {
+    if (!pages.length || !wmText.trim()) {
+      setToast(t("请输入水印文字"));
+      return;
+    }
+    setWmOpen(false);
+    setSaving(true);
+    const wm: PdfWatermark = {
+      text: wmText,
+      size: wmSize,
+      opacity: wmOpacity / 100,
+      angle: wmAngle,
+      gray: 128,
+      tile: wmTile,
+    };
+    const dot = path.lastIndexOf(".");
+    const dest = `${dot > 0 ? path.slice(0, dot) : path}-watermark.pdf`;
+    try {
+      await api.pdfWatermark(account, path, sourceBytes(), buildAssembly(), wm, dest);
+      setToast(t("✓ 已加水印,另存为 {name}", { name: baseName(dest) }));
+    } catch (e) {
+      setToast(t("保存失败:{msg}", { msg: String(e) }));
+    }
+    setSaving(false);
+  };
+
   const save = async (overwrite: boolean) => {
     setSaveMenu(false);
     if (!pages.length) {
@@ -520,6 +560,11 @@ export function PdfWindow({ account, path, name }: Props) {
           <Tooltip label={t("加页码")}>
             <button className="pv__tbtn" onClick={() => setNumOpen(true)}>
               <FontAwesomeIcon icon={faListOl} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("加水印")}>
+            <button className="pv__tbtn" onClick={() => setWmOpen(true)}>
+              <FontAwesomeIcon icon={faStamp} />
             </button>
           </Tooltip>
           <div className="pv__spacer" />
@@ -686,6 +731,72 @@ export function PdfWindow({ account, path, name }: Props) {
                 <button
                   className="pv__btn pv__btn--primary"
                   onClick={applyNumbers}
+                >
+                  {t("生成新文件")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {wmOpen && (
+          <div className="pv__modal-back" onClick={() => setWmOpen(false)}>
+            <div className="pv__modal" onClick={(e) => e.stopPropagation()}>
+              <div className="pv__modal-title">{t("加水印")}</div>
+              <label className="pv__field">
+                <span>{t("文字")}</span>
+                <input
+                  type="text"
+                  value={wmText}
+                  placeholder={t("如:机密 / 草稿")}
+                  onChange={(e) => setWmText(e.target.value)}
+                />
+              </label>
+              <label className="pv__field">
+                <span>{t("透明度")} {wmOpacity}%</span>
+                <input
+                  type="range"
+                  min={5}
+                  max={100}
+                  value={wmOpacity}
+                  onChange={(e) => setWmOpacity(Number(e.target.value))}
+                />
+              </label>
+              <label className="pv__field">
+                <span>{t("角度")} {wmAngle}°</span>
+                <input
+                  type="range"
+                  min={-90}
+                  max={90}
+                  value={wmAngle}
+                  onChange={(e) => setWmAngle(Number(e.target.value))}
+                />
+              </label>
+              <label className="pv__field">
+                <span>{t("字号")}</span>
+                <input
+                  type="number"
+                  min={12}
+                  max={144}
+                  value={wmSize}
+                  onChange={(e) => setWmSize(Number(e.target.value))}
+                />
+              </label>
+              <label className="pv__field">
+                <span>{t("平铺铺满")}</span>
+                <input
+                  type="checkbox"
+                  checked={wmTile}
+                  onChange={(e) => setWmTile(e.target.checked)}
+                />
+              </label>
+              <div className="pv__modal-actions">
+                <button className="pv__btn" onClick={() => setWmOpen(false)}>
+                  {t("取消")}
+                </button>
+                <button
+                  className="pv__btn pv__btn--primary"
+                  onClick={applyWatermark}
                 >
                   {t("生成新文件")}
                 </button>

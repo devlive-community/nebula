@@ -92,6 +92,25 @@ pub struct PageNumbers {
     pub format: String,
 }
 
+/// 文字水印参数。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Watermark {
+    /// 水印文字。
+    pub text: String,
+    /// 字号(pt)。
+    pub size: f32,
+    /// 不透明度 0..1。
+    pub opacity: f32,
+    /// 旋转角(度,逆时针为正);常用 45。
+    pub angle: f32,
+    /// 灰度 0..255(0 黑 255 白);默认中灰。
+    #[serde(default)]
+    pub gray: u8,
+    /// 是否平铺铺满整页(否则页面居中一处)。
+    #[serde(default)]
+    pub tile: bool,
+}
+
 /// 读取 PDF 的页面概览(页数、每页尺寸与旋转)。
 pub fn info(bytes: &[u8]) -> Result<PdfInfo> {
     let doc = Document::load_mem(bytes)?;
@@ -304,6 +323,101 @@ pub fn add_page_numbers(bytes: &[u8], opts: &PageNumbers) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
+/// 给每页加文字水印(Helvetica,半透明,可旋转,可平铺)。返回新 PDF 字节。
+pub fn add_watermark(bytes: &[u8], wm: &Watermark) -> Result<Vec<u8>> {
+    if wm.text.is_empty() {
+        return Ok(bytes.to_vec());
+    }
+    let mut doc = Document::load_mem(bytes)?;
+    let size = if wm.size > 0.0 { wm.size } else { 48.0 };
+    let opacity = wm.opacity.clamp(0.05, 1.0);
+    let gray = wm.gray as f32 / 255.0;
+    let theta = wm.angle.to_radians();
+    let (c, s) = (theta.cos(), theta.sin());
+
+    // 共享字体 + 透明度 ExtGState。
+    let mut font = Dictionary::new();
+    font.set("Type", Object::Name(b"Font".to_vec()));
+    font.set("Subtype", Object::Name(b"Type1".to_vec()));
+    font.set("BaseFont", Object::Name(b"Helvetica".to_vec()));
+    let font_id = doc.add_object(Object::Dictionary(font));
+
+    let mut gs = Dictionary::new();
+    gs.set("Type", Object::Name(b"ExtGState".to_vec()));
+    gs.set("ca", Object::Real(opacity));
+    gs.set("CA", Object::Real(opacity));
+    let gs_id = doc.add_object(Object::Dictionary(gs));
+
+    let esc = escape_pdf_text(&wm.text);
+    let text_w = wm.text.chars().count() as f32 * size * 0.5;
+
+    let page_ids: Vec<ObjectId> = doc.get_pages().into_values().collect();
+    for page_id in &page_ids {
+        let (w, h) = page_size(&doc, *page_id).unwrap_or((595.0, 842.0));
+        let rotate = page_rotation(&doc, *page_id);
+        let (vis_w, vis_h) = if rotate == 90 || rotate == 270 {
+            (h, w)
+        } else {
+            (w, h)
+        };
+
+        // 平铺网格,或页面居中一处。半宽/半高偏移让文字中心落在锚点。
+        let anchors: Vec<(f32, f32)> = if wm.tile {
+            let step_x = (text_w + size * 2.0).max(size * 4.0);
+            let step_y = size * 5.0;
+            let mut v = Vec::new();
+            let mut y = step_y * 0.5;
+            while y < vis_h {
+                let mut x = step_x * 0.3;
+                while x < vis_w {
+                    v.push((x, y));
+                    x += step_x;
+                }
+                y += step_y;
+            }
+            v
+        } else {
+            vec![(vis_w / 2.0, vis_h / 2.0)]
+        };
+
+        let mut body = String::new();
+        for (ax, ay) in anchors {
+            // 文字中心对齐到锚点:沿文字方向回退半宽,再垂直回退约 0.35em。
+            let sx = ax - (text_w / 2.0) * c + (0.35 * size) * s;
+            let sy = ay - (text_w / 2.0) * s - (0.35 * size) * c;
+            body.push_str(&format!(
+                "{c:.4} {s:.4} {ns:.4} {c2:.4} {sx:.2} {sy:.2} Tm ({esc}) Tj ",
+                c = c,
+                s = s,
+                ns = -s,
+                c2 = c,
+                sx = sx,
+                sy = sy,
+                esc = esc,
+            ));
+        }
+
+        let cm = rotation_cm(rotate, w, h);
+        let content = format!(
+            "Q q {cm}/GSnb gs {gray:.3} g BT /Fnb {size} Tf {body}ET Q",
+            cm = cm,
+            gray = gray,
+            size = size,
+            body = body,
+        );
+        let lead_id = doc.add_object(lopdf::Stream::new(Dictionary::new(), b"q".to_vec()));
+        let tail_id = doc.add_object(lopdf::Stream::new(Dictionary::new(), content.into_bytes()));
+        append_contents(&mut doc, *page_id, lead_id, tail_id);
+        ensure_font(&mut doc, *page_id, font_id);
+        ensure_resource(&mut doc, *page_id, b"ExtGState", b"GSnb", gs_id);
+    }
+
+    let mut buf = Vec::new();
+    doc.save_to(&mut buf)
+        .map_err(|e| PdfError::Save(e.to_string()))?;
+    Ok(buf)
+}
+
 /// (top, right, center) 布尔标志。
 fn pos_flags(p: NumberPos) -> (bool, bool, bool) {
     use NumberPos::*;
@@ -362,15 +476,27 @@ fn append_contents(doc: &mut Document, page_id: ObjectId, lead: ObjectId, tail: 
     }
 }
 
-/// 确保页面 /Resources 里有我们的字体 /Fnb(固化继承的 Resources,避免污染共享对象)。
+/// 确保页面 /Resources 里有我们的字体 /Fnb。
 fn ensure_font(doc: &mut Document, page_id: ObjectId, font_id: ObjectId) {
+    ensure_resource(doc, page_id, b"Font", b"Fnb", font_id);
+}
+
+/// 在页面 /Resources 的某个类别子字典(Font / ExtGState / …)里登记 `key → id`。
+/// 固化继承的 Resources 到本页,避免污染共享对象。
+fn ensure_resource(
+    doc: &mut Document,
+    page_id: ObjectId,
+    category: &[u8],
+    key: &[u8],
+    id: ObjectId,
+) {
     // 取本页有效的 Resources(inline / 引用 / 继承),克隆成独立字典。
     let mut res = match inherited(doc, page_id, b"Resources") {
         Some(Object::Dictionary(d)) => d,
         _ => Dictionary::new(),
     };
-    // 取或建 /Font 子字典(可能是引用)。
-    let mut fonts = match res.get(b"Font") {
+    // 取或建类别子字典(可能是引用)。
+    let mut sub = match res.get(category) {
         Ok(Object::Dictionary(d)) => d.clone(),
         Ok(Object::Reference(r)) => doc
             .get_object(*r)
@@ -380,8 +506,8 @@ fn ensure_font(doc: &mut Document, page_id: ObjectId, font_id: ObjectId) {
             .unwrap_or_default(),
         _ => Dictionary::new(),
     };
-    fonts.set("Fnb", Object::Reference(font_id));
-    res.set("Font", Object::Dictionary(fonts));
+    sub.set(key.to_vec(), Object::Reference(id));
+    res.set(category.to_vec(), Object::Dictionary(sub));
     if let Ok(dict) = doc.get_object_mut(page_id).and_then(|o| o.as_dict_mut()) {
         dict.set("Resources", Object::Dictionary(res));
     }
@@ -559,5 +685,39 @@ mod tests {
         // 输出应包含我们写入的字体基名与文本绘制操作符。
         let s = String::from_utf8_lossy(&out);
         assert!(s.contains("Helvetica"));
+    }
+
+    #[test]
+    fn watermark_produces_valid_pdf() {
+        let pdf = make_pdf(&[(400, 600), (400, 600)]);
+        let wm = Watermark {
+            text: "CONFIDENTIAL".into(),
+            size: 48.0,
+            opacity: 0.2,
+            angle: 45.0,
+            gray: 128,
+            tile: true,
+        };
+        let out = add_watermark(&pdf, &wm).unwrap();
+        let got = info(&out).unwrap();
+        assert_eq!(got.pages.len(), 2);
+        assert_eq!(got.pages[0].width as i64, 400);
+        let s = String::from_utf8_lossy(&out);
+        assert!(s.contains("ExtGState"));
+    }
+
+    #[test]
+    fn watermark_empty_text_is_noop() {
+        let pdf = make_pdf(&[(200, 200)]);
+        let wm = Watermark {
+            text: String::new(),
+            size: 40.0,
+            opacity: 0.3,
+            angle: 0.0,
+            gray: 128,
+            tile: false,
+        };
+        let out = add_watermark(&pdf, &wm).unwrap();
+        assert_eq!(out, pdf);
     }
 }

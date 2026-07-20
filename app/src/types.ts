@@ -98,6 +98,16 @@ export interface PdfPageNumbers {
   format: string;
 }
 
+/** 文字水印参数(与 nebula_pdf::Watermark 对应)。 */
+export interface PdfWatermark {
+  text: string;
+  size: number;
+  opacity: number;
+  angle: number;
+  gray: number;
+  tile: boolean;
+}
+
 /** 图片编辑操作(与 app_core::Ops 对应)。几何操作先应用,再颜色调整。 */
 export interface ImageOps {
   crop?: { x: number; y: number; width: number; height: number } | null;

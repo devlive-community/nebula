@@ -456,6 +456,15 @@ export const pdfNumber = (
   dest: string,
 ) => invoke<void>("pdf_number", { account, path, sources, asm, opts, dest });
 
+export const pdfWatermark = (
+  account: string,
+  path: string,
+  sources: number[][],
+  asm: import("./types").PdfAssembly,
+  wm: import("./types").PdfWatermark,
+  dest: string,
+) => invoke<void>("pdf_watermark", { account, path, sources, asm, wm, dest });
+
 // AI 抠图插件(去背景)
 export const mattingSupported = () => invoke<boolean>("matting_supported");
 
