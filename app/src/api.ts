@@ -421,6 +421,32 @@ export const getPref = (key: string) => invoke<string | null>("get_pref", { key 
 export const setPref = (key: string, value: string) =>
   invoke<void>("set_pref", { key, value });
 
+// PDF 页面编辑(后端 lopdf 解析 / 组装)
+export const readFileBytes = (path: string) =>
+  invoke<number[]>("read_file_bytes", { path });
+
+export const pdfInfo = (account: string, path: string) =>
+  invoke<import("./types").PdfInfo>("pdf_info", { account, path });
+
+export const pdfBytes = (account: string, path: string) =>
+  invoke<number[]>("pdf_bytes", { account, path });
+
+export const pdfSave = (
+  account: string,
+  path: string,
+  sources: number[][],
+  asm: import("./types").PdfAssembly,
+  dest: string,
+) => invoke<void>("pdf_save", { account, path, sources, asm, dest });
+
+export const pdfDownload = (
+  account: string,
+  path: string,
+  sources: number[][],
+  asm: import("./types").PdfAssembly,
+  dest: string,
+) => invoke<void>("pdf_download", { account, path, sources, asm, dest });
+
 // AI 抠图插件(去背景)
 export const mattingSupported = () => invoke<boolean>("matting_supported");
 

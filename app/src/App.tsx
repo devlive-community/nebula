@@ -85,6 +85,25 @@ function openImageWindow(account: string, entry: Entry) {
   win.once("tauri://error", (e) => console.error("open image window failed", e));
 }
 
+/** 在独立窗口打开一个 PDF 编辑器(页面管理)。label 以 pdf- 开头以匹配 capability。 */
+function openPdfWindow(account: string, entry: Entry) {
+  const q = new URLSearchParams({
+    view: "pdf",
+    account,
+    path: entry.path,
+    name: entry.name,
+  });
+  const label = `pdf-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+  const win = new WebviewWindow(label, {
+    url: `index.html?${q.toString()}`,
+    title: entry.name,
+    width: 1180,
+    height: 800,
+    resizable: true,
+  });
+  win.once("tauri://error", (e) => console.error("open pdf window failed", e));
+}
+
 export default function App() {
   const { t } = useI18n();
   const [accounts, setAccounts] = useState<AccountInfo[]>([]);
@@ -223,6 +242,11 @@ export default function App() {
     // 图片在独立窗口打开(只这一张):Rust 解码/缩放,前端做缩放/平移/旋转/EXIF。
     if (kind === "image") {
       openImageWindow(current, entry);
+      return;
+    }
+    // PDF 在独立窗口打开页面编辑器:后端 lopdf 解析/组装,前端 pdf.js 出缩略图。
+    if (kind === "pdf") {
+      openPdfWindow(current, entry);
       return;
     }
     setError(null);

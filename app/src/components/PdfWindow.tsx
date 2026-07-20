@@ -1,0 +1,424 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faXmark,
+  faSave,
+  faSpinner,
+  faTrash,
+  faRotateLeft,
+  faRotateRight,
+  faObjectGroup,
+  faCheckDouble,
+} from "@fortawesome/free-solid-svg-icons";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
+import * as pdfjs from "pdfjs-dist";
+import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import * as api from "../api";
+import { useI18n } from "../i18n";
+import { Tooltip } from "./Tooltip";
+import type { PdfAssembly } from "../types";
+
+pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+
+interface Props {
+  account: string;
+  path: string;
+  name: string;
+}
+
+/** 工作集中的一页:来自第几个源文档、该文档第几页(0 起)、绝对旋转角、稳定 key。 */
+interface PageItem {
+  id: string;
+  doc: number;
+  page: number;
+  rotate: number;
+}
+
+function baseName(p: string): string {
+  const i = p.lastIndexOf("/");
+  return i >= 0 ? p.slice(i + 1) : p;
+}
+
+/** 另存路径:扩展名前加 -edited。 */
+function editedPath(p: string): string {
+  const slash = p.lastIndexOf("/");
+  const dir = slash >= 0 ? p.slice(0, slash + 1) : "";
+  const base = slash >= 0 ? p.slice(slash + 1) : p;
+  const dot = base.lastIndexOf(".");
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  return `${dir}${stem}-edited.pdf`;
+}
+
+/**
+ * 独立窗口里的 PDF 页面编辑器:删除 / 重排(拖拽)/ 旋转 / 合并 / 提取。
+ * 解析与组装在 Rust(lopdf)侧,前端用 pdf.js 渲染缩略图与交互。
+ */
+export function PdfWindow({ account, path, name }: Props) {
+  const { t } = useI18n();
+  const [pages, setPages] = useState<PageItem[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMenu, setSaveMenu] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+
+  // 源文档:0 = 主文档(云端 path),1.. = 合并进来的本地 PDF 字节。
+  const docs = useRef<Uint8Array[]>([]);
+  // pdf.js 文档句柄,与 docs 索引一一对应(渲染缩略图用)。
+  const pdfDocs = useRef<pdfjs.PDFDocumentProxy[]>([]);
+  const dragFrom = useRef<number | null>(null);
+
+  const close = useCallback(() => void getCurrentWindow().close(), []);
+
+  useEffect(() => {
+    document.title = name;
+  }, [name]);
+
+  // 跟随应用主题。
+  useEffect(() => {
+    api
+      .getPref("theme")
+      .then((th) => {
+        const theme = th === "light" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", theme);
+        void getCurrentWindow().setTheme(theme);
+      })
+      .catch(() => {});
+  }, []);
+
+  // 载入主文档:取字节 → pdf.js 打开 → 初始化页面工作集(带各页原有旋转)。
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [bytes, info] = await Promise.all([
+          api.pdfBytes(account, path),
+          api.pdfInfo(account, path),
+        ]);
+        if (!alive) return;
+        const u8 = new Uint8Array(bytes);
+        docs.current = [u8];
+        const pdf = await pdfjs.getDocument({ data: u8.slice() }).promise;
+        if (!alive) return;
+        pdfDocs.current = [pdf];
+        setPages(
+          info.pages.map((p, i) => ({
+            id: `0:${i}`,
+            doc: 0,
+            page: i,
+            rotate: ((p.rotate % 360) + 360) % 360,
+          })),
+        );
+        setLoading(false);
+      } catch (e) {
+        if (alive) {
+          setError(String(e));
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [account, path]);
+
+  // 缺哪页缩略图就渲染哪页(无旋转底图,旋转用 CSS 施加,和后端绝对角一致)。
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      for (const it of pages) {
+        const key = `${it.doc}:${it.page}`;
+        if (thumbs.has(key)) continue;
+        const pdf = pdfDocs.current[it.doc];
+        if (!pdf) continue;
+        try {
+          const page = await pdf.getPage(it.page + 1);
+          const viewport = page.getViewport({ scale: 0.4, rotation: 0 });
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+          await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+          if (!alive) return;
+          const url = canvas.toDataURL();
+          setThumbs((m) => {
+            const n = new Map(m);
+            n.set(key, url);
+            return n;
+          });
+        } catch {
+          /* 单页渲染失败不阻断其它页 */
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [pages, thumbs]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const toggleSelect = (id: string) => {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+  const selectAll = () => {
+    setSelected((s) =>
+      s.size === pages.length ? new Set() : new Set(pages.map((p) => p.id)),
+    );
+  };
+
+  // 旋转选中页(没选则全部)±90°,绝对角。
+  const rotateSelected = (delta: number) => {
+    const targets = selected.size ? selected : new Set(pages.map((p) => p.id));
+    setPages((ps) =>
+      ps.map((p) =>
+        targets.has(p.id)
+          ? { ...p, rotate: (((p.rotate + delta) % 360) + 360) % 360 }
+          : p,
+      ),
+    );
+    setDirty(true);
+  };
+
+  const deleteSelected = () => {
+    if (!selected.size) return;
+    if (selected.size >= pages.length) {
+      setToast(t("不能删除全部页面"));
+      return;
+    }
+    setPages((ps) => ps.filter((p) => !selected.has(p.id)));
+    setSelected(new Set());
+    setDirty(true);
+  };
+
+  // 拖拽重排。
+  const onDragStart = (i: number) => (dragFrom.current = i);
+  const onDrop = (to: number) => {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    if (from === null || from === to) return;
+    setPages((ps) => {
+      const n = ps.slice();
+      const [moved] = n.splice(from, 1);
+      n.splice(to, 0, moved);
+      return n;
+    });
+    setDirty(true);
+  };
+
+  // 合并本地 PDF:选文件 → 读字节 → pdf.js 打开 → 把它的页追加到工作集末尾。
+  const mergeLocal = async () => {
+    const picked = await openDialog({
+      multiple: false,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (typeof picked !== "string") return;
+    try {
+      const bytes = new Uint8Array(await api.readFileBytes(picked));
+      const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+      const docIndex = docs.current.length;
+      docs.current.push(bytes);
+      pdfDocs.current.push(pdf);
+      const added: PageItem[] = [];
+      for (let i = 0; i < pdf.numPages; i++) {
+        const p = await pdf.getPage(i + 1);
+        added.push({
+          id: `${docIndex}:${i}`,
+          doc: docIndex,
+          page: i,
+          rotate: (((p.rotate ?? 0) % 360) + 360) % 360,
+        });
+      }
+      setPages((ps) => [...ps, ...added]);
+      setDirty(true);
+      setToast(t("已合并 {n} 页", { n: String(added.length) }));
+    } catch (e) {
+      setToast(t("合并失败:{msg}", { msg: String(e) }));
+    }
+  };
+
+  const buildAssembly = (): PdfAssembly => ({
+    pages: pages.map((p) => ({ doc: p.doc, page: p.page, rotate: p.rotate })),
+  });
+  // 合并源(doc 1..)的字节,转成普通数组给 IPC。
+  const sourceBytes = () =>
+    docs.current.slice(1).map((u8) => Array.from(u8));
+
+  const save = async (overwrite: boolean) => {
+    setSaveMenu(false);
+    if (!pages.length) {
+      setToast(t("没有页面"));
+      return;
+    }
+    setSaving(true);
+    const dest = overwrite ? path : editedPath(path);
+    try {
+      await api.pdfSave(account, path, sourceBytes(), buildAssembly(), dest);
+      setToast(
+        overwrite
+          ? t("✓ 已覆盖保存")
+          : t("✓ 已另存为 {name}", { name: baseName(dest) }),
+      );
+      setDirty(false);
+    } catch (e) {
+      setToast(t("保存失败:{msg}", { msg: String(e) }));
+    }
+    setSaving(false);
+  };
+
+  const downloadLocal = async () => {
+    setSaveMenu(false);
+    if (!pages.length) return;
+    const dest = await saveDialog({
+      defaultPath: baseName(editedPath(path)),
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (typeof dest !== "string") return;
+    setSaving(true);
+    try {
+      await api.pdfDownload(account, path, sourceBytes(), buildAssembly(), dest);
+      setToast(t("✓ 已下载到本地"));
+    } catch (e) {
+      setToast(t("保存失败:{msg}", { msg: String(e) }));
+    }
+    setSaving(false);
+  };
+
+  const allSelected = selected.size === pages.length && pages.length > 0;
+
+  return (
+    <div className="pv">
+      <div className="pv__bar" data-tauri-drag-region>
+        <span className="pv__name" title={name}>
+          {name}
+          {dirty ? " •" : ""}
+        </span>
+        <span className="pv__count">{t("{n} 页", { n: String(pages.length) })}</span>
+        <div className="pv__spacer" />
+        <div className="pv__savewrap">
+          <Tooltip label={saving ? t("保存中…") : t("保存")} side="bottom">
+            <button
+              className="pv__btn pv__btn--primary"
+              disabled={saving || !!error}
+              onClick={() => setSaveMenu((v) => !v)}
+            >
+              <FontAwesomeIcon icon={saving ? faSpinner : faSave} spin={saving} />
+            </button>
+          </Tooltip>
+          {saveMenu && (
+            <div className="pv__savemenu">
+              <button onClick={() => save(false)}>{t("另存为新对象")}</button>
+              <button onClick={() => save(true)}>{t("覆盖原文件")}</button>
+              <button onClick={downloadLocal}>{t("下载到本地")}</button>
+            </div>
+          )}
+        </div>
+        <Tooltip label={t("关闭")} side="bottom">
+          <button className="pv__btn" onClick={close}>
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
+        </Tooltip>
+      </div>
+
+      {!error && (
+        <div className="pv__toolbar">
+          <Tooltip label={t("全选")}>
+            <button
+              className={`pv__tbtn ${allSelected ? "pv__tbtn--on" : ""}`}
+              onClick={selectAll}
+            >
+              <FontAwesomeIcon icon={faCheckDouble} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("向左旋转")}>
+            <button className="pv__tbtn" onClick={() => rotateSelected(-90)}>
+              <FontAwesomeIcon icon={faRotateLeft} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("向右旋转")}>
+            <button className="pv__tbtn" onClick={() => rotateSelected(90)}>
+              <FontAwesomeIcon icon={faRotateRight} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("删除选中页")}>
+            <button
+              className="pv__tbtn"
+              disabled={!selected.size}
+              onClick={deleteSelected}
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("合并 PDF")}>
+            <button className="pv__tbtn" onClick={mergeLocal}>
+              <FontAwesomeIcon icon={faObjectGroup} />
+            </button>
+          </Tooltip>
+          <div className="pv__spacer" />
+          <span className="pv__hint">
+            {selected.size
+              ? t("已选 {n} 页 · 拖拽可重排", { n: String(selected.size) })
+              : t("点击选择 · 拖拽重排 · 旋转/删除作用于选中页")}
+          </span>
+        </div>
+      )}
+
+      <div className="pv__body">
+        {loading && <div className="pv__status">{t("加载中…")}</div>}
+        {error && <div className="pv__status">{t("无法打开该 PDF")}</div>}
+        {!loading && !error && (
+          <div className="pv__grid">
+            {pages.map((p, i) => {
+              const key = `${p.doc}:${p.page}`;
+              const url = thumbs.get(key);
+              const isSel = selected.has(p.id);
+              return (
+                <div
+                  key={p.id}
+                  className={`pv__page ${isSel ? "pv__page--sel" : ""}`}
+                  draggable
+                  onDragStart={() => onDragStart(i)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => onDrop(i)}
+                  onClick={() => toggleSelect(p.id)}
+                >
+                  <div className="pv__thumb">
+                    {url ? (
+                      <img
+                        src={url}
+                        alt={`page ${i + 1}`}
+                        draggable={false}
+                        style={{ transform: `rotate(${p.rotate}deg)` }}
+                      />
+                    ) : (
+                      <div className="pv__thumbload">
+                        <FontAwesomeIcon icon={faSpinner} spin />
+                      </div>
+                    )}
+                  </div>
+                  <div className="pv__pageno">{i + 1}</div>
+                  {isSel && <div className="pv__check">✓</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {toast && <div className="pv__toast">{toast}</div>}
+      </div>
+    </div>
+  );
+}

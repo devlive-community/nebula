@@ -1359,6 +1359,12 @@ async fn save_image_bytes_local(dest: String, bytes: Vec<u8>) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
+/// 读取一个本地文件的原始字节(合并本地 PDF 时用)。
+#[tauri::command]
+async fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+    tokio::fs::read(&path).await.map_err(|e| e.to_string())
+}
+
 /// 读取 PDF 页面概览(页数 / 每页尺寸 / 旋转)。
 #[tauri::command]
 async fn pdf_info(state: State<'_, App>, account: String, path: String) -> Result<PdfInfo, String> {
@@ -1387,7 +1393,7 @@ async fn pdf_save(
     state: State<'_, App>,
     account: String,
     path: String,
-    sources: Vec<String>,
+    sources: Vec<Vec<u8>>,
     asm: Assembly,
     dest: String,
 ) -> Result<(), String> {
@@ -1403,7 +1409,7 @@ async fn pdf_download(
     state: State<'_, App>,
     account: String,
     path: String,
-    sources: Vec<String>,
+    sources: Vec<Vec<u8>>,
     asm: Assembly,
     dest: String,
 ) -> Result<(), String> {
@@ -1613,6 +1619,7 @@ pub fn run() {
             matting_installed,
             install_matting_plugin,
             uninstall_matting_plugin,
+            read_file_bytes,
             pdf_info,
             pdf_bytes,
             pdf_save,

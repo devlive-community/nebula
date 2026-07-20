@@ -2906,3 +2906,234 @@ input[type="range"]:disabled {
   color: var(--danger);
   word-break: break-word;
 }
+
+/* ── PDF 页面编辑器(独立窗口) ─────────────────────────────── */
+.pv {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.pv__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+}
+
+.pv__name {
+  font-size: 13px;
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv__count {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.pv__spacer {
+  flex: 1;
+}
+
+.pv__btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.pv__btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.pv__btn--primary {
+  color: var(--primary);
+}
+
+.pv__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pv__savewrap {
+  position: relative;
+}
+
+.pv__savemenu {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  z-index: 10;
+  min-width: 160px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.pv__savemenu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pv__savemenu button:hover {
+  background: var(--bg-hover);
+}
+
+.pv__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+}
+
+.pv__tbtn {
+  width: 32px;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.pv__tbtn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.pv__tbtn--on {
+  background: var(--bg-hover);
+  color: var(--primary);
+}
+
+.pv__tbtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pv__hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.pv__body {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.pv__status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+.pv__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.pv__page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pv__page:hover {
+  background: var(--bg-hover);
+}
+
+.pv__page--sel {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+}
+
+.pv__thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 170px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pv__thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  transition: transform 0.15s;
+}
+
+.pv__thumbload {
+  color: #888;
+}
+
+.pv__pageno {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.pv__check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+}
+
+.pv__toast {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}

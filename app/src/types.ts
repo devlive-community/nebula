@@ -56,6 +56,30 @@ export interface ImageData {
   orig_height: number;
 }
 
+/** PDF 单页概览(与 nebula_pdf::PageInfo 对应)。尺寸为 PDF 用户单位(1/72 英寸)。 */
+export interface PdfPageInfo {
+  width: number;
+  height: number;
+  rotate: number;
+}
+
+/** PDF 页面概览(与 nebula_pdf::PdfInfo 对应)。 */
+export interface PdfInfo {
+  pages: PdfPageInfo[];
+}
+
+/** 组装清单里的一页(与 nebula_pdf::PageSpec 对应)。 */
+export interface PdfPageSpec {
+  doc: number;
+  page: number;
+  rotate: number;
+}
+
+/** PDF 组装清单(与 nebula_pdf::Assembly 对应)。 */
+export interface PdfAssembly {
+  pages: PdfPageSpec[];
+}
+
 /** 图片编辑操作(与 app_core::Ops 对应)。几何操作先应用,再颜色调整。 */
 export interface ImageOps {
   crop?: { x: number; y: number; width: number; height: number } | null;

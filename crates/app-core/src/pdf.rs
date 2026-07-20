@@ -22,35 +22,42 @@ impl App {
         Ok(self.provider(account)?.read(path).await?.to_vec())
     }
 
-    /// 按清单组装 PDF 并写回云端。
+    /// 读入主文档 + 合并源,按清单组装,返回输出字节。
     ///
-    /// `sources` 是除主文档外要合并进来的其它对象路径(与 `Assembly::pages` 里
-    /// `doc` 索引对应:0 = 主文档 `path`,1.. = `sources` 依次)。`dest == path` 即覆盖。
-    pub async fn pdf_save(
+    /// `sources` 是除主文档外要合并进来的其它 PDF 的**原始字节**(与 `Assembly::pages`
+    /// 里 `doc` 索引对应:0 = 主文档 `path`,1.. = `sources` 依次)。前端从本地文件选择
+    /// 后把字节传进来,无需这些文件在云端。
+    async fn pdf_assemble(
         &self,
         account: &str,
         path: &str,
-        sources: Vec<String>,
+        sources: Vec<Vec<u8>>,
         asm: Assembly,
-        dest: &str,
-    ) -> Result<()> {
-        let provider = self.provider(account)?;
-        // 读入主文档 + 所有合并源。
+    ) -> Result<Vec<u8>> {
+        let main = self.provider(account)?.read(path).await?.to_vec();
         let mut docs: Vec<Vec<u8>> = Vec::with_capacity(1 + sources.len());
-        docs.push(provider.read(path).await?.to_vec());
-        for s in &sources {
-            docs.push(provider.read(s).await?.to_vec());
-        }
-
-        let out = tokio::task::spawn_blocking(move || {
+        docs.push(main);
+        docs.extend(sources);
+        tokio::task::spawn_blocking(move || {
             let refs: Vec<&[u8]> = docs.iter().map(|d| d.as_slice()).collect();
             nebula_pdf::assemble(&refs, &asm)
         })
         .await
         .map_err(|e| AppError::Image(e.to_string()))?
-        .map_err(|e| AppError::Image(e.to_string()))?;
+        .map_err(|e| AppError::Image(e.to_string()))
+    }
 
-        provider
+    /// 组装 PDF 并写回云端(`dest == path` 覆盖,否则另存为新对象)。
+    pub async fn pdf_save(
+        &self,
+        account: &str,
+        path: &str,
+        sources: Vec<Vec<u8>>,
+        asm: Assembly,
+        dest: &str,
+    ) -> Result<()> {
+        let out = self.pdf_assemble(account, path, sources, asm).await?;
+        self.provider(account)?
             .write(dest, bytes::Bytes::from(out), Some("application/pdf"))
             .await?;
         Ok(())
@@ -61,21 +68,9 @@ impl App {
         &self,
         account: &str,
         path: &str,
-        sources: Vec<String>,
+        sources: Vec<Vec<u8>>,
         asm: Assembly,
     ) -> Result<Vec<u8>> {
-        let provider = self.provider(account)?;
-        let mut docs: Vec<Vec<u8>> = Vec::with_capacity(1 + sources.len());
-        docs.push(provider.read(path).await?.to_vec());
-        for s in &sources {
-            docs.push(provider.read(s).await?.to_vec());
-        }
-        tokio::task::spawn_blocking(move || {
-            let refs: Vec<&[u8]> = docs.iter().map(|d| d.as_slice()).collect();
-            nebula_pdf::assemble(&refs, &asm)
-        })
-        .await
-        .map_err(|e| AppError::Image(e.to_string()))?
-        .map_err(|e| AppError::Image(e.to_string()))
+        self.pdf_assemble(account, path, sources, asm).await
     }
 }
