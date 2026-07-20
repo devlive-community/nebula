@@ -8,6 +8,7 @@ import {
   faRotateLeft,
   faRotateRight,
   faObjectGroup,
+  faFileExport,
   faCheckDouble,
   faChevronLeft,
   faChevronRight,
@@ -341,6 +342,32 @@ export function PdfWindow({ account, path, name }: Props) {
   const sourceBytes = () =>
     docs.current.slice(1).map((u8) => Array.from(u8));
 
+  // 提取选中页为一个新对象(按当前顺序;不改动原文档)。
+  const extractSelected = async () => {
+    if (!selected.size) {
+      setToast(t("请先选择要提取的页"));
+      return;
+    }
+    const asm: PdfAssembly = {
+      pages: pages
+        .filter((p) => selected.has(p.id))
+        .map((p) => ({ doc: p.doc, page: p.page, rotate: p.rotate })),
+    };
+    const dot = path.lastIndexOf(".");
+    const dest = `${dot > 0 ? path.slice(0, dot) : path}-extract.pdf`;
+    setSaving(true);
+    try {
+      await api.pdfSave(account, path, sourceBytes(), asm, dest);
+      setToast(t("✓ 已提取 {n} 页为 {name}", {
+        n: String(selected.size),
+        name: baseName(dest),
+      }));
+    } catch (e) {
+      setToast(t("保存失败:{msg}", { msg: String(e) }));
+    }
+    setSaving(false);
+  };
+
   const save = async (overwrite: boolean) => {
     setSaveMenu(false);
     if (!pages.length) {
@@ -444,6 +471,15 @@ export function PdfWindow({ account, path, name }: Props) {
               onClick={deleteSelected}
             >
               <FontAwesomeIcon icon={faTrash} />
+            </button>
+          </Tooltip>
+          <Tooltip label={t("提取选中页为新 PDF")}>
+            <button
+              className="pv__tbtn"
+              disabled={!selected.size}
+              onClick={extractSelected}
+            >
+              <FontAwesomeIcon icon={faFileExport} />
             </button>
           </Tooltip>
           <Tooltip label={t("合并 PDF")}>
