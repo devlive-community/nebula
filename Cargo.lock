@@ -40,7 +40,7 @@ dependencies = [
 
 [[package]]
 name = "aliyun-oss"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -62,7 +62,7 @@ checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "app-core"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "aws-s3"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -320,7 +320,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "cloud-core"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-stream",
  "base64",
@@ -337,7 +337,7 @@ dependencies = [
 
 [[package]]
 name = "cloudflare-r2"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "s3-core",
 ]
@@ -830,7 +830,7 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "huawei-obs"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -1272,7 +1272,7 @@ checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
 name = "minio-s3"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "s3-core",
 ]
@@ -1331,7 +1331,7 @@ dependencies = [
 
 [[package]]
 name = "nebula-image"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "image",
  "kamadak-exif",
@@ -1341,7 +1341,7 @@ dependencies = [
 
 [[package]]
 name = "nebula-matting"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "image",
  "ort",
@@ -1350,7 +1350,7 @@ dependencies = [
 
 [[package]]
 name = "nebula-provider"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1607,7 +1607,7 @@ dependencies = [
 
 [[package]]
 name = "provider-aliyun"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "aliyun-oss",
  "async-trait",
@@ -1619,7 +1619,7 @@ dependencies = [
 
 [[package]]
 name = "provider-aws"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "aws-s3",
@@ -1631,7 +1631,7 @@ dependencies = [
 
 [[package]]
 name = "provider-huawei"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1643,7 +1643,7 @@ dependencies = [
 
 [[package]]
 name = "provider-minio"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "provider-qiniu"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1667,7 +1667,7 @@ dependencies = [
 
 [[package]]
 name = "provider-r2"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1679,7 +1679,7 @@ dependencies = [
 
 [[package]]
 name = "provider-tencent"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1720,7 +1720,7 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "qiniu-kodo"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -2100,7 +2100,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "s3-core"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -2115,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "s3-sigv4"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -2357,7 +2357,7 @@ dependencies = [
 
 [[package]]
 name = "tencent-cos"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "bytes",
  "cloud-core",
