@@ -356,14 +356,7 @@ pub fn add_page_numbers(bytes: &[u8], opts: &PageNumbers) -> Result<Vec<u8>> {
 
         let cm = rotation_cm(rotate, w, h);
         let esc = escape_pdf_text(&text);
-        let content = format!(
-            "Q q {cm} BT /Fnb {size} Tf {x:.2} {y:.2} Td ({esc}) Tj ET Q",
-            cm = cm,
-            size = size,
-            x = x,
-            y = y,
-            esc = esc,
-        );
+        let content = format!("Q q {cm} BT /Fnb {size} Tf {x:.2} {y:.2} Td ({esc}) Tj ET Q");
         let lead_id = doc.add_object(lopdf::Stream::new(Dictionary::new(), b"q".to_vec()));
         let tail_id = doc.add_object(lopdf::Stream::new(Dictionary::new(), content.into_bytes()));
 
@@ -434,31 +427,20 @@ pub fn add_watermark(bytes: &[u8], wm: &Watermark) -> Result<Vec<u8>> {
             vec![(vis_w / 2.0, vis_h / 2.0)]
         };
 
+        // 文字矩阵的旋转分量:cos sin -sin cos。
+        let ns = -s;
         let mut body = String::new();
         for (ax, ay) in anchors {
             // 文字中心对齐到锚点:沿文字方向回退半宽,再垂直回退约 0.35em。
             let sx = ax - (text_w / 2.0) * c + (0.35 * size) * s;
             let sy = ay - (text_w / 2.0) * s - (0.35 * size) * c;
             body.push_str(&format!(
-                "{c:.4} {s:.4} {ns:.4} {c2:.4} {sx:.2} {sy:.2} Tm ({esc}) Tj ",
-                c = c,
-                s = s,
-                ns = -s,
-                c2 = c,
-                sx = sx,
-                sy = sy,
-                esc = esc,
+                "{c:.4} {s:.4} {ns:.4} {c:.4} {sx:.2} {sy:.2} Tm ({esc}) Tj "
             ));
         }
 
         let cm = rotation_cm(rotate, w, h);
-        let content = format!(
-            "Q q {cm}/GSnb gs {gray:.3} g BT /Fnb {size} Tf {body}ET Q",
-            cm = cm,
-            gray = gray,
-            size = size,
-            body = body,
-        );
+        let content = format!("Q q {cm}/GSnb gs {gray:.3} g BT /Fnb {size} Tf {body}ET Q");
         let lead_id = doc.add_object(lopdf::Stream::new(Dictionary::new(), b"q".to_vec()));
         let tail_id = doc.add_object(lopdf::Stream::new(Dictionary::new(), content.into_bytes()));
         append_contents(&mut doc, *page_id, lead_id, tail_id);
@@ -488,9 +470,9 @@ fn pos_flags(p: NumberPos) -> (bool, bool, bool) {
 /// 把「可见方向坐标」映射回页面基坐标的 CTM(cm 操作符串,含末尾空格)。
 fn rotation_cm(rotate: i64, w: f32, h: f32) -> String {
     match rotate {
-        90 => format!("0 1 -1 0 {w} 0 cm ", w = w),
-        180 => format!("-1 0 0 -1 {w} {h} cm ", w = w, h = h),
-        270 => format!("0 -1 1 0 0 {h} cm ", h = h),
+        90 => format!("0 1 -1 0 {w} 0 cm "),
+        180 => format!("-1 0 0 -1 {w} {h} cm "),
+        270 => format!("0 -1 1 0 0 {h} cm "),
         _ => String::new(),
     }
 }
