@@ -7,6 +7,8 @@
 Rust + Tauri로 제작 —— 가볍고 빠르며 macOS / Windows / Linux에서 네이티브로 동작합니다. 각 클라우드는 집계 라이브러리에 의존하지 않고 직접 작성한 독립 배포 가능한 Rust SDK로 구현되어 있습니다.
 
 > 웹사이트: <https://nebula.devlive.org/> · 다운로드: [GitHub Releases](https://github.com/devlive-community/nebula/releases)
+>
+> 저장소: [GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
 
 ## 지원 클라우드
 

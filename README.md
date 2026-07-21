@@ -7,6 +7,8 @@
 Built with Rust + Tauri — lightweight, fast, and native on macOS / Windows / Linux. Each cloud is backed by a hand-written, independently publishable Rust SDK, with no aggregation libraries.
 
 > Website: <https://nebula.devlive.org/> · Download: [GitHub Releases](https://github.com/devlive-community/nebula/releases)
+>
+> Repository: [GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
 
 ## Supported clouds
 

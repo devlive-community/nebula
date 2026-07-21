@@ -7,6 +7,8 @@
 用 Rust + Tauri 打造,轻量、快速、原生三端(macOS / Windows / Linux)。底层每家云都是从零手写的**独立可发布 Rust SDK**,不依赖任何聚合库。
 
 > 官网:<https://nebula.devlive.org/> · 下载:[GitHub Releases](https://github.com/devlive-community/nebula/releases)
+>
+> 代码仓库:[GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
 
 ## 支持的云
 

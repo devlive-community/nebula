@@ -7,6 +7,8 @@
 Rust + Tauri 製 —— 軽量・高速で、macOS / Windows / Linux でネイティブ動作。各クラウドは、集約ライブラリに依存しない手書きの独立公開可能な Rust SDK で実装されています。
 
 > 公式サイト:<https://nebula.devlive.org/> · ダウンロード:[GitHub Releases](https://github.com/devlive-community/nebula/releases)
+>
+> リポジトリ:[GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
 
 ## 対応クラウド
 

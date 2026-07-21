@@ -7,6 +7,8 @@
 Создано на Rust + Tauri — лёгкое, быстрое, нативное на macOS / Windows / Linux. Каждое облако поддержано написанным вручную, независимо публикуемым Rust SDK, без каких-либо агрегирующих библиотек.
 
 > Сайт: <https://nebula.devlive.org/> · Загрузка: [GitHub Releases](https://github.com/devlive-community/nebula/releases)
+>
+> Репозиторий: [GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
 
 ## Поддерживаемые облака
 
