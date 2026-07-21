@@ -1,5 +1,10 @@
 [English](README.md) · **简体中文** · [Русский](README.ru.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
+[![GitHub stars](https://img.shields.io/github/stars/devlive-community/nebula?style=flat&logo=github)](https://github.com/devlive-community/nebula)
+[![Release](https://img.shields.io/github/v/release/devlive-community/nebula?display_name=tag)](https://github.com/devlive-community/nebula/releases)
+[![License](https://img.shields.io/github/license/devlive-community/nebula)](./LICENSE)
+[![GitCode](https://img.shields.io/badge/GitCode-mirror-blue)](https://gitcode.com/trendforge/nebula)
+
 # Nebula
 
 **跨平台桌面端的多云对象存储管理器** —— 在一个原生应用里,像用本地文件管理器一样管理阿里云 OSS、腾讯云 COS、华为云 OBS、AWS S3、Cloudflare R2、七牛云 Kodo、MinIO:浏览、上传下载、分享、跨云迁移,一站搞定。

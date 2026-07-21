@@ -1,5 +1,10 @@
 **English** · [简体中文](README.zh-CN.md) · [Русский](README.ru.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
+[![GitHub stars](https://img.shields.io/github/stars/devlive-community/nebula?style=flat&logo=github)](https://github.com/devlive-community/nebula)
+[![Release](https://img.shields.io/github/v/release/devlive-community/nebula?display_name=tag)](https://github.com/devlive-community/nebula/releases)
+[![License](https://img.shields.io/github/license/devlive-community/nebula)](./LICENSE)
+[![GitCode](https://img.shields.io/badge/GitCode-mirror-blue)](https://gitcode.com/trendforge/nebula)
+
 # Nebula
 
 **A cross-platform desktop manager for multi-cloud object storage** — manage Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo and MinIO from a single native app, just like a local file manager: browse, upload, download, share and migrate across clouds, all in one place.

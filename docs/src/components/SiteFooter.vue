@@ -8,6 +8,7 @@
       </div>
       <div class="flex items-center gap-6">
         <a class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors" href="https://github.com/devlive-community/nebula" target="_blank" rel="noopener">GitHub</a>
+        <a class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors" href="https://gitcode.com/trendforge/nebula" target="_blank" rel="noopener">GitCode</a>
         <RouterLink class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors" to="/download">{{ t('footer.download') }}</RouterLink>
         <RouterLink class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors" to="/blog">{{ t('footer.blog') }}</RouterLink>
         <RouterLink class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors" to="/release">{{ t('footer.releases') }}</RouterLink>
