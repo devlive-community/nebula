@@ -135,7 +135,7 @@ pub fn compress(bytes: &[u8]) -> Result<(Vec<u8>, usize, usize)> {
     let mut doc = Document::load_mem(bytes)?;
 
     // 1) 逐个压缩尚未带 Filter 的流(内容流 / 图片等)。
-    for (_id, obj) in doc.objects.iter_mut() {
+    for obj in doc.objects.values_mut() {
         if let Object::Stream(stream) = obj {
             let _ = stream.compress();
         }
