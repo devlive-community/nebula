@@ -20,6 +20,7 @@ mod preview;
 mod secret;
 mod settings;
 mod store;
+mod sync;
 mod upload;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -48,6 +49,10 @@ pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
 pub use store::{AccountRecord, AccountStore};
+pub use sync::{
+    diff as sync_diff, summarize as sync_summarize, DiffItem, DiffSummary, LocalFile, RemoteFile,
+    SyncAction, SyncMode,
+};
 
 const VENDOR_ALIYUN: &str = "aliyun";
 const VENDOR_HUAWEI: &str = "huawei";
