@@ -68,6 +68,7 @@
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {useRoute} from 'vue-router'
+import {useHead} from '@unhead/vue'
 import {blogs} from '../content/blogs'
 
 const route = useRoute()
@@ -80,6 +81,30 @@ const currentSlug = computed(() => {
 const currentIndex = computed(() => {
   if (!currentSlug.value) return -1
   return blogs.findIndex(b => b.slug === currentSlug.value)
+})
+
+const currentBlog = computed(() =>
+  currentIndex.value >= 0 ? blogs[currentIndex.value] : null
+)
+
+// 按文章设置分享元信息:标题用文章标题(修复分享显示成「技术博客」),描述用 frontmatter。
+useHead({
+  title: () => currentBlog.value?.title ?? '技术博客',
+  meta: [
+    {name: 'description', content: () => currentBlog.value?.description ?? ''},
+    {property: 'og:type', content: 'article'},
+    {property: 'og:title', content: () => currentBlog.value?.title ?? '技术博客'},
+    {property: 'og:description', content: () => currentBlog.value?.description ?? ''},
+    {
+      property: 'og:url',
+      content: () => `https://nebula.devlive.org/blog/${currentSlug.value ?? ''}`,
+    },
+    {name: 'twitter:title', content: () => currentBlog.value?.title ?? '技术博客'},
+    {
+      name: 'twitter:description',
+      content: () => currentBlog.value?.description ?? '',
+    },
+  ],
 })
 
 const prevBlog = computed(() => {
