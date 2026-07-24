@@ -472,6 +472,16 @@ export const pdfWatermark = (
   dest: string,
 ) => invoke<void>("pdf_watermark", { account, path, sources, asm, wm, dest });
 
+// 同步与备份
+export const syncPreview = (spec: import("./types").SyncSpec) =>
+  invoke<[import("./types").SyncDiffItem[], import("./types").SyncDiffSummary]>(
+    "sync_preview",
+    { spec },
+  );
+
+export const syncRun = (id: string, spec: import("./types").SyncSpec) =>
+  invoke<import("./types").SyncReport>("sync_run", { id, spec });
+
 // AI 抠图插件(去背景)
 export const mattingSupported = () => invoke<boolean>("matting_supported");
 

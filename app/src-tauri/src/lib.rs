@@ -7,9 +7,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, Assembly, Bookmark, EditSave, ExifInfo, FolderStats, ImageData,
-    IncompleteUpload, Integrity, Ops, Page, PageNumbers, PdfInfo, RenamePlan, RenameRule,
-    SearchResult, Settings, StorageBreakdown, TextPreview, TransferRecord, Watermark,
+    AccountInfo, App, Assembly, Bookmark, DiffItem, DiffSummary, EditSave, ExifInfo, FolderStats,
+    ImageData, IncompleteUpload, Integrity, Ops, Page, PageNumbers, PdfInfo, RenamePlan,
+    RenameRule, SearchResult, Settings, StorageBreakdown, SyncReport, SyncSpec, TextPreview,
+    TransferRecord, Watermark,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -103,6 +104,17 @@ struct TransferProgress {
     /// 目标端路径,前端以此定位进度条。
     to: String,
     transferred: u64,
+    total: u64,
+}
+
+/// 同步进度事件负载,发往前端 `sync-progress`。以**动作数**计量。
+#[derive(Clone, Serialize)]
+struct SyncProgress {
+    /// 同步任务 id,前端以此定位进度。
+    id: String,
+    /// 已处理动作数。
+    done: u64,
+    /// 总动作数。
     total: u64,
 }
 
@@ -1484,6 +1496,49 @@ async fn pdf_download(
         .map_err(|e| e.to_string())
 }
 
+/// 预览同步:扫两侧算 diff,返回每个文件的动作与汇总(不改动数据)。
+#[tauri::command]
+async fn sync_preview(
+    state: State<'_, App>,
+    spec: SyncSpec,
+) -> Result<(Vec<DiffItem>, DiffSummary), String> {
+    let app = state.inner().clone();
+    app.sync_preview(&spec).await.map_err(|e| e.to_string())
+}
+
+/// 执行同步:按 diff 动作逐个处理,进度经 `sync-progress` 事件推送,可用 `id` 取消。
+#[tauri::command]
+async fn sync_run(
+    app_handle: AppHandle,
+    state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    id: String,
+    spec: SyncSpec,
+) -> Result<SyncReport, String> {
+    let core = state.inner().clone();
+    let cancel = transfers.begin(&id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: id.clone(),
+    };
+    let handle = app_handle.clone();
+    let ev_id = id.clone();
+    let report = core
+        .sync_run(&spec, &cancel, &move |done, total| {
+            let _ = handle.emit(
+                "sync-progress",
+                SyncProgress {
+                    id: ev_id.clone(),
+                    done,
+                    total,
+                },
+            );
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(report)
+}
+
 /// 把编辑结果编码后保存到本地文件(`save.dest` 为本地路径,不回云端)。
 #[tauri::command]
 async fn image_edit_download(
@@ -1689,6 +1744,8 @@ pub fn run() {
             pdf_number,
             pdf_watermark,
             pdf_download,
+            sync_preview,
+            sync_run,
             remove_background,
             get_pref,
             set_pref,

@@ -108,6 +108,55 @@ export interface PdfWatermark {
   tile: boolean;
 }
 
+/** 同步模式(与 nebula sync::SyncMode 对应,snake_case)。 */
+export type SyncMode = "mirror_up" | "mirror_down" | "two_way";
+
+/** 单个文件的同步动作(与 sync::SyncAction 对应)。 */
+export type SyncAction =
+  | "upload"
+  | "download"
+  | "delete_remote"
+  | "delete_local"
+  | "skip";
+
+/** 一个同步任务参数(与 sync::SyncSpec 对应)。 */
+export interface SyncSpec {
+  account: string;
+  local_dir: string;
+  remote_prefix: string;
+  mode: SyncMode;
+  delete_extra: boolean;
+}
+
+/** diff 的一条(与 sync::DiffItem 对应)。 */
+export interface SyncDiffItem {
+  rel_path: string;
+  action: SyncAction;
+  local_size: number | null;
+  remote_size: number | null;
+}
+
+/** diff 汇总(与 sync::DiffSummary 对应)。 */
+export interface SyncDiffSummary {
+  upload: number;
+  download: number;
+  delete_remote: number;
+  delete_local: number;
+  skip: number;
+  transfer_bytes: number;
+}
+
+/** 同步执行报告(与 sync::SyncReport 对应)。 */
+export interface SyncReport {
+  uploaded: number;
+  downloaded: number;
+  deleted_remote: number;
+  deleted_local: number;
+  skipped: number;
+  failed: number;
+  bytes: number;
+}
+
 /** 图片编辑操作(与 app_core::Ops 对应)。几何操作先应用,再颜色调整。 */
 export interface ImageOps {
   crop?: { x: number; y: number; width: number; height: number } | null;

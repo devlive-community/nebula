@@ -57,6 +57,7 @@ import { CleanupDialog } from "./components/CleanupDialog";
 import { TransferPanel } from "./components/TransferPanel";
 import { SearchResults } from "./components/SearchResults";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { SyncDialog } from "./components/SyncDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { PreviewModal } from "./components/PreviewModal";
 import { AboutDialog } from "./components/AboutDialog";
@@ -208,6 +209,7 @@ export default function App() {
     rate_limit_kib_per_sec: 0,
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [showSync, setShowSync] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [update, setUpdate] = useState<Update | null>(null);
   const [updateFlash, setUpdateFlash] = useState<string | null>(null);
@@ -1719,6 +1721,12 @@ export default function App() {
     label: t("切换主题"),
     run: () => setTheme((x) => (x === "dark" ? "light" : "dark")),
   });
+  if (current)
+    paletteCommands.push({
+      id: "sync",
+      label: t("备份 / 同步"),
+      run: () => setShowSync(true),
+    });
   paletteCommands.push({
     id: "settings",
     label: t("设置"),
@@ -2167,6 +2175,15 @@ export default function App() {
           settings={settings}
           onSave={saveSettings}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showSync && (
+        <SyncDialog
+          accounts={accounts}
+          defaultAccount={current}
+          defaultPrefix={path}
+          onClose={() => setShowSync(false)}
         />
       )}
 

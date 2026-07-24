@@ -103,6 +103,25 @@ export const EN: Record<string, string> = {
   容差: "Tolerance",
   点击要去掉的区域: "Click the area to remove",
   在图上按住涂抹擦除: "Press and drag to erase",
+  // 备份 / 同步
+  "备份 / 同步": "Backup / Sync",
+  本地目录: "Local folder",
+  "选择本地文件夹…": "Choose a local folder…",
+  "选择…": "Choose…",
+  云端前缀: "Cloud prefix",
+  模式: "Mode",
+  "备份(本地 → 云端)": "Backup (local → cloud)",
+  "还原(云端 → 本地)": "Restore (cloud → local)",
+  双向同步: "Two-way sync",
+  "删除云端多余对象(镜像)": "Delete extra cloud objects (mirror)",
+  "删除本地多余文件(镜像)": "Delete extra local files (mirror)",
+  开始同步: "Start sync",
+  取消同步: "Cancel sync",
+  "两侧已一致,无需同步": "Both sides already match, nothing to sync",
+  请选择账号与本地目录: "Choose an account and a local folder",
+  "完成:上传 {u} · 下载 {d} · 删除 {x} · 失败 {f} · 共 {b}":
+    "Done: {u} up · {d} down · {x} deleted · {f} failed · {b} total",
+
   // PDF 页面编辑器 / 阅读器
   上一页: "Previous page",
   下一页: "Next page",

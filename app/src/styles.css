@@ -3325,3 +3325,126 @@ input[type="range"]:disabled {
   color: var(--text);
   font-family: inherit;
 }
+
+/* ── 备份 / 同步对话框 ───────────────────────────────── */
+.modal--wide {
+  max-width: 640px;
+  width: 90vw;
+}
+
+.field--check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync__dir {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+.sync__dir input {
+  flex: 1;
+}
+
+.sync__summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg-elev-2);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.sync__stat {
+  color: var(--text-dim);
+}
+.sync__stat--up {
+  color: #34c759;
+}
+.sync__stat--down {
+  color: #0a84ff;
+}
+.sync__stat--del {
+  color: var(--danger);
+}
+.sync__stat--bytes {
+  margin-left: auto;
+  color: var(--text);
+}
+
+.sync__list {
+  margin-top: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.sync__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--border);
+}
+.sync__row:last-child {
+  border-bottom: none;
+}
+.sync__act {
+  flex: none;
+  width: 44px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.sync__act--upload {
+  color: #34c759;
+}
+.sync__act--download {
+  color: #0a84ff;
+}
+.sync__act--delete_remote,
+.sync__act--delete_local {
+  color: var(--danger);
+}
+.sync__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.sync__empty,
+.sync__report {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.sync__error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--danger);
+  word-break: break-word;
+}
+
+.sync__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.sync__bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-elev-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sync__fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.2s;
+}
