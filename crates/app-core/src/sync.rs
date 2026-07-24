@@ -17,8 +17,14 @@
 //!   时才读盘算本地 MD5,和秒传 [`crate::dedup`] 一致。
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWriteExt;
+
+use crate::{App, AppError, Result};
 
 /// 同步模式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -188,6 +194,257 @@ pub fn summarize(items: &[DiffItem]) -> DiffSummary {
         }
     }
     s
+}
+
+/// 一次同步执行的结果统计。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SyncReport {
+    pub uploaded: usize,
+    pub downloaded: usize,
+    pub deleted_remote: usize,
+    pub deleted_local: usize,
+    pub skipped: usize,
+    /// 出错但已跳过继续的文件数。
+    pub failed: usize,
+    /// 实际传输的字节数(上传 + 下载)。
+    pub bytes: u64,
+}
+
+/// 一个同步任务的参数(账号 / 本地目录 / 远端前缀 / 模式 / 是否删多余)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncSpec {
+    pub account: String,
+    pub local_dir: String,
+    pub remote_prefix: String,
+    pub mode: SyncMode,
+    #[serde(default)]
+    pub delete_extra: bool,
+}
+
+/// 归一化远端前缀:去掉尾部 `/`,便于统一拼接。
+fn norm_prefix(p: &str) -> String {
+    p.trim_end_matches('/').to_string()
+}
+
+/// 远端对象完整路径 = 前缀 + 相对路径。
+fn remote_path(prefix: &str, rel: &str) -> String {
+    let prefix = norm_prefix(prefix);
+    if prefix.is_empty() {
+        rel.to_string()
+    } else {
+        format!("{prefix}/{rel}")
+    }
+}
+
+impl App {
+    /// 递归遍历本地目录,返回 `相对路径(用 /)-> (字节数, 绝对路径)`。
+    async fn scan_local(&self, root: &Path) -> Result<BTreeMap<String, (u64, PathBuf)>> {
+        let mut out = BTreeMap::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            let mut rd = match tokio::fs::read_dir(&dir).await {
+                Ok(rd) => rd,
+                Err(_) => continue, // 目录不可读则跳过
+            };
+            while let Some(entry) = rd.next_entry().await? {
+                let path = entry.path();
+                let ft = entry.file_type().await?;
+                if ft.is_dir() {
+                    stack.push(path);
+                } else if ft.is_file() {
+                    let meta = entry.metadata().await?;
+                    let rel = path
+                        .strip_prefix(root)
+                        .unwrap_or(&path)
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    out.insert(rel, (meta.len(), path));
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// 列出远端前缀下所有对象,返回 `相对路径 -> (字节数, ETag)`。
+    async fn scan_remote(
+        &self,
+        account: &str,
+        prefix: &str,
+    ) -> Result<BTreeMap<String, (u64, Option<String>)>> {
+        let base = norm_prefix(prefix);
+        let files = self.list_all_files(account, prefix).await?;
+        let mut out = BTreeMap::new();
+        for f in files {
+            let rel = f
+                .path
+                .strip_prefix(&base)
+                .map(|s| s.trim_start_matches('/').to_string())
+                .unwrap_or_else(|| f.path.clone());
+            if rel.is_empty() {
+                continue;
+            }
+            out.insert(rel, (f.size, f.etag));
+        }
+        Ok(out)
+    }
+
+    /// 扫两侧、构建 diff 输入(仅对「值得比对」的候选算本地 MD5),返回 diff 结果与两侧原始表。
+    async fn sync_diff_maps(
+        &self,
+        spec: &SyncSpec,
+    ) -> Result<(
+        Vec<DiffItem>,
+        BTreeMap<String, (u64, PathBuf)>,
+        BTreeMap<String, (u64, Option<String>)>,
+    )> {
+        let local_raw = self.scan_local(Path::new(&spec.local_dir)).await?;
+        let remote_raw = self.scan_remote(&spec.account, &spec.remote_prefix).await?;
+
+        // 构建云端 map。
+        let mut remote: BTreeMap<String, RemoteFile> = BTreeMap::new();
+        for (rel, (size, etag)) in &remote_raw {
+            remote.insert(
+                rel.clone(),
+                RemoteFile {
+                    size: *size,
+                    etag: etag.clone(),
+                },
+            );
+        }
+        // 构建本地 map;仅当两侧同大小且云端 ETag 是整对象 MD5 时才算本地 MD5(和秒传一致)。
+        let mut local: BTreeMap<String, LocalFile> = BTreeMap::new();
+        for (rel, (size, abs)) in &local_raw {
+            let md5 = match remote_raw.get(rel) {
+                Some((rsize, retag))
+                    if rsize == size
+                        && retag
+                            .as_deref()
+                            .and_then(crate::integrity::etag_as_md5)
+                            .is_some() =>
+                {
+                    crate::dedup::file_md5(&abs.to_string_lossy()).await.ok()
+                }
+                _ => None,
+            };
+            local.insert(rel.clone(), LocalFile { size: *size, md5 });
+        }
+
+        let items = diff(&local, &remote, spec.mode, spec.delete_extra);
+        Ok((items, local_raw, remote_raw))
+    }
+
+    /// 预览同步:返回每个文件的动作与汇总,不改动任何数据。
+    pub async fn sync_preview(&self, spec: &SyncSpec) -> Result<(Vec<DiffItem>, DiffSummary)> {
+        let (items, _, _) = self.sync_diff_maps(spec).await?;
+        let summary = summarize(&items);
+        Ok((items, summary))
+    }
+
+    /// 执行同步:按 diff 动作逐个处理。单个文件出错记为 failed 并继续,`cancel` 置位即中止。
+    /// `progress(已处理文件数, 总动作数)`。
+    pub async fn sync_run(
+        &self,
+        spec: &SyncSpec,
+        cancel: &AtomicBool,
+        progress: nebula_provider::ProgressFn<'_>,
+    ) -> Result<SyncReport> {
+        let account = &spec.account;
+        let remote_prefix = &spec.remote_prefix;
+        let local_root = Path::new(&spec.local_dir);
+        let (items, local_raw, _) = self.sync_diff_maps(spec).await?;
+
+        let actionable: Vec<&DiffItem> = items
+            .iter()
+            .filter(|i| i.action != SyncAction::Skip)
+            .collect();
+        let total = actionable.len() as u64;
+        let mut report = SyncReport::default();
+        let noop: nebula_provider::ProgressFn = &|_, _| {};
+
+        for (done, it) in actionable.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            let rkey = remote_path(remote_prefix, &it.rel_path);
+            let result: Result<()> = match it.action {
+                SyncAction::Upload => {
+                    let abs = local_raw
+                        .get(&it.rel_path)
+                        .map(|(_, p)| p.to_string_lossy().to_string());
+                    match abs {
+                        Some(abs) => self
+                            .upload_resumable(account, &rkey, &abs, None, cancel, noop)
+                            .await
+                            .map(|_| {
+                                report.uploaded += 1;
+                                report.bytes += it.local_size.unwrap_or(0);
+                            }),
+                        None => Ok(()),
+                    }
+                }
+                SyncAction::Download => {
+                    let dest = local_root.join(rel_to_native(&it.rel_path));
+                    self.download_to_file(account, &rkey, &dest, cancel)
+                        .await
+                        .map(|_| {
+                            report.downloaded += 1;
+                            report.bytes += it.remote_size.unwrap_or(0);
+                        })
+                }
+                SyncAction::DeleteRemote => self.delete(account, &rkey).await.map(|_| {
+                    report.deleted_remote += 1;
+                }),
+                SyncAction::DeleteLocal => {
+                    let abs = local_root.join(rel_to_native(&it.rel_path));
+                    tokio::fs::remove_file(&abs)
+                        .await
+                        .map_err(AppError::from)
+                        .map(|_| {
+                            report.deleted_local += 1;
+                        })
+                }
+                SyncAction::Skip => Ok(()),
+            };
+            if result.is_err() {
+                report.failed += 1;
+            }
+            progress((done + 1) as u64, total);
+        }
+        Ok(report)
+    }
+
+    /// 流式下载远端对象到本地文件(先写 `.part` 再原子重命名,建好父目录)。
+    async fn download_to_file(
+        &self,
+        account: &str,
+        remote_path: &str,
+        dest: &Path,
+        cancel: &AtomicBool,
+    ) -> Result<()> {
+        if let Some(parent) = dest.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        let part = dest.with_extension("nebula-part");
+        let (_, mut stream) = self.provider(account)?.read_stream(remote_path).await?;
+        let mut file = tokio::fs::File::create(&part).await?;
+        while let Some(chunk) = stream.next().await {
+            if cancel.load(Ordering::Relaxed) {
+                let _ = tokio::fs::remove_file(&part).await;
+                return Err(AppError::InvalidInput("cancelled".into()));
+            }
+            let chunk = chunk?;
+            file.write_all(&chunk).await?;
+        }
+        file.flush().await?;
+        drop(file);
+        tokio::fs::rename(&part, dest).await?;
+        Ok(())
+    }
+}
+
+/// 相对路径(用 `/`)转成本地原生分隔符的相对 PathBuf。
+fn rel_to_native(rel: &str) -> PathBuf {
+    rel.split('/').collect()
 }
 
 #[cfg(test)]
