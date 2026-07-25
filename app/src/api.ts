@@ -189,6 +189,14 @@ export const searchContent = (
 export const findDuplicates = (account: string, root: string) =>
   invoke<import("./types").DupResult>("find_duplicates", { account, root });
 
+/** 列出某文件夹下最大的 top 个文件。 */
+export const largestFiles = (account: string, root: string, top: number) =>
+  invoke<import("./types").LargestFiles>("largest_files", {
+    account,
+    root,
+    top,
+  });
+
 export const search = (
   account: string,
   root: string,

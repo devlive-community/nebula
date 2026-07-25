@@ -3702,3 +3702,56 @@ input[type="range"]:disabled {
   color: var(--danger);
   word-break: break-word;
 }
+
+/* ── 大文件排行 ───────────────────────────────── */
+.large__list {
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.large__row {
+  display: grid;
+  grid-template-columns: 1fr auto 52px;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  border-radius: 6px;
+}
+.large__row:hover {
+  background: var(--bg-hover);
+}
+.large__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.large__size {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.large__pct {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: right;
+}
+.large__bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  background: var(--bg-elev-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.large__fill {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}

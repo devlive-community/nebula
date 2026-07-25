@@ -15,6 +15,7 @@ mod duplicates;
 mod error;
 mod imaging;
 mod integrity;
+mod largest;
 mod limits;
 mod matting_plugin;
 mod pdf;
@@ -44,6 +45,7 @@ pub use duplicates::{DupGroup, DupResult};
 pub use error::{AppError, Result};
 pub use imaging::{CropRect, EditSave, ExifInfo, ImageData, Ops};
 pub use integrity::{verify_bytes, Integrity};
+pub use largest::LargestFiles;
 pub use limits::TransferLimits;
 pub use nebula_pdf::{Assembly, NumberPos, PageInfo, PageNumbers, PageSpec, PdfInfo, Watermark};
 pub use nebula_provider::{

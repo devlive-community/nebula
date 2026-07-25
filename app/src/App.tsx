@@ -59,6 +59,7 @@ import { SearchResults } from "./components/SearchResults";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SyncDialog } from "./components/SyncDialog";
 import { DuplicatesDialog } from "./components/DuplicatesDialog";
+import { LargestFilesDialog } from "./components/LargestFilesDialog";
 import { matchBinding, resolveBindings, type Bindings } from "./shortcuts";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { PreviewModal } from "./components/PreviewModal";
@@ -219,6 +220,8 @@ export default function App() {
   const [syncPrefix, setSyncPrefix] = useState<string | null>(null);
   // 查找重复文件对话框的根路径(null = 未打开)。
   const [dupRoot, setDupRoot] = useState<string | null>(null);
+  // 大文件排行对话框的根路径(null = 未打开)。
+  const [largeRoot, setLargeRoot] = useState<string | null>(null);
   // 自定义快捷键(动作 id → 绑定串;仅存用户改过的项),持久化在 ui_prefs。
   const [shortcuts, setShortcuts] = useState<Bindings>({});
   const [showAbout, setShowAbout] = useState(false);
@@ -1855,6 +1858,12 @@ export default function App() {
       label: t("查找重复文件"),
       run: () => setDupRoot(path),
     });
+  if (current && path !== "")
+    paletteCommands.push({
+      id: "largest",
+      label: t("大文件排行"),
+      run: () => setLargeRoot(path),
+    });
   paletteCommands.push({
     id: "settings",
     label: t("设置"),
@@ -2329,6 +2338,18 @@ export default function App() {
         />
       )}
 
+      {largeRoot !== null && current && (
+        <LargestFilesDialog
+          account={current}
+          root={largeRoot}
+          onClose={() => setLargeRoot(null)}
+          onOpen={(p) => {
+            setLargeRoot(null);
+            setPath(parentPath(p));
+          }}
+        />
+      )}
+
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
 
       {showPalette && (
@@ -2393,6 +2414,7 @@ export default function App() {
         { label: t("下载文件夹"), onClick: () => downloadFolderEntry(entry) },
         { label: t("备份 / 同步"), onClick: () => setSyncPrefix(entry.path) },
         { label: t("查找重复文件"), onClick: () => setDupRoot(entry.path) },
+        { label: t("大文件排行"), onClick: () => setLargeRoot(entry.path) },
         { label: t("重命名"), onClick: () => setRenameTarget(entry) },
         { label: t("复制 / 移动到"), onClick: () => setMoveCopyTarget(entry) },
       ];

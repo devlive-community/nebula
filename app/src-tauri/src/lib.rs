@@ -9,8 +9,9 @@ use std::sync::{Arc, Mutex};
 use app_core::{
     AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, DiffItem,
     DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload,
-    Integrity, Ops, Page, PageNumbers, PdfInfo, RenamePlan, RenameRule, SearchResult, Settings,
-    StorageBreakdown, SyncJob, SyncReport, SyncSpec, TextPreview, TransferRecord, Watermark,
+    Integrity, LargestFiles, Ops, Page, PageNumbers, PdfInfo, RenamePlan, RenameRule, SearchResult,
+    Settings, StorageBreakdown, SyncJob, SyncReport, SyncSpec, TextPreview, TransferRecord,
+    Watermark,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -333,6 +334,20 @@ async fn search_content(
 ) -> Result<ContentSearchResult, String> {
     let app = state.inner().clone();
     app.search_content(&account, &root, &query, max_hits)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 列出 `root` 下最大的 `top` 个文件(成本治理)。
+#[tauri::command]
+async fn largest_files(
+    state: State<'_, App>,
+    account: String,
+    root: String,
+    top: usize,
+) -> Result<LargestFiles, String> {
+    let app = state.inner().clone();
+    app.largest_files(&account, &root, top)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1731,6 +1746,7 @@ pub fn run() {
             search,
             search_content,
             find_duplicates,
+            largest_files,
             upload_file,
             download_file,
             delete,

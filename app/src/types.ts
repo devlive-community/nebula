@@ -375,6 +375,13 @@ export interface DupResult {
   truncated: boolean;
 }
 
+/** 大文件排行结果(与 app_core::LargestFiles 对应)。 */
+export interface LargestFiles {
+  files: Entry[];
+  total_bytes: number;
+  total_count: number;
+}
+
 /** 与 Rust 端 nebula_provider::Entry 对应。 */
 export interface Entry {
   name: string;
