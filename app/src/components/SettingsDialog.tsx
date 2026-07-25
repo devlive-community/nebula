@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSliders, faKeyboard, faPuzzlePiece } from "@fortawesome/free-solid-svg-icons";
 import type { Settings } from "../types";
 import { Select } from "./Select";
 import { MattingPluginCard } from "./MattingPluginCard";
@@ -6,6 +8,8 @@ import { ShortcutsEditor } from "./ShortcutsEditor";
 import { useI18n } from "../i18n";
 import { LOCALES } from "../locales";
 import type { Bindings } from "../shortcuts";
+
+type Tab = "general" | "shortcuts" | "plugins";
 
 interface Props {
   settings: Settings;
@@ -32,63 +36,79 @@ export function SettingsDialog({
   );
   const valid =
     minutes >= 1 && concurrency >= 1 && concurrency <= 10 && rateLimit >= 0;
+  const [tab, setTab] = useState<Tab>("general");
+
+  const tabs: { id: Tab; label: string; icon: typeof faSliders }[] = [
+    { id: "general", label: t("基础"), icon: faSliders },
+    { id: "shortcuts", label: t("快捷键"), icon: faKeyboard },
+    { id: "plugins", label: t("插件"), icon: faPuzzlePiece },
+  ];
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal--tabs" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
           <h3>{t("设置")}</h3>
         </div>
+        <div className="settings-tabs">
+          {tabs.map((tb) => (
+            <button
+              key={tb.id}
+              className={`settings-tab ${tab === tb.id ? "settings-tab--on" : ""}`}
+              onClick={() => setTab(tb.id)}
+            >
+              <FontAwesomeIcon icon={tb.icon} />
+              <span>{tb.label}</span>
+            </button>
+          ))}
+        </div>
         <div className="modal__body">
-          <label className="field">
-            <span>{t("语言")}</span>
-            <Select
-              value={locale}
-              options={LOCALES.map((l) => ({ value: l.code, label: l.label }))}
-              onChange={setLocale}
-            />
-          </label>
-          <label className="field">
-            <span>{t("分享链接有效期(分钟)")}</span>
-            <input
-              type="number"
-              min={1}
-              value={minutes}
-              onChange={(e) => setMinutes(Number(e.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>{t("批量传输并发数(1–10)")}</span>
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={concurrency}
-              onChange={(e) => setConcurrency(Number(e.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>{t("传输限速(KiB/秒,0 = 不限速)")}</span>
-            <input
-              type="number"
-              min={0}
-              value={rateLimit}
-              onChange={(e) => setRateLimit(Number(e.target.value))}
-            />
-          </label>
+          {tab === "general" && (
+            <>
+              <label className="field">
+                <span>{t("语言")}</span>
+                <Select
+                  value={locale}
+                  options={LOCALES.map((l) => ({ value: l.code, label: l.label }))}
+                  onChange={setLocale}
+                />
+              </label>
+              <label className="field">
+                <span>{t("分享链接有效期(分钟)")}</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={minutes}
+                  onChange={(e) => setMinutes(Number(e.target.value))}
+                />
+              </label>
+              <label className="field">
+                <span>{t("批量传输并发数(1–10)")}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={concurrency}
+                  onChange={(e) => setConcurrency(Number(e.target.value))}
+                />
+              </label>
+              <label className="field">
+                <span>{t("传输限速(KiB/秒,0 = 不限速)")}</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={rateLimit}
+                  onChange={(e) => setRateLimit(Number(e.target.value))}
+                />
+              </label>
+            </>
+          )}
 
-          <div className="field">
-            <span>{t("快捷键")}</span>
-            <ShortcutsEditor
-              bindings={shortcuts}
-              onChange={onShortcutsChange}
-            />
-          </div>
+          {tab === "shortcuts" && (
+            <ShortcutsEditor bindings={shortcuts} onChange={onShortcutsChange} />
+          )}
 
-          <div className="field">
-            <span>{t("插件")}</span>
-            <MattingPluginCard />
-          </div>
+          {tab === "plugins" && <MattingPluginCard />}
         </div>
         <div className="modal__footer">
           <button className="btn" onClick={onClose}>

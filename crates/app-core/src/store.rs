@@ -81,6 +81,18 @@ impl AccountStore {
                 size INTEGER NOT NULL,
                 hash TEXT,
                 PRIMARY KEY (job, rel)
+            );
+            CREATE TABLE IF NOT EXISTS sync_jobs (
+                id            TEXT PRIMARY KEY,
+                name          TEXT NOT NULL,
+                account       TEXT NOT NULL,
+                local_dir     TEXT NOT NULL,
+                remote_prefix TEXT NOT NULL,
+                mode          TEXT NOT NULL,
+                delete_extra  INTEGER NOT NULL,
+                excludes      TEXT NOT NULL,
+                interval_mins INTEGER NOT NULL,
+                last_run      INTEGER NOT NULL
             );",
         )?;
         // 对已有库补列(1.6.0 及更早没有 custom_domain);已存在则忽略错误。
@@ -431,6 +443,80 @@ impl AccountStore {
         tx.commit()?;
         Ok(())
     }
+
+    /// 列出所有已保存的同步任务(按名字排序)。`excludes` 为 JSON 字符串,由上层解析。
+    pub fn list_sync_jobs(&self) -> rusqlite::Result<Vec<SyncJobRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, account, local_dir, remote_prefix, mode, delete_extra,
+                    excludes, interval_mins, last_run
+             FROM sync_jobs ORDER BY name",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(SyncJobRow {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                account: r.get(2)?,
+                local_dir: r.get(3)?,
+                remote_prefix: r.get(4)?,
+                mode: r.get(5)?,
+                delete_extra: r.get::<_, i64>(6)? != 0,
+                excludes: r.get(7)?,
+                interval_mins: r.get::<_, i64>(8)? as u32,
+                last_run: r.get(9)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// 写入(或覆盖)一条同步任务。
+    pub fn put_sync_job(&self, j: &SyncJobRow) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO sync_jobs
+                (id, name, account, local_dir, remote_prefix, mode, delete_extra,
+                 excludes, interval_mins, last_run)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+             ON CONFLICT(id) DO UPDATE SET
+                name = ?2, account = ?3, local_dir = ?4, remote_prefix = ?5, mode = ?6,
+                delete_extra = ?7, excludes = ?8, interval_mins = ?9, last_run = ?10",
+            params![
+                j.id,
+                j.name,
+                j.account,
+                j.local_dir,
+                j.remote_prefix,
+                j.mode,
+                j.delete_extra as i64,
+                j.excludes,
+                j.interval_mins as i64,
+                j.last_run
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// 删除一条同步任务(及其 manifest)。
+    pub fn delete_sync_job(&self, id: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM sync_jobs WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+}
+
+/// 一条持久化的同步任务(store 层原始行;`excludes` 为 JSON 字符串)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyncJobRow {
+    pub id: String,
+    pub name: String,
+    pub account: String,
+    pub local_dir: String,
+    pub remote_prefix: String,
+    pub mode: String,
+    pub delete_extra: bool,
+    pub excludes: String,
+    pub interval_mins: u32,
+    pub last_run: i64,
 }
 
 /// 一条收藏记录(账号 + 路径)。

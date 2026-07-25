@@ -9,6 +9,7 @@ import type {
   AccountInfo,
   SyncDiffItem,
   SyncDiffSummary,
+  SyncJob,
   SyncMode,
   SyncReport,
   SyncSpec,
@@ -48,6 +49,11 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
   const [mode, setMode] = useState<SyncMode>("mirror_up");
   const [deleteExtra, setDeleteExtra] = useState(false);
   const [excludes, setExcludes] = useState(".DS_Store\nnode_modules/**\n*.tmp");
+  // 已保存任务 + 当前任务名 / 定时间隔(分钟,0=手动)。
+  const [jobs, setJobs] = useState<SyncJob[]>([]);
+  const [jobName, setJobName] = useState("");
+  const [intervalMins, setIntervalMins] = useState(0);
+  const [jobId, setJobId] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<SyncDiffItem[] | null>(null);
@@ -59,6 +65,11 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
   const unlisten = useRef<(() => void) | null>(null);
 
   useEffect(() => () => unlisten.current?.(), []);
+
+  const loadJobs = () => {
+    api.syncJobs().then(setJobs).catch(() => {});
+  };
+  useEffect(loadJobs, []);
 
   const spec = (): SyncSpec => ({
     account,
@@ -123,6 +134,48 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
 
   const cancel = () => {
     if (runId.current) void api.cancelTransfer(runId.current);
+  };
+
+  // 保存当前设置为一个命名任务(可定时)。
+  const saveJob = async () => {
+    if (!jobName.trim() || !account || !localDir) {
+      setError(t("请填任务名、账号与本地目录"));
+      return;
+    }
+    const job: SyncJob = {
+      id: jobId ?? `job-${Date.now()}`,
+      name: jobName.trim(),
+      spec: spec(),
+      interval_mins: intervalMins,
+      last_run: 0,
+    };
+    setError(null);
+    try {
+      await api.saveSyncJob(job);
+      setJobId(job.id);
+      loadJobs();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+  const loadJob = (j: SyncJob) => {
+    setJobId(j.id);
+    setJobName(j.name);
+    setAccount(j.spec.account);
+    setLocalDir(j.spec.local_dir);
+    setRemotePrefix(j.spec.remote_prefix);
+    setMode(j.spec.mode);
+    setDeleteExtra(j.spec.delete_extra);
+    setExcludes(j.spec.excludes.join("\n"));
+    setIntervalMins(j.interval_mins);
+    setItems(null);
+    setSummary(null);
+    setReport(null);
+  };
+  const removeJob = async (id: string) => {
+    await api.deleteSyncJob(id).catch(() => {});
+    if (jobId === id) setJobId(null);
+    loadJobs();
   };
 
   const hasWork =
@@ -198,6 +251,55 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
               placeholder={t("每行一条 glob,如 .DS_Store 或 node_modules/**")}
             />
           </label>
+
+          <label className="field">
+            <span>{t("任务名(保存用)")}</span>
+            <div className="sync__dir">
+              <input
+                value={jobName}
+                onChange={(e) => setJobName(e.target.value)}
+                placeholder={t("如:照片备份")}
+              />
+              <Select
+                value={String(intervalMins)}
+                options={[
+                  { value: "0", label: t("手动") },
+                  { value: "15", label: t("每 15 分钟") },
+                  { value: "60", label: t("每小时") },
+                  { value: "360", label: t("每 6 小时") },
+                  { value: "1440", label: t("每天") },
+                ]}
+                onChange={(v) => setIntervalMins(Number(v))}
+              />
+              <button className="btn" onClick={saveJob}>
+                {jobId ? t("更新任务") : t("保存任务")}
+              </button>
+            </div>
+          </label>
+
+          {jobs.length > 0 && (
+            <div className="sync__jobs">
+              {jobs.map((j) => (
+                <div className="sync__job" key={j.id}>
+                  <button className="sync__job-load" onClick={() => loadJob(j)}>
+                    <span className="sync__job-name">{j.name}</span>
+                    <span className="sync__job-meta">
+                      {j.interval_mins > 0
+                        ? t("每 {n} 分钟", { n: String(j.interval_mins) })
+                        : t("手动")}
+                    </span>
+                  </button>
+                  <button
+                    className="sync__job-del"
+                    title={t("删除")}
+                    onClick={() => removeJob(j.id)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {summary && (
             <div className="sync__summary">

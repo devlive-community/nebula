@@ -9,8 +9,8 @@ use std::sync::{Arc, Mutex};
 use app_core::{
     AccountInfo, App, Assembly, Bookmark, DiffItem, DiffSummary, EditSave, ExifInfo, FolderStats,
     ImageData, IncompleteUpload, Integrity, Ops, Page, PageNumbers, PdfInfo, RenamePlan,
-    RenameRule, SearchResult, Settings, StorageBreakdown, SyncReport, SyncSpec, TextPreview,
-    TransferRecord, Watermark,
+    RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport, SyncSpec,
+    TextPreview, TransferRecord, Watermark,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -1539,6 +1539,24 @@ async fn sync_run(
     Ok(report)
 }
 
+/// 列出已保存的同步任务。
+#[tauri::command]
+fn sync_jobs(state: State<'_, App>) -> Vec<SyncJob> {
+    state.sync_jobs()
+}
+
+/// 保存(新增或覆盖)一条同步任务。
+#[tauri::command]
+fn save_sync_job(state: State<'_, App>, job: SyncJob) -> Result<(), String> {
+    state.save_sync_job(&job).map_err(|e| e.to_string())
+}
+
+/// 删除一条同步任务。
+#[tauri::command]
+fn delete_sync_job(state: State<'_, App>, id: String) -> Result<(), String> {
+    state.delete_sync_job(&id).map_err(|e| e.to_string())
+}
+
 /// 把编辑结果编码后保存到本地文件(`save.dest` 为本地路径,不回云端)。
 #[tauri::command]
 async fn image_edit_download(
@@ -1746,6 +1764,9 @@ pub fn run() {
             pdf_download,
             sync_preview,
             sync_run,
+            sync_jobs,
+            save_sync_job,
+            delete_sync_job,
             remove_background,
             get_pref,
             set_pref,

@@ -103,7 +103,8 @@ export const EN: Record<string, string> = {
   容差: "Tolerance",
   点击要去掉的区域: "Click the area to remove",
   在图上按住涂抹擦除: "Press and drag to erase",
-  // 快捷键
+  // 设置 / 快捷键
+  基础: "General",
   快捷键: "Shortcuts",
   命令面板: "Command palette",
   删除选中: "Delete selection",
@@ -126,6 +127,17 @@ export const EN: Record<string, string> = {
   排除规则: "Exclude rules",
   "每行一条 glob,如 .DS_Store 或 node_modules/**":
     "One glob per line, e.g. .DS_Store or node_modules/**",
+  "任务名(保存用)": "Job name (to save)",
+  "如:照片备份": "e.g. Photo backup",
+  手动: "Manual",
+  "每 15 分钟": "Every 15 min",
+  每小时: "Hourly",
+  "每 6 小时": "Every 6 h",
+  每天: "Daily",
+  保存任务: "Save job",
+  更新任务: "Update job",
+  "每 {n} 分钟": "Every {n} min",
+  "请填任务名、账号与本地目录": "Enter a job name, account and local folder",
   开始同步: "Start sync",
   取消同步: "Cancel sync",
   "两侧已一致,无需同步": "Both sides already match, nothing to sync",

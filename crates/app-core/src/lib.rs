@@ -51,7 +51,7 @@ pub use settings::Settings;
 pub use store::{AccountRecord, AccountStore};
 pub use sync::{
     diff as sync_diff, summarize as sync_summarize, DiffItem, DiffSummary, LocalFile, RemoteFile,
-    SyncAction, SyncMode, SyncReport, SyncSpec,
+    SyncAction, SyncJob, SyncMode, SyncReport, SyncSpec,
 };
 
 const VENDOR_ALIYUN: &str = "aliyun";

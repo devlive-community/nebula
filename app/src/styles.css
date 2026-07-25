@@ -3521,3 +3521,84 @@ input[type="range"]:disabled {
   font-size: 12.5px;
   line-height: 1.5;
 }
+
+/* ── 设置对话框 Tab 分栏 ───────────────────────────────── */
+.modal--tabs {
+  width: 90vw;
+  max-width: 560px;
+}
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.settings-tab:hover {
+  color: var(--text);
+}
+.settings-tab--on {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* 已保存的同步任务列表 */
+.sync__jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.sync__job {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sync__job-load {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.sync__job-load:hover {
+  border-color: var(--primary);
+}
+.sync__job-name {
+  font-size: 13px;
+}
+.sync__job-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.sync__job-del {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.sync__job-del:hover {
+  background: var(--bg-hover);
+  color: var(--danger);
+}

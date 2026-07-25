@@ -482,6 +482,14 @@ export const syncPreview = (spec: import("./types").SyncSpec) =>
 export const syncRun = (id: string, spec: import("./types").SyncSpec) =>
   invoke<import("./types").SyncReport>("sync_run", { id, spec });
 
+export const syncJobs = () => invoke<import("./types").SyncJob[]>("sync_jobs");
+
+export const saveSyncJob = (job: import("./types").SyncJob) =>
+  invoke<void>("save_sync_job", { job });
+
+export const deleteSyncJob = (id: string) =>
+  invoke<void>("delete_sync_job", { id });
+
 // AI 抠图插件(去背景)
 export const mattingSupported = () => invoke<boolean>("matting_supported");
 

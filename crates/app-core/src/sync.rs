@@ -403,6 +403,96 @@ fn is_excluded(rel: &str, excludes: &[String]) -> bool {
         .any(|pat| !pat.trim().is_empty() && glob_match(pat.trim(), rel))
 }
 
+/// 一条已保存的同步任务:参数 + 名字 + 定时间隔 + 上次运行时间。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncJob {
+    pub id: String,
+    pub name: String,
+    pub spec: SyncSpec,
+    /// 定时间隔(分钟);0 = 仅手动。
+    #[serde(default)]
+    pub interval_mins: u32,
+    /// 上次运行的 Unix 秒;0 = 从未。
+    #[serde(default)]
+    pub last_run: i64,
+}
+
+/// [`SyncMode`] ↔ 存储字符串。
+fn mode_to_str(m: SyncMode) -> &'static str {
+    match m {
+        SyncMode::MirrorUp => "mirror_up",
+        SyncMode::MirrorDown => "mirror_down",
+        SyncMode::TwoWay => "two_way",
+    }
+}
+fn mode_from_str(s: &str) -> SyncMode {
+    match s {
+        "mirror_down" => SyncMode::MirrorDown,
+        "two_way" => SyncMode::TwoWay,
+        _ => SyncMode::MirrorUp,
+    }
+}
+
+impl App {
+    /// 列出所有已保存的同步任务。
+    pub fn sync_jobs(&self) -> Vec<SyncJob> {
+        let Some(store) = &self.store else {
+            return Vec::new();
+        };
+        store
+            .list_sync_jobs()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|r| SyncJob {
+                id: r.id,
+                name: r.name,
+                spec: SyncSpec {
+                    account: r.account,
+                    local_dir: r.local_dir,
+                    remote_prefix: r.remote_prefix,
+                    mode: mode_from_str(&r.mode),
+                    delete_extra: r.delete_extra,
+                    excludes: serde_json::from_str(&r.excludes).unwrap_or_default(),
+                },
+                interval_mins: r.interval_mins,
+                last_run: r.last_run,
+            })
+            .collect()
+    }
+
+    /// 保存(新增或覆盖)一条同步任务。
+    pub fn save_sync_job(&self, job: &SyncJob) -> Result<()> {
+        if let Some(store) = &self.store {
+            let row = crate::store::SyncJobRow {
+                id: job.id.clone(),
+                name: job.name.clone(),
+                account: job.spec.account.clone(),
+                local_dir: job.spec.local_dir.clone(),
+                remote_prefix: job.spec.remote_prefix.clone(),
+                mode: mode_to_str(job.spec.mode).to_string(),
+                delete_extra: job.spec.delete_extra,
+                excludes: serde_json::to_string(&job.spec.excludes).unwrap_or_else(|_| "[]".into()),
+                interval_mins: job.interval_mins,
+                last_run: job.last_run,
+            };
+            store
+                .put_sync_job(&row)
+                .map_err(|e| AppError::Image(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// 删除一条同步任务(连带其 manifest)。
+    pub fn delete_sync_job(&self, id: &str) -> Result<()> {
+        if let Some(store) = &self.store {
+            store
+                .delete_sync_job(id)
+                .map_err(|e| AppError::Image(e.to_string()))?;
+        }
+        Ok(())
+    }
+}
+
 /// 某同步任务的稳定标识(账号 + 本地目录 + 远端前缀),用作 manifest 的 job 键。
 fn sync_job_key(spec: &SyncSpec) -> String {
     format!(

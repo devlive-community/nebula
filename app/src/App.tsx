@@ -624,6 +624,39 @@ export default function App() {
     })();
   }, []);
 
+  // 定时同步:应用打开时,每分钟检查已保存任务,到点的静默执行并更新 last_run。
+  const runningJobs = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const tick = async () => {
+      let jobs;
+      try {
+        jobs = await api.syncJobs();
+      } catch {
+        return;
+      }
+      const now = Math.floor(Date.now() / 1000);
+      for (const j of jobs) {
+        if (
+          j.interval_mins > 0 &&
+          !runningJobs.current.has(j.id) &&
+          now - j.last_run >= j.interval_mins * 60
+        ) {
+          runningJobs.current.add(j.id);
+          api
+            .syncRun(`job-run-${j.id}`, j.spec)
+            .catch(() => {})
+            .finally(() => {
+              runningJobs.current.delete(j.id);
+              void api.saveSyncJob({ ...j, last_run: Math.floor(Date.now() / 1000) });
+            });
+        }
+      }
+    };
+    const id = setInterval(tick, 60_000);
+    void tick();
+    return () => clearInterval(id);
+  }, []);
+
   // 拖拽侧栏右边缘调整宽度(限制在 180–480px)。
   const startResize = (e: React.MouseEvent) => {
     e.preventDefault();

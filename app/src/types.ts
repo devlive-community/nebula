@@ -150,6 +150,15 @@ export interface SyncDiffSummary {
   transfer_bytes: number;
 }
 
+/** 一条已保存的同步任务(与 sync::SyncJob 对应)。 */
+export interface SyncJob {
+  id: string;
+  name: string;
+  spec: SyncSpec;
+  interval_mins: number;
+  last_run: number;
+}
+
 /** 同步执行报告(与 sync::SyncReport 对应)。 */
 export interface SyncReport {
   uploaded: number;
