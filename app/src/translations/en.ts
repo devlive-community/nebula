@@ -267,6 +267,8 @@ export const EN: Record<string, string> = {
 
   // 预览
   "内容较大,仅预览前 256 KB。": "Large file — previewing the first 256 KB only.",
+  "{n} 行": "{n} lines",
+  自动换行: "Wrap lines",
 
   // 秒传
   "✓ {name} 下载完成({n} 个未改动已跳过)":
