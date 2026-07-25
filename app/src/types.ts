@@ -160,6 +160,7 @@ export interface SyncJob {
   spec: SyncSpec;
   interval_mins: number;
   last_run: number;
+  last_result: string;
 }
 
 /** 同步执行报告(与 sync::SyncReport 对应)。 */

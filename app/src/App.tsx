@@ -644,10 +644,40 @@ export default function App() {
           runningJobs.current.add(j.id);
           api
             .syncRun(`job-run-${j.id}`, j.spec)
-            .catch(() => {})
+            .then((rep) => {
+              const result = `↑${rep.uploaded} ↓${rep.downloaded} ✕${
+                rep.deleted_remote + rep.deleted_local
+              }${rep.failed ? ` ⚠${rep.failed}` : ""}`;
+              void api.saveSyncJob({
+                ...j,
+                last_run: Math.floor(Date.now() / 1000),
+                last_result: result,
+              });
+              if (rep.uploaded + rep.downloaded + rep.deleted_remote + rep.deleted_local > 0)
+                setNotice({
+                  tone: rep.failed ? "warn" : "ok",
+                  text: t("定时同步「{name}」完成:{result}", {
+                    name: j.name,
+                    result,
+                  }),
+                });
+            })
+            .catch((e) => {
+              void api.saveSyncJob({
+                ...j,
+                last_run: Math.floor(Date.now() / 1000),
+                last_result: t("失败"),
+              });
+              setNotice({
+                tone: "err",
+                text: t("定时同步「{name}」失败:{msg}", {
+                  name: j.name,
+                  msg: String(e),
+                }),
+              });
+            })
             .finally(() => {
               runningJobs.current.delete(j.id);
-              void api.saveSyncJob({ ...j, last_run: Math.floor(Date.now() / 1000) });
             });
         }
       }

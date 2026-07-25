@@ -92,12 +92,18 @@ impl AccountStore {
                 delete_extra  INTEGER NOT NULL,
                 excludes      TEXT NOT NULL,
                 interval_mins INTEGER NOT NULL,
-                last_run      INTEGER NOT NULL
+                last_run      INTEGER NOT NULL,
+                last_result   TEXT NOT NULL DEFAULT ''
             );",
         )?;
         // 对已有库补列(1.6.0 及更早没有 custom_domain);已存在则忽略错误。
         let _ = conn.execute(
             "ALTER TABLE accounts ADD COLUMN custom_domain TEXT NOT NULL DEFAULT ''",
+            [],
+        );
+        // sync_jobs 的上次结果列(早期没有);已存在则忽略。
+        let _ = conn.execute(
+            "ALTER TABLE sync_jobs ADD COLUMN last_result TEXT NOT NULL DEFAULT ''",
             [],
         );
         Ok(Self {
@@ -449,7 +455,7 @@ impl AccountStore {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, name, account, local_dir, remote_prefix, mode, delete_extra,
-                    excludes, interval_mins, last_run
+                    excludes, interval_mins, last_run, last_result
              FROM sync_jobs ORDER BY name",
         )?;
         let rows = stmt.query_map([], |r| {
@@ -464,6 +470,7 @@ impl AccountStore {
                 excludes: r.get(7)?,
                 interval_mins: r.get::<_, i64>(8)? as u32,
                 last_run: r.get(9)?,
+                last_result: r.get(10)?,
             })
         })?;
         rows.collect()
@@ -475,11 +482,12 @@ impl AccountStore {
         conn.execute(
             "INSERT INTO sync_jobs
                 (id, name, account, local_dir, remote_prefix, mode, delete_extra,
-                 excludes, interval_mins, last_run)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                 excludes, interval_mins, last_run, last_result)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
              ON CONFLICT(id) DO UPDATE SET
                 name = ?2, account = ?3, local_dir = ?4, remote_prefix = ?5, mode = ?6,
-                delete_extra = ?7, excludes = ?8, interval_mins = ?9, last_run = ?10",
+                delete_extra = ?7, excludes = ?8, interval_mins = ?9, last_run = ?10,
+                last_result = ?11",
             params![
                 j.id,
                 j.name,
@@ -490,7 +498,8 @@ impl AccountStore {
                 j.delete_extra as i64,
                 j.excludes,
                 j.interval_mins as i64,
-                j.last_run
+                j.last_run,
+                j.last_result
             ],
         )?;
         Ok(())
@@ -517,6 +526,8 @@ pub struct SyncJobRow {
     pub excludes: String,
     pub interval_mins: u32,
     pub last_run: i64,
+    /// 上次运行结果的简短摘要(前端写入,如「↑5 ↓2」或错误)。
+    pub last_result: String,
 }
 
 /// 一条收藏记录(账号 + 路径)。

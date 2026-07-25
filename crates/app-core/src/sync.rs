@@ -427,6 +427,9 @@ pub struct SyncJob {
     /// 上次运行的 Unix 秒;0 = 从未。
     #[serde(default)]
     pub last_run: i64,
+    /// 上次运行结果的简短摘要(前端写入);从未运行则空。
+    #[serde(default)]
+    pub last_result: String,
 }
 
 /// [`SyncMode`] ↔ 存储字符串。
@@ -468,6 +471,7 @@ impl App {
                 },
                 interval_mins: r.interval_mins,
                 last_run: r.last_run,
+                last_result: r.last_result,
             })
             .collect()
     }
@@ -486,6 +490,7 @@ impl App {
                 excludes: serde_json::to_string(&job.spec.excludes).unwrap_or_else(|_| "[]".into()),
                 interval_mins: job.interval_mins,
                 last_run: job.last_run,
+                last_result: job.last_result.clone(),
             };
             store
                 .put_sync_job(&row)

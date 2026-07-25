@@ -38,6 +38,15 @@ const ACTION_LABEL: Record<string, string> = {
   skip: "=",
 };
 
+/** 把 Unix 秒格式化成简短的相对时间。`tr` 为 i18n 翻译函数。 */
+function relTime(tr: (k: string, v?: Record<string, string>) => string, epochSecs: number): string {
+  const s = Math.max(0, Math.floor(Date.now() / 1000) - epochSecs);
+  if (s < 60) return tr("刚刚");
+  if (s < 3600) return tr("{n} 分钟前", { n: String(Math.floor(s / 60)) });
+  if (s < 86400) return tr("{n} 小时前", { n: String(Math.floor(s / 3600)) });
+  return tr("{n} 天前", { n: String(Math.floor(s / 86400)) });
+}
+
 /**
  * 备份 / 同步对话框:本地目录 ⇄ 云端前缀。先预览 diff(不改数据),确认后执行。
  * 模式:备份(本地→云)/ 还原(云→本地)/ 双向。可删除目标侧多余文件。
@@ -145,12 +154,14 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
       setError(t("请填任务名、账号与本地目录"));
       return;
     }
+    const existing = jobs.find((j) => j.id === jobId);
     const job: SyncJob = {
       id: jobId ?? `job-${Date.now()}`,
       name: jobName.trim(),
       spec: spec(),
       interval_mins: intervalMins,
-      last_run: 0,
+      last_run: existing?.last_run ?? 0,
+      last_result: existing?.last_result ?? "",
     };
     setError(null);
     try {
@@ -295,6 +306,10 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
                       {j.interval_mins > 0
                         ? t("每 {n} 分钟", { n: String(j.interval_mins) })
                         : t("手动")}
+                      {j.last_run > 0 &&
+                        ` · ${t("上次")} ${relTime(t, j.last_run)}${
+                          j.last_result ? ` · ${j.last_result}` : ""
+                        }`}
                     </span>
                   </button>
                   <button
