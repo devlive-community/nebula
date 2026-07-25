@@ -3857,3 +3857,8 @@ input[type="range"]:disabled {
   height: 100%;
   background: var(--primary);
 }
+
+/* 紧凑图标按钮(工具栏前进 / 后退) */
+.btn--icon {
+  padding: 7px 10px;
+}

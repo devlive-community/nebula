@@ -114,6 +114,10 @@ export const EN: Record<string, string> = {
   点击后按下新的组合键: "Click, then press a new key combo",
   恢复默认: "Reset to default",
 
+  // 导航
+  后退: "Back",
+  前进: "Forward",
+
   // 面包屑路径
   编辑路径: "Edit path",
   "输入路径,如 bucket/dir/": "Type a path, e.g. bucket/dir/",

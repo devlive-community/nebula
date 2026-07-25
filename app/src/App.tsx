@@ -332,6 +332,38 @@ export default function App() {
   // 切换按钮 / 命令:在当前生效主题的基础上翻转成一个显式主题。
   const toggleTheme = () =>
     setThemePref(theme === "dark" ? "light" : "dark");
+
+  // 导航历史(前进 / 后退):监听 current + path 变化入栈,前进后退时不重复入栈。
+  const navHistory = useRef<{ account: string | null; path: string }[]>([]);
+  const navIdx = useRef(-1);
+  const navBack = useRef(false);
+  const [navVer, setNavVer] = useState(0);
+  useEffect(() => {
+    if (navBack.current) {
+      navBack.current = false;
+      return;
+    }
+    const cut = navHistory.current.slice(0, navIdx.current + 1);
+    const last = cut[cut.length - 1];
+    if (last && last.account === current && last.path === path) return;
+    cut.push({ account: current, path });
+    navHistory.current = cut;
+    navIdx.current = cut.length - 1;
+    setNavVer((v) => v + 1);
+  }, [current, path]);
+  const goHistory = (delta: number) => {
+    const target = navIdx.current + delta;
+    if (target < 0 || target >= navHistory.current.length) return;
+    navIdx.current = target;
+    navBack.current = true;
+    const e = navHistory.current[target];
+    if (e.account !== current) setCurrent(e.account);
+    setPath(e.path);
+    setNavVer((v) => v + 1);
+  };
+  void navVer;
+  const canBack = navIdx.current > 0;
+  const canForward = navIdx.current < navHistory.current.length - 1;
   // 快捷键改动后持久化(仅存用户覆盖的项)。
   useEffect(() => {
     if (prefsHydrated.current)
@@ -1879,6 +1911,18 @@ export default function App() {
 
     if (typing || anyModalOpen || !current) return;
 
+    // 导航历史:Alt/⌘ + ← / →(前进后退)。
+    if ((e.altKey || e.metaKey) && e.key === "ArrowLeft") {
+      e.preventDefault();
+      goHistory(-1);
+      return;
+    }
+    if ((e.altKey || e.metaKey) && e.key === "ArrowRight") {
+      e.preventDefault();
+      goHistory(1);
+      return;
+    }
+
     if (matchBinding(e, keys.selectAll)) {
       e.preventDefault();
       setSelected(new Set(visibleFiles.map((f) => f.path)));
@@ -2023,6 +2067,10 @@ export default function App() {
                 onRemove={removeBookmark}
               />
               <Toolbar
+                canBack={canBack}
+                canForward={canForward}
+                onBack={() => goHistory(-1)}
+                onForward={() => goHistory(1)}
                 canGoUp={path !== ""}
                 canUpload={path !== ""}
                 busy={busy}

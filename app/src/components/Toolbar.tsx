@@ -1,6 +1,8 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowUp,
+  faArrowLeft,
+  faArrowRight,
   faDatabase,
   faFolderOpen,
   faFolderPlus,
@@ -14,6 +16,10 @@ import { useI18n } from "../i18n";
 import { Tooltip } from "./Tooltip";
 
 interface Props {
+  canBack: boolean;
+  canForward: boolean;
+  onBack: () => void;
+  onForward: () => void;
   canGoUp: boolean;
   canUpload: boolean;
   busy: boolean;
@@ -34,6 +40,10 @@ interface Props {
 }
 
 export function Toolbar({
+  canBack,
+  canForward,
+  onBack,
+  onForward,
   canGoUp,
   canUpload,
   busy,
@@ -54,6 +64,20 @@ export function Toolbar({
   const { t } = useI18n();
   return (
     <div className="toolbar">
+      <Tooltip label={t("后退")}>
+        <button className="btn btn--icon" disabled={!canBack} onClick={onBack}>
+          <FontAwesomeIcon icon={faArrowLeft} />
+        </button>
+      </Tooltip>
+      <Tooltip label={t("前进")}>
+        <button
+          className="btn btn--icon"
+          disabled={!canForward}
+          onClick={onForward}
+        >
+          <FontAwesomeIcon icon={faArrowRight} />
+        </button>
+      </Tooltip>
       <button
         className="btn"
         disabled={!canGoUp}
