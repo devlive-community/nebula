@@ -20,6 +20,11 @@ interface Props {
   onOpen: (entry: Entry) => void;
   onToggleSelect: (path: string) => void;
   onToggleSelectAll: () => void;
+  /** 内容搜索时:路径 → 命中片段。 */
+  snippets?: Record<string, string>;
+  /** 是否内容搜索模式。 */
+  contentMode: boolean;
+  onToggleContent: () => void;
   onClear: () => void;
 }
 
@@ -46,6 +51,9 @@ export function SearchResults({
   onOpen,
   onToggleSelect,
   onToggleSelectAll,
+  snippets,
+  contentMode,
+  onToggleContent,
   onClear,
 }: Props) {
   const { t } = useI18n();
@@ -74,26 +82,37 @@ export function SearchResults({
       </div>
 
       <div className="search-results__filters">
-        <Select
-          value={String(minSize)}
-          options={SIZE_PRESETS.map(([label, v]) => ({
-            value: String(v),
-            label: t(label),
-          }))}
-          onChange={(v) => onFilter(Number(v), extInput)}
-        />
-        <input
-          className="search-results__ext"
-          placeholder={t("扩展名,如 jpg(回车应用)")}
-          value={extInput}
-          onChange={(e) => setExtInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onFilter(minSize, extInput);
-          }}
-          onBlur={() => {
-            if (extInput.trim() !== ext.trim()) onFilter(minSize, extInput);
-          }}
-        />
+        <button
+          className={`btn ${contentMode ? "btn--primary" : ""}`}
+          onClick={onToggleContent}
+          title={t("在文本 / PDF 文件内容里搜索")}
+        >
+          {contentMode ? t("按内容搜索") : t("按名称搜索")}
+        </button>
+        {!contentMode && (
+          <>
+            <Select
+              value={String(minSize)}
+              options={SIZE_PRESETS.map(([label, v]) => ({
+                value: String(v),
+                label: t(label),
+              }))}
+              onChange={(v) => onFilter(Number(v), extInput)}
+            />
+            <input
+              className="search-results__ext"
+              placeholder={t("扩展名,如 jpg(回车应用)")}
+              value={extInput}
+              onChange={(e) => setExtInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onFilter(minSize, extInput);
+              }}
+              onBlur={() => {
+                if (extInput.trim() !== ext.trim()) onFilter(minSize, extInput);
+              }}
+            />
+          </>
+        )}
         {!loading && results.length > 0 && (
           <label className="search-results__selall">
             <input
@@ -140,6 +159,11 @@ export function SearchResults({
                   {formatBytes(entry.size)}
                 </span>
               </button>
+              {snippets?.[entry.path] && (
+                <div className="search-results__snippet">
+                  {snippets[entry.path]}
+                </div>
+              )}
             </div>
           ))
         )}

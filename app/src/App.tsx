@@ -124,9 +124,13 @@ export default function App() {
     results: Entry[];
     loading: boolean;
     truncated: boolean;
+    /** 内容搜索时:路径 → 命中片段。 */
+    snippets?: Record<string, string>;
   } | null>(null);
   // 搜索过滤:minSize 字节(0=不限),ext 扩展名(空=不限)。
   const [searchFilter, setSearchFilter] = useState({ minSize: 0, ext: "" });
+  // 内容搜索模式(搜文件内容而非文件名)。
+  const [contentSearch, setContentSearch] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{
@@ -745,25 +749,42 @@ export default function App() {
 
   // 从当前目录递归搜索(全桶或子树,取决于所在层级)。
   const runSearch = useCallback(
-    async (query: string, filter: { minSize: number; ext: string }) => {
+    async (
+      query: string,
+      filter: { minSize: number; ext: string },
+      content = false,
+    ) => {
       if (!current || path === "") return;
       setSelected(new Set()); // 选择按视图隔离:进入搜索先清空目录里的选中
       setSearch({ query, results: [], loading: true, truncated: false });
       try {
-        const res = await api.search(
-          current,
-          path,
-          query,
-          filter.minSize || null,
-          filter.ext.trim() || null,
-          500,
-        );
-        setSearch({
-          query,
-          results: res.entries,
-          loading: false,
-          truncated: res.truncated,
-        });
+        if (content) {
+          const res = await api.searchContent(current, path, query, 200);
+          setSearch({
+            query,
+            results: res.hits.map((h) => h.entry),
+            snippets: Object.fromEntries(
+              res.hits.map((h) => [h.entry.path, h.snippet]),
+            ),
+            loading: false,
+            truncated: res.truncated,
+          });
+        } else {
+          const res = await api.search(
+            current,
+            path,
+            query,
+            filter.minSize || null,
+            filter.ext.trim() || null,
+            500,
+          );
+          setSearch({
+            query,
+            results: res.entries,
+            loading: false,
+            truncated: res.truncated,
+          });
+        }
       } catch (e) {
         setError(String(e));
         setSearch(null);
@@ -775,7 +796,13 @@ export default function App() {
   // 改变过滤条件时,用当前关键词重跑搜索。
   const applySearchFilter = (minSize: number, ext: string) => {
     setSearchFilter({ minSize, ext });
-    if (search) void runSearch(search.query, { minSize, ext });
+    if (search) void runSearch(search.query, { minSize, ext }, contentSearch);
+  };
+  // 切换「按名 / 按内容」搜索并重跑。
+  const toggleContentSearch = () => {
+    const next = !contentSearch;
+    setContentSearch(next);
+    if (search) void runSearch(search.query, searchFilter, next);
   };
 
   // 打开搜索结果:跳到其所在目录并退出搜索。
@@ -1886,7 +1913,7 @@ export default function App() {
                 atRoot={path === "" && !!current}
                 onNewBucket={() => setShowNewBucket(true)}
                 onFilter={setFilter}
-                onSearch={(q) => runSearch(q, searchFilter)}
+                onSearch={(q) => runSearch(q, searchFilter, contentSearch)}
                 onUp={() => setPath(parentPath(path))}
                 onRefresh={load}
                 onToggleView={() =>
@@ -1950,6 +1977,9 @@ export default function App() {
                 onOpen={openSearchResult}
                 onToggleSelect={toggleSelect}
                 onToggleSelectAll={toggleSelectAllSearch}
+                snippets={search.snippets}
+                contentMode={contentSearch}
+                onToggleContent={toggleContentSearch}
                 onClear={() => {
                   setSearch(null);
                   clearSelection();

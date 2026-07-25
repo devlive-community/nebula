@@ -3627,3 +3627,16 @@ input[type="range"]:disabled {
   border-color: var(--primary);
   color: #fff;
 }
+
+/* 内容搜索命中片段 */
+.search-results__snippet {
+  margin: 2px 0 6px 44px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  background: var(--bg-elev-2);
+  border-radius: 6px;
+  border-left: 2px solid var(--primary);
+  word-break: break-word;
+}

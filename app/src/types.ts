@@ -346,6 +346,19 @@ export interface SearchResult {
   truncated: boolean;
 }
 
+/** 内容搜索的一条命中(与 app_core::ContentHit 对应)。 */
+export interface ContentHit {
+  entry: Entry;
+  snippet: string;
+}
+
+/** 内容搜索结果(与 app_core::ContentSearchResult 对应)。 */
+export interface ContentSearchResult {
+  hits: ContentHit[];
+  scanned: number;
+  truncated: boolean;
+}
+
 /** 与 Rust 端 nebula_provider::Entry 对应。 */
 export interface Entry {
   name: string;

@@ -7,10 +7,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, Assembly, Bookmark, ConflictChoice, DiffItem, DiffSummary, EditSave,
-    ExifInfo, FolderStats, ImageData, IncompleteUpload, Integrity, Ops, Page, PageNumbers, PdfInfo,
-    RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport,
-    SyncSpec, TextPreview, TransferRecord, Watermark,
+    AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, DiffItem,
+    DiffSummary, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload, Integrity, Ops,
+    Page, PageNumbers, PdfInfo, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown,
+    SyncJob, SyncReport, SyncSpec, TextPreview, TransferRecord, Watermark,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -318,6 +318,21 @@ async fn search(
     let app = state.inner().clone();
     let filter = app_core::SearchFilter { min_size, ext };
     app.search(&account, &root, &query, &filter, max_results)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 内容搜索:在文本类 / PDF 文件里查关键字,返回命中文件与片段。
+#[tauri::command]
+async fn search_content(
+    state: State<'_, App>,
+    account: String,
+    root: String,
+    query: String,
+    max_hits: usize,
+) -> Result<ContentSearchResult, String> {
+    let app = state.inner().clone();
+    app.search_content(&account, &root, &query, max_hits)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1701,6 +1716,7 @@ pub fn run() {
             save_transfer,
             delete_transfer,
             search,
+            search_content,
             upload_file,
             download_file,
             delete,

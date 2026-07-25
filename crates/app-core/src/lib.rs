@@ -9,6 +9,7 @@
 
 mod breakdown;
 mod cancel;
+mod content_search;
 mod dedup;
 mod error;
 mod imaging;
@@ -37,6 +38,7 @@ use provider_r2::R2Provider;
 use provider_tencent::TencentProvider;
 
 pub use breakdown::{ClassStat, StorageBreakdown};
+pub use content_search::{ContentHit, ContentSearchResult};
 pub use error::{AppError, Result};
 pub use imaging::{CropRect, EditSave, ExifInfo, ImageData, Ops};
 pub use integrity::{verify_bytes, Integrity};

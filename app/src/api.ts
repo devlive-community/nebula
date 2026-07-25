@@ -171,6 +171,20 @@ export const copyFolder = (
 export const deleteFolder = (account: string, path: string) =>
   invoke<void>("delete_folder", { account, path });
 
+/** 内容搜索:在文本 / PDF 文件里查关键字,返回命中文件与片段。 */
+export const searchContent = (
+  account: string,
+  root: string,
+  query: string,
+  maxHits: number,
+) =>
+  invoke<import("./types").ContentSearchResult>("search_content", {
+    account,
+    root,
+    query,
+    maxHits,
+  });
+
 export const search = (
   account: string,
   root: string,
