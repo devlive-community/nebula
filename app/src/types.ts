@@ -150,6 +150,9 @@ export interface SyncDiffSummary {
   transfer_bytes: number;
 }
 
+/** 双向冲突决议(与 sync::ConflictChoice 对应)。 */
+export type ConflictChoice = "keep_local" | "keep_remote" | "skip";
+
 /** 一条已保存的同步任务(与 sync::SyncJob 对应)。 */
 export interface SyncJob {
   id: string;

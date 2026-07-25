@@ -479,8 +479,11 @@ export const syncPreview = (spec: import("./types").SyncSpec) =>
     { spec },
   );
 
-export const syncRun = (id: string, spec: import("./types").SyncSpec) =>
-  invoke<import("./types").SyncReport>("sync_run", { id, spec });
+export const syncRun = (
+  id: string,
+  spec: import("./types").SyncSpec,
+  resolutions: Record<string, import("./types").ConflictChoice> = {},
+) => invoke<import("./types").SyncReport>("sync_run", { id, spec, resolutions });
 
 export const syncJobs = () => invoke<import("./types").SyncJob[]>("sync_jobs");
 

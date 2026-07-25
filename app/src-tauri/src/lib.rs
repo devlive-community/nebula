@@ -7,10 +7,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, Assembly, Bookmark, DiffItem, DiffSummary, EditSave, ExifInfo, FolderStats,
-    ImageData, IncompleteUpload, Integrity, Ops, Page, PageNumbers, PdfInfo, RenamePlan,
-    RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport, SyncSpec,
-    TextPreview, TransferRecord, Watermark,
+    AccountInfo, App, Assembly, Bookmark, ConflictChoice, DiffItem, DiffSummary, EditSave,
+    ExifInfo, FolderStats, ImageData, IncompleteUpload, Integrity, Ops, Page, PageNumbers, PdfInfo,
+    RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport,
+    SyncSpec, TextPreview, TransferRecord, Watermark,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -1514,6 +1514,7 @@ async fn sync_run(
     transfers: State<'_, Transfers>,
     id: String,
     spec: SyncSpec,
+    resolutions: std::collections::BTreeMap<String, ConflictChoice>,
 ) -> Result<SyncReport, String> {
     let core = state.inner().clone();
     let cancel = transfers.begin(&id);
@@ -1524,7 +1525,7 @@ async fn sync_run(
     let handle = app_handle.clone();
     let ev_id = id.clone();
     let report = core
-        .sync_run(&spec, &cancel, &move |done, total| {
+        .sync_run(&spec, &resolutions, &cancel, &move |done, total| {
             let _ = handle.emit(
                 "sync-progress",
                 SyncProgress {

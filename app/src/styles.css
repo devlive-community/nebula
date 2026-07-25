@@ -3602,3 +3602,28 @@ input[type="range"]:disabled {
   background: var(--bg-hover);
   color: var(--danger);
 }
+
+/* 冲突逐文件决议按钮 */
+.sync__resolve {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  flex: none;
+}
+.sync__choice {
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sync__choice:hover {
+  color: var(--text);
+}
+.sync__choice--on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}

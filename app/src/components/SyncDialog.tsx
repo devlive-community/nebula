@@ -7,6 +7,7 @@ import { formatBytes } from "../util";
 import { Select } from "./Select";
 import type {
   AccountInfo,
+  ConflictChoice,
   SyncDiffItem,
   SyncDiffSummary,
   SyncJob,
@@ -54,6 +55,8 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
   const [jobName, setJobName] = useState("");
   const [intervalMins, setIntervalMins] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
+  // 双向冲突的逐文件决议(rel_path → 保留哪边)。
+  const [resolutions, setResolutions] = useState<Record<string, ConflictChoice>>({});
 
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<SyncDiffItem[] | null>(null);
@@ -117,7 +120,7 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
         setProgress({ done: e.payload.done, total: e.payload.total });
     });
     try {
-      const rep = await api.syncRun(runId.current, spec());
+      const rep = await api.syncRun(runId.current, spec(), resolutions);
       setReport(rep);
       // 执行后重新预览,反映最新状态。
       const [its, sum] = await api.syncPreview(spec());
@@ -178,9 +181,14 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
     loadJobs();
   };
 
+  // 已解决(选了保留哪边)的冲突数——这些会变成实际要传的工作。
+  const resolvedCount = Object.values(resolutions).filter(
+    (c) => c !== "skip",
+  ).length;
   const hasWork =
-    summary &&
-    summary.upload + summary.download + summary.delete_remote + summary.delete_local > 0;
+    !!summary &&
+    (summary.upload + summary.download + summary.delete_remote + summary.delete_local > 0 ||
+      resolvedCount > 0);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -333,6 +341,27 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
                     <span className="sync__path" title={it.rel_path}>
                       {it.rel_path}
                     </span>
+                    {it.action === "conflict" && (
+                      <span className="sync__resolve">
+                        {(
+                          [
+                            ["keep_local", t("留本地")],
+                            ["keep_remote", t("留云端")],
+                            ["skip", t("跳过")],
+                          ] as [ConflictChoice, string][]
+                        ).map(([c, label]) => (
+                          <button
+                            key={c}
+                            className={`sync__choice ${resolutions[it.rel_path] === c ? "sync__choice--on" : ""}`}
+                            onClick={() =>
+                              setResolutions((r) => ({ ...r, [it.rel_path]: c }))
+                            }
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </span>
+                    )}
                   </div>
                 ))}
             </div>

@@ -56,6 +56,18 @@ pub enum SyncAction {
     Skip,
 }
 
+/// 双向冲突的用户决议:保留哪一侧,或跳过不动。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConflictChoice {
+    /// 保留本地(上传覆盖云端)。
+    KeepLocal,
+    /// 保留云端(下载覆盖本地)。
+    KeepRemote,
+    /// 跳过,保持冲突。
+    Skip,
+}
+
 /// 本地一侧的文件元信息。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalFile {
@@ -674,6 +686,7 @@ impl App {
     pub async fn sync_run(
         &self,
         spec: &SyncSpec,
+        resolutions: &BTreeMap<String, ConflictChoice>,
         cancel: &AtomicBool,
         progress: nebula_provider::ProgressFn<'_>,
     ) -> Result<SyncReport> {
@@ -681,7 +694,18 @@ impl App {
         let remote_prefix = &spec.remote_prefix;
         let local_root = Path::new(&spec.local_dir);
         let two_way = spec.mode == SyncMode::TwoWay;
-        let (items, local_raw, remote_raw) = self.sync_diff_maps(spec).await?;
+        let (mut items, local_raw, remote_raw) = self.sync_diff_maps(spec).await?;
+
+        // 应用冲突决议:把用户选了「保留本地 / 云端」的冲突项转成上传 / 下载;选跳过则保持冲突。
+        for it in &mut items {
+            if it.action == SyncAction::Conflict {
+                match resolutions.get(&it.rel_path) {
+                    Some(ConflictChoice::KeepLocal) => it.action = SyncAction::Upload,
+                    Some(ConflictChoice::KeepRemote) => it.action = SyncAction::Download,
+                    _ => {}
+                }
+            }
+        }
 
         // 冲突与跳过都不算「工作」;只对真正要传 / 删的项计进度与执行。
         let actionable: Vec<&DiffItem> = items
