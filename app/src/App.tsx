@@ -305,12 +305,33 @@ export default function App() {
   const [showBatchTags, setShowBatchTags] = useState(false);
   const [showBatchMove, setShowBatchMove] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  // 主题偏好:深色 / 浅色 / 跟随系统。实际生效主题由偏好 + 系统色推导。
+  const [themePref, setThemePref] = useState<"dark" | "light" | "system">("system");
+  const [systemDark, setSystemDark] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+  const theme: "dark" | "light" =
+    themePref === "system" ? (systemDark ? "dark" : "light") : themePref;
+  // 跟随系统时监听系统日夜切换。
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const on = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    if (prefsHydrated.current) api.setPref("theme", theme).catch(() => {});
   }, [theme]);
+  // 持久化偏好(而非推导结果)。
+  useEffect(() => {
+    if (prefsHydrated.current) api.setPref("theme", themePref).catch(() => {});
+  }, [themePref]);
+  // 切换按钮 / 命令:在当前生效主题的基础上翻转成一个显式主题。
+  const toggleTheme = () =>
+    setThemePref(theme === "dark" ? "light" : "dark");
   // 快捷键改动后持久化(仅存用户覆盖的项)。
   useEffect(() => {
     if (prefsHydrated.current)
@@ -621,7 +642,7 @@ export default function App() {
         const n = Number(sw);
         if (n >= 180 && n <= 480) setSidebarWidth(n);
         if (v === "list" || v === "grid") setView(v);
-        if (th === "dark" || th === "light") setTheme(th);
+        if (th === "dark" || th === "light" || th === "system") setThemePref(th);
         if (sc) {
           try {
             setShortcuts(JSON.parse(sc));
@@ -843,8 +864,7 @@ export default function App() {
     if (action === "about") setShowAbout(true);
     else if (action === "settings") setShowSettings(true);
     else if (action === "add-account") setShowForm(true);
-    else if (action === "toggle-theme")
-      setTheme((t) => (t === "dark" ? "light" : "dark"));
+    else if (action === "toggle-theme") toggleTheme();
     else if (action === "refresh") void load();
     else if (action === "check-update") void runUpdateCheck(true);
   };
@@ -1919,7 +1939,7 @@ export default function App() {
   paletteCommands.push({
     id: "toggle-theme",
     label: t("切换主题"),
-    run: () => setTheme((x) => (x === "dark" ? "light" : "dark")),
+    run: () => toggleTheme(),
   });
   if (current)
     paletteCommands.push({
@@ -1973,7 +1993,7 @@ export default function App() {
         onAdd={() => setShowForm(true)}
         onEdit={editAccount}
         onRemove={removeAccount}
-        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        onToggleTheme={toggleTheme}
         onSettings={() => setShowSettings(true)}
       />
 
@@ -2434,6 +2454,8 @@ export default function App() {
           settings={settings}
           shortcuts={shortcuts}
           onShortcutsChange={setShortcuts}
+          themePref={themePref}
+          onThemeChange={setThemePref}
           onSave={saveSettings}
           onClose={() => setShowSettings(false)}
         />

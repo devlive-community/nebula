@@ -105,6 +105,8 @@ export const EN: Record<string, string> = {
   在图上按住涂抹擦除: "Press and drag to erase",
   // 设置 / 快捷键
   基础: "General",
+  主题: "Theme",
+  跟随系统: "Follow system",
   快捷键: "Shortcuts",
   命令面板: "Command palette",
   删除选中: "Delete selection",

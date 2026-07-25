@@ -11,10 +11,14 @@ import type { Bindings } from "../shortcuts";
 
 type Tab = "general" | "shortcuts" | "plugins";
 
+type ThemePref = "dark" | "light" | "system";
+
 interface Props {
   settings: Settings;
   shortcuts: Bindings;
   onShortcutsChange: (next: Bindings) => void;
+  themePref: ThemePref;
+  onThemeChange: (t: ThemePref) => void;
   onSave: (settings: Settings) => void;
   onClose: () => void;
 }
@@ -23,6 +27,8 @@ export function SettingsDialog({
   settings,
   shortcuts,
   onShortcutsChange,
+  themePref,
+  onThemeChange,
   onSave,
   onClose,
 }: Props) {
@@ -71,6 +77,18 @@ export function SettingsDialog({
                   value={locale}
                   options={LOCALES.map((l) => ({ value: l.code, label: l.label }))}
                   onChange={setLocale}
+                />
+              </label>
+              <label className="field">
+                <span>{t("主题")}</span>
+                <Select
+                  value={themePref}
+                  options={[
+                    { value: "system", label: t("跟随系统") },
+                    { value: "dark", label: t("深色") },
+                    { value: "light", label: t("浅色") },
+                  ]}
+                  onChange={(v) => onThemeChange(v as ThemePref)}
                 />
               </label>
               <label className="field">

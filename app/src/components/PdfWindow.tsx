@@ -121,7 +121,14 @@ export function PdfWindow({ account, path, name }: Props) {
     api
       .getPref("theme")
       .then((th) => {
-        const theme = th === "light" ? "light" : "dark";
+        const theme =
+          th === "light"
+            ? "light"
+            : th === "dark"
+              ? "dark"
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
         document.documentElement.setAttribute("data-theme", theme);
         void getCurrentWindow().setTheme(theme);
       })
