@@ -39,7 +39,7 @@ Built with Rust + Tauri — lightweight, fast, and native on macOS / Windows / L
 - **Search & batch** — recursive in-bucket search by name (name / size / type filters) or by **content** inside text and PDF files (with a matching snippet), multi-select results to change storage class / restore / delete / download; buckets in other regions are routed to their own region automatically.
 - **Navigation & productivity** — a **Cmd/Ctrl+K command palette** (type to jump to accounts / bookmarks or run commands), **bookmarks**, **recent locations**; English / Chinese UI, light / dark themes, shortcuts and context menus.
 - **Transfer management** — concurrency control, global rate limit, speed / ETA, cancel / resume, restart recovery, retry-all-failed.
-- **Storage hygiene** — clean up orphaned incomplete multipart uploads to reclaim silently-billed storage; transition tiers or restore archives for a single object or a whole folder.
+- **Storage hygiene** — clean up orphaned incomplete multipart uploads to reclaim silently-billed storage; find duplicate objects (grouped by size + ETag) and delete redundant copies keeping one; transition tiers or restore archives for a single object or a whole folder.
 - **Accounts & security** — secrets in the system keyring; metadata, settings, bookmarks, recents and UI preferences persisted to local SQLite (across dedicated tables; unfinished transfers resume after a restart).
 - **Auto-update** — detect new versions in-app and install with one click, verified by update signatures.
 
