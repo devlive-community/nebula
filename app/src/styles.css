@@ -255,6 +255,44 @@ body.resizing {
   align-items: center;
 }
 
+/* 面包屑:编辑路径的铅笔按钮(默认淡,悬停整条时显现)+ 输入态 */
+.breadcrumb__editbtn {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 3px 6px;
+  margin-left: 4px;
+  border-radius: 5px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.breadcrumb:hover .breadcrumb__editbtn,
+.breadcrumb--edit .breadcrumb__editbtn {
+  opacity: 0.7;
+}
+.breadcrumb__editbtn:hover {
+  opacity: 1;
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.breadcrumb--edit {
+  flex: 1;
+  gap: 4px;
+}
+.breadcrumb__input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 10px;
+  font-size: 14px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--primary);
+  border-radius: 7px;
+  color: var(--text);
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
 .breadcrumb__link {
   background: none;
   border: none;
