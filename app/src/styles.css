@@ -3502,3 +3502,16 @@ input[type="range"]:disabled {
   opacity: 0.3;
   cursor: default;
 }
+
+.sync__excludes {
+  flex: 1;
+  resize: vertical;
+  padding: 6px 8px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+}

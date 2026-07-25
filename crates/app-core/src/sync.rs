@@ -210,7 +210,7 @@ pub struct SyncReport {
     pub bytes: u64,
 }
 
-/// 一个同步任务的参数(账号 / 本地目录 / 远端前缀 / 模式 / 是否删多余)。
+/// 一个同步任务的参数(账号 / 本地目录 / 远端前缀 / 模式 / 是否删多余 / 排除规则)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncSpec {
     pub account: String,
@@ -219,6 +219,66 @@ pub struct SyncSpec {
     pub mode: SyncMode,
     #[serde(default)]
     pub delete_extra: bool,
+    /// 排除规则(glob):命中的相对路径两侧都忽略。如 `.DS_Store`、`node_modules/**`、`*.tmp`。
+    #[serde(default)]
+    pub excludes: Vec<String>,
+}
+
+/// 一条 glob 规则是否命中某相对路径(用 `/` 分隔)。
+///
+/// 支持:`*`(不跨 `/` 的任意串)、`**`(跨目录任意串)、`?`(单字符)。规则不含 `/`
+/// 时对**任意路径段**匹配(如 `.DS_Store` 命中任何目录下的该文件;`*.tmp` 命中任何 .tmp)。
+fn glob_match(pattern: &str, path: &str) -> bool {
+    // 不含 `/` 的规则:对每个路径段单独尝试,命中任一即算命中。
+    if !pattern.contains('/') {
+        return path.split('/').any(|seg| glob_seg(pattern, seg)) || glob_seg(pattern, path);
+    }
+    glob_seg(pattern, path)
+}
+
+/// 在单个字符串上做 glob 匹配(`**` 跨 `/`,`*` 不跨 `/`,`?` 单字符)。
+fn glob_seg(pattern: &str, text: &str) -> bool {
+    let p: Vec<char> = pattern.chars().collect();
+    let t: Vec<char> = text.chars().collect();
+    glob_rec(&p, &t)
+}
+
+fn glob_rec(p: &[char], t: &[char]) -> bool {
+    if p.is_empty() {
+        return t.is_empty();
+    }
+    match p[0] {
+        '*' => {
+            // `**` 跨目录:吃掉任意(含 /)。
+            if p.get(1) == Some(&'*') {
+                let rest = &p[2..];
+                // 允许吃掉前导 `/`。
+                let rest = if rest.first() == Some(&'/') {
+                    &rest[1..]
+                } else {
+                    rest
+                };
+                if glob_rec(rest, t) {
+                    return true;
+                }
+                return !t.is_empty() && glob_rec(p, &t[1..]);
+            }
+            // 单 `*`:不跨 `/`。
+            if glob_rec(&p[1..], t) {
+                return true;
+            }
+            !t.is_empty() && t[0] != '/' && glob_rec(p, &t[1..])
+        }
+        '?' => !t.is_empty() && t[0] != '/' && glob_rec(&p[1..], &t[1..]),
+        c => !t.is_empty() && t[0] == c && glob_rec(&p[1..], &t[1..]),
+    }
+}
+
+/// 相对路径是否被任一排除规则命中。
+fn is_excluded(rel: &str, excludes: &[String]) -> bool {
+    excludes
+        .iter()
+        .any(|pat| !pat.trim().is_empty() && glob_match(pat.trim(), rel))
 }
 
 /// 归一化远端前缀:去掉尾部 `/`,便于统一拼接。
@@ -297,8 +357,14 @@ impl App {
         BTreeMap<String, (u64, PathBuf)>,
         BTreeMap<String, (u64, Option<String>)>,
     )> {
-        let local_raw = self.scan_local(Path::new(&spec.local_dir)).await?;
-        let remote_raw = self.scan_remote(&spec.account, &spec.remote_prefix).await?;
+        let mut local_raw = self.scan_local(Path::new(&spec.local_dir)).await?;
+        let mut remote_raw = self.scan_remote(&spec.account, &spec.remote_prefix).await?;
+
+        // 排除规则:命中的相对路径两侧都剔除,不参与 diff / 执行。
+        if !spec.excludes.is_empty() {
+            local_raw.retain(|rel, _| !is_excluded(rel, &spec.excludes));
+            remote_raw.retain(|rel, _| !is_excluded(rel, &spec.excludes));
+        }
 
         // 构建云端 map。
         let mut remote: BTreeMap<String, RemoteFile> = BTreeMap::new();
@@ -558,6 +624,33 @@ mod tests {
         let d = diff(&l, &r, SyncMode::TwoWay, false);
         assert_eq!(action_of(&d, "only_local"), Some(&SyncAction::Upload));
         assert_eq!(action_of(&d, "only_remote"), Some(&SyncAction::Download));
+    }
+
+    #[test]
+    fn glob_bare_name_matches_any_segment() {
+        assert!(is_excluded(".DS_Store", &[".DS_Store".into()]));
+        assert!(is_excluded("sub/dir/.DS_Store", &[".DS_Store".into()]));
+        assert!(is_excluded("a/b.tmp", &["*.tmp".into()]));
+        assert!(!is_excluded("a/b.txt", &["*.tmp".into()]));
+    }
+
+    #[test]
+    fn glob_double_star_crosses_dirs() {
+        assert!(is_excluded(
+            "node_modules/x/y.js",
+            &["node_modules/**".into()]
+        ));
+        assert!(is_excluded(
+            "a/node_modules/z",
+            &["**/node_modules/**".into()]
+        ));
+        assert!(!is_excluded("src/app.js", &["node_modules/**".into()]));
+    }
+
+    #[test]
+    fn glob_single_star_does_not_cross_slash() {
+        assert!(is_excluded("build/out.o", &["build/*.o".into()]));
+        assert!(!is_excluded("build/sub/out.o", &["build/*.o".into()]));
     }
 
     #[test]

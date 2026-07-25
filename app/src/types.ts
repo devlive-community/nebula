@@ -126,6 +126,8 @@ export interface SyncSpec {
   remote_prefix: string;
   mode: SyncMode;
   delete_extra: boolean;
+  /** 排除规则(glob),每行一条。 */
+  excludes: string[];
 }
 
 /** diff 的一条(与 sync::DiffItem 对应)。 */

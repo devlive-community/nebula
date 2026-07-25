@@ -123,6 +123,9 @@ export const EN: Record<string, string> = {
   双向同步: "Two-way sync",
   "删除云端多余对象(镜像)": "Delete extra cloud objects (mirror)",
   "删除本地多余文件(镜像)": "Delete extra local files (mirror)",
+  排除规则: "Exclude rules",
+  "每行一条 glob,如 .DS_Store 或 node_modules/**":
+    "One glob per line, e.g. .DS_Store or node_modules/**",
   开始同步: "Start sync",
   取消同步: "Cancel sync",
   "两侧已一致,无需同步": "Both sides already match, nothing to sync",

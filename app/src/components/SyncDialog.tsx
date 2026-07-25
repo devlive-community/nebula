@@ -46,6 +46,7 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
   const [remotePrefix, setRemotePrefix] = useState(defaultPrefix);
   const [mode, setMode] = useState<SyncMode>("mirror_up");
   const [deleteExtra, setDeleteExtra] = useState(false);
+  const [excludes, setExcludes] = useState(".DS_Store\nnode_modules/**\n*.tmp");
 
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<SyncDiffItem[] | null>(null);
@@ -64,6 +65,10 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
     remote_prefix: remotePrefix,
     mode,
     delete_extra: deleteExtra,
+    excludes: excludes
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean),
   });
 
   const pickDir = async () => {
@@ -181,6 +186,17 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
               </span>
             </label>
           )}
+
+          <label className="field">
+            <span>{t("排除规则")}</span>
+            <textarea
+              className="sync__excludes"
+              rows={3}
+              value={excludes}
+              onChange={(e) => setExcludes(e.target.value)}
+              placeholder={t("每行一条 glob,如 .DS_Store 或 node_modules/**")}
+            />
+          </label>
 
           {summary && (
             <div className="sync__summary">
