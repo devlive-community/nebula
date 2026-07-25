@@ -32,6 +32,7 @@ const ACTION_LABEL: Record<string, string> = {
   download: "↓",
   delete_remote: "✕云",
   delete_local: "✕本地",
+  conflict: "⚠",
   skip: "=",
 };
 
@@ -205,6 +206,11 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
               <span className="sync__stat sync__stat--del">
                 ✕ {summary.delete_remote + summary.delete_local}
               </span>
+              {summary.conflict > 0 && (
+                <span className="sync__stat sync__stat--conflict">
+                  ⚠ {summary.conflict}
+                </span>
+              )}
               <span className="sync__stat">= {summary.skip}</span>
               <span className="sync__stat sync__stat--bytes">
                 {formatBytes(summary.transfer_bytes)}

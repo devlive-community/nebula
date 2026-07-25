@@ -74,6 +74,13 @@ impl AccountStore {
                 path    TEXT NOT NULL,
                 seq     INTEGER NOT NULL,
                 PRIMARY KEY (account, path)
+            );
+            CREATE TABLE IF NOT EXISTS sync_manifest (
+                job  TEXT NOT NULL,
+                rel  TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                hash TEXT,
+                PRIMARY KEY (job, rel)
             );",
         )?;
         // 对已有库补列(1.6.0 及更早没有 custom_domain);已存在则忽略错误。
@@ -384,6 +391,44 @@ impl AccountStore {
              ON CONFLICT(key) DO UPDATE SET value = ?2",
             params![key, value],
         )?;
+        Ok(())
+    }
+
+    /// 读取某同步任务的上次同步快照:`rel -> (size, 可选 hash)`。
+    pub fn sync_manifest_load(
+        &self,
+        job: &str,
+    ) -> rusqlite::Result<Vec<(String, u64, Option<String>)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT rel, size, hash FROM sync_manifest WHERE job = ?1")?;
+        let rows = stmt.query_map(params![job], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)? as u64,
+                r.get::<_, Option<String>>(2)?,
+            ))
+        })?;
+        rows.collect()
+    }
+
+    /// 用新快照整体替换某同步任务的 manifest(先删后插,单事务)。
+    pub fn sync_manifest_replace(
+        &self,
+        job: &str,
+        entries: &[(String, u64, Option<String>)],
+    ) -> rusqlite::Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute("DELETE FROM sync_manifest WHERE job = ?1", params![job])?;
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO sync_manifest (job, rel, size, hash) VALUES (?1, ?2, ?3, ?4)",
+            )?;
+            for (rel, size, hash) in entries {
+                stmt.execute(params![job, rel, *size as i64, hash])?;
+            }
+        }
+        tx.commit()?;
         Ok(())
     }
 }

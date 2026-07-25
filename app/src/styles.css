@@ -3369,6 +3369,12 @@ input[type="range"]:disabled {
 .sync__stat--del {
   color: var(--danger);
 }
+.sync__stat--conflict {
+  color: #ff9500;
+}
+.sync__act--conflict {
+  color: #ff9500;
+}
 .sync__stat--bytes {
   margin-left: auto;
   color: var(--text);

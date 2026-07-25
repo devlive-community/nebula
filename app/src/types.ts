@@ -117,6 +117,7 @@ export type SyncAction =
   | "download"
   | "delete_remote"
   | "delete_local"
+  | "conflict"
   | "skip";
 
 /** 一个同步任务参数(与 sync::SyncSpec 对应)。 */
@@ -144,6 +145,7 @@ export interface SyncDiffSummary {
   download: number;
   delete_remote: number;
   delete_local: number;
+  conflict: number;
   skip: number;
   transfer_bytes: number;
 }

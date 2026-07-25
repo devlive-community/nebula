@@ -50,6 +50,8 @@ pub enum SyncAction {
     DeleteRemote,
     /// 删除本地多余文件。
     DeleteLocal,
+    /// 冲突(双向:两侧自上次同步后都改了)——不动数据,交用户处理。
+    Conflict,
     /// 无需动作(两侧一致)。
     Skip,
 }
@@ -163,6 +165,123 @@ pub fn diff(
     out
 }
 
+/// 上次成功同步时记录的一个文件签名(用于双向区分「删除」与「新增」)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManifestEntry {
+    pub size: u64,
+    /// 当时的内容哈希(整对象 MD5);取不到则 `None`(size-only)。
+    pub hash: Option<String>,
+}
+
+/// 某一侧相对上次同步的变化。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Change {
+    /// 与上次一致(或从未记录且当前也不存在)。
+    Unchanged,
+    /// 新增(上次没有,现在有)。
+    Added,
+    /// 修改(上次有,现在也有但内容不同)。
+    Modified,
+    /// 删除(上次有,现在没了)。
+    Deleted,
+}
+
+/// 本地当前状态相对 manifest 的变化。
+fn local_change(cur: Option<&LocalFile>, m: Option<&ManifestEntry>) -> Change {
+    match (cur, m) {
+        (None, None) => Change::Unchanged,
+        (Some(_), None) => Change::Added,
+        (None, Some(_)) => Change::Deleted,
+        (Some(l), Some(m)) => {
+            if l.size != m.size {
+                Change::Modified
+            } else {
+                match (l.md5.as_deref(), m.hash.as_deref()) {
+                    (Some(a), Some(b)) if !a.eq_ignore_ascii_case(b) => Change::Modified,
+                    _ => Change::Unchanged, // size 相同且哈希取不到 → 视为未变
+                }
+            }
+        }
+    }
+}
+
+/// 云端当前状态相对 manifest 的变化。
+fn remote_change(cur: Option<&RemoteFile>, m: Option<&ManifestEntry>) -> Change {
+    match (cur, m) {
+        (None, None) => Change::Unchanged,
+        (Some(_), None) => Change::Added,
+        (None, Some(_)) => Change::Deleted,
+        (Some(r), Some(m)) => {
+            if r.size != m.size {
+                Change::Modified
+            } else {
+                match (
+                    r.etag.as_deref().and_then(crate::integrity::etag_as_md5),
+                    m.hash.as_deref(),
+                ) {
+                    (Some(a), Some(b)) if !a.eq_ignore_ascii_case(b) => Change::Modified,
+                    _ => Change::Unchanged,
+                }
+            }
+        }
+    }
+}
+
+/// 双向同步的 diff:借助上次同步的 `manifest` 区分「某边删除」与「另一边新增」,
+/// 两侧自上次后都改动则判为冲突(不动数据)。
+pub fn diff_two_way(
+    local: &BTreeMap<String, LocalFile>,
+    remote: &BTreeMap<String, RemoteFile>,
+    manifest: &BTreeMap<String, ManifestEntry>,
+) -> Vec<DiffItem> {
+    let mut paths: Vec<&String> = local
+        .keys()
+        .chain(remote.keys())
+        .chain(manifest.keys())
+        .collect();
+    paths.sort_unstable();
+    paths.dedup();
+
+    let mut out = Vec::with_capacity(paths.len());
+    for p in paths {
+        let l = local.get(p);
+        let r = remote.get(p);
+        let m = manifest.get(p);
+        let lc = local_change(l, m);
+        let rc = remote_change(r, m);
+        use Change::*;
+        let action = match (lc, rc) {
+            // 两侧都没变。
+            (Unchanged, Unchanged) => SyncAction::Skip,
+            // 一侧变、另一侧没变:把变化推过去。
+            (Added, Unchanged) | (Modified, Unchanged) => SyncAction::Upload,
+            (Unchanged, Added) | (Unchanged, Modified) => SyncAction::Download,
+            (Deleted, Unchanged) => SyncAction::DeleteRemote,
+            (Unchanged, Deleted) => SyncAction::DeleteLocal,
+            // 两侧都删了:无事(manifest 里清掉即可)。
+            (Deleted, Deleted) => SyncAction::Skip,
+            // 两侧都有内容改动:若恰好一致则跳过,否则冲突。
+            (Added, Added) | (Added, Modified) | (Modified, Added) | (Modified, Modified) => {
+                match (l, r) {
+                    (Some(lf), Some(rf)) if same(lf, rf) => SyncAction::Skip,
+                    _ => SyncAction::Conflict,
+                }
+            }
+            // 一边删一边改:冲突,别自动丢数据。
+            (Deleted, Added) | (Deleted, Modified) | (Added, Deleted) | (Modified, Deleted) => {
+                SyncAction::Conflict
+            }
+        };
+        out.push(DiffItem {
+            rel_path: p.clone(),
+            action,
+            local_size: l.map(|f| f.size),
+            remote_size: r.map(|f| f.size),
+        });
+    }
+    out
+}
+
 /// Diff 的动作汇总(给前端预览用:各类多少个、涉及多少字节)。
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiffSummary {
@@ -170,6 +289,8 @@ pub struct DiffSummary {
     pub download: usize,
     pub delete_remote: usize,
     pub delete_local: usize,
+    #[serde(default)]
+    pub conflict: usize,
     pub skip: usize,
     /// 需要传输(上传 + 下载)的总字节数。
     pub transfer_bytes: u64,
@@ -190,6 +311,7 @@ pub fn summarize(items: &[DiffItem]) -> DiffSummary {
             }
             SyncAction::DeleteRemote => s.delete_remote += 1,
             SyncAction::DeleteLocal => s.delete_local += 1,
+            SyncAction::Conflict => s.conflict += 1,
             SyncAction::Skip => s.skip += 1,
         }
     }
@@ -279,6 +401,16 @@ fn is_excluded(rel: &str, excludes: &[String]) -> bool {
     excludes
         .iter()
         .any(|pat| !pat.trim().is_empty() && glob_match(pat.trim(), rel))
+}
+
+/// 某同步任务的稳定标识(账号 + 本地目录 + 远端前缀),用作 manifest 的 job 键。
+fn sync_job_key(spec: &SyncSpec) -> String {
+    format!(
+        "{}\u{0}{}\u{0}{}",
+        spec.account,
+        spec.local_dir,
+        norm_prefix(&spec.remote_prefix)
+    )
 }
 
 /// 归一化远端前缀:去掉尾部 `/`,便于统一拼接。
@@ -377,26 +509,67 @@ impl App {
                 },
             );
         }
-        // 构建本地 map;仅当两侧同大小且云端 ETag 是整对象 MD5 时才算本地 MD5(和秒传一致)。
+        // 双向模式:载入上次同步快照(manifest),用于区分「删除」与「新增」。
+        let two_way = spec.mode == SyncMode::TwoWay;
+        let manifest = if two_way {
+            self.load_manifest(&sync_job_key(spec))
+        } else {
+            BTreeMap::new()
+        };
+
+        // 构建本地 map。需要算本地 MD5 的场景:
+        // (a) 和秒传一致——两侧同大小且云端 ETag 是整对象 MD5;
+        // (b) 双向——manifest 里有该文件的哈希且大小一致(用于判断本地是否改过)。
         let mut local: BTreeMap<String, LocalFile> = BTreeMap::new();
         for (rel, (size, abs)) in &local_raw {
-            let md5 = match remote_raw.get(rel) {
+            let worth_remote = matches!(
+                remote_raw.get(rel),
                 Some((rsize, retag))
                     if rsize == size
-                        && retag
-                            .as_deref()
-                            .and_then(crate::integrity::etag_as_md5)
-                            .is_some() =>
-                {
-                    crate::dedup::file_md5(&abs.to_string_lossy()).await.ok()
-                }
-                _ => None,
+                        && retag.as_deref().and_then(crate::integrity::etag_as_md5).is_some()
+            );
+            let worth_manifest = matches!(
+                manifest.get(rel),
+                Some(m) if m.size == *size && m.hash.is_some()
+            );
+            let md5 = if worth_remote || worth_manifest {
+                crate::dedup::file_md5(&abs.to_string_lossy()).await.ok()
+            } else {
+                None
             };
             local.insert(rel.clone(), LocalFile { size: *size, md5 });
         }
 
-        let items = diff(&local, &remote, spec.mode, spec.delete_extra);
+        let items = if two_way {
+            diff_two_way(&local, &remote, &manifest)
+        } else {
+            diff(&local, &remote, spec.mode, spec.delete_extra)
+        };
         Ok((items, local_raw, remote_raw))
+    }
+
+    /// 载入某同步任务的 manifest。无 store 或无记录返回空表。
+    fn load_manifest(&self, job: &str) -> BTreeMap<String, ManifestEntry> {
+        let mut out = BTreeMap::new();
+        if let Some(store) = &self.store {
+            if let Ok(rows) = store.sync_manifest_load(job) {
+                for (rel, size, hash) in rows {
+                    out.insert(rel, ManifestEntry { size, hash });
+                }
+            }
+        }
+        out
+    }
+
+    /// 保存某同步任务的 manifest(整体替换)。
+    fn save_manifest(&self, job: &str, man: &BTreeMap<String, ManifestEntry>) {
+        if let Some(store) = &self.store {
+            let rows: Vec<(String, u64, Option<String>)> = man
+                .iter()
+                .map(|(rel, e)| (rel.clone(), e.size, e.hash.clone()))
+                .collect();
+            let _ = store.sync_manifest_replace(job, &rows);
+        }
     }
 
     /// 预览同步:返回每个文件的动作与汇总,不改动任何数据。
@@ -417,15 +590,19 @@ impl App {
         let account = &spec.account;
         let remote_prefix = &spec.remote_prefix;
         let local_root = Path::new(&spec.local_dir);
-        let (items, local_raw, _) = self.sync_diff_maps(spec).await?;
+        let two_way = spec.mode == SyncMode::TwoWay;
+        let (items, local_raw, remote_raw) = self.sync_diff_maps(spec).await?;
 
+        // 冲突与跳过都不算「工作」;只对真正要传 / 删的项计进度与执行。
         let actionable: Vec<&DiffItem> = items
             .iter()
-            .filter(|i| i.action != SyncAction::Skip)
+            .filter(|i| !matches!(i.action, SyncAction::Skip | SyncAction::Conflict))
             .collect();
         let total = actionable.len() as u64;
         let mut report = SyncReport::default();
         let noop: nebula_provider::ProgressFn = &|_, _| {};
+        // 双向:记录每个动作是否成功,收尾时据此更新 manifest。
+        let mut ok_set: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         for (done, it) in actionable.iter().enumerate() {
             if cancel.load(Ordering::Relaxed) {
@@ -469,13 +646,70 @@ impl App {
                             report.deleted_local += 1;
                         })
                 }
-                SyncAction::Skip => Ok(()),
+                // 冲突不动数据(交用户处理);跳过无事。
+                SyncAction::Conflict | SyncAction::Skip => Ok(()),
             };
             if result.is_err() {
                 report.failed += 1;
+            } else {
+                ok_set.insert(it.rel_path.clone());
             }
             progress((done + 1) as u64, total);
         }
+
+        // 双向:根据本次结果重建 manifest(记录已达成一致的状态,冲突 / 失败保留旧记录)。
+        if two_way && !cancel.load(Ordering::Relaxed) {
+            let job = sync_job_key(spec);
+            let mut man = self.load_manifest(&job);
+            let etag_hash = |rel: &str| -> Option<String> {
+                remote_raw
+                    .get(rel)
+                    .and_then(|(_, e)| e.as_deref())
+                    .and_then(crate::integrity::etag_as_md5)
+            };
+            for it in &items {
+                let rel = &it.rel_path;
+                match it.action {
+                    // 两侧已一致:记录约定签名(首次同步时把已相同的文件纳入 manifest)。
+                    SyncAction::Skip => {
+                        if it.local_size.is_some() && it.remote_size.is_some() {
+                            man.insert(
+                                rel.clone(),
+                                ManifestEntry {
+                                    size: it.remote_size.unwrap_or(0),
+                                    hash: etag_hash(rel),
+                                },
+                            );
+                        }
+                    }
+                    SyncAction::Upload if ok_set.contains(rel) => {
+                        man.insert(
+                            rel.clone(),
+                            ManifestEntry {
+                                size: it.local_size.unwrap_or(0),
+                                hash: None, // 上传后不回取 ETag,按 size-only 记录
+                            },
+                        );
+                    }
+                    SyncAction::Download if ok_set.contains(rel) => {
+                        man.insert(
+                            rel.clone(),
+                            ManifestEntry {
+                                size: it.remote_size.unwrap_or(0),
+                                hash: etag_hash(rel),
+                            },
+                        );
+                    }
+                    SyncAction::DeleteRemote | SyncAction::DeleteLocal if ok_set.contains(rel) => {
+                        man.remove(rel);
+                    }
+                    // 冲突 / 失败:保留旧记录不动。
+                    _ => {}
+                }
+            }
+            self.save_manifest(&job, &man);
+        }
+
         Ok(report)
     }
 
@@ -624,6 +858,90 @@ mod tests {
         let d = diff(&l, &r, SyncMode::TwoWay, false);
         assert_eq!(action_of(&d, "only_local"), Some(&SyncAction::Upload));
         assert_eq!(action_of(&d, "only_remote"), Some(&SyncAction::Download));
+    }
+
+    fn me(size: u64, hash: Option<&str>) -> ManifestEntry {
+        ManifestEntry {
+            size,
+            hash: hash.map(|s| s.to_string()),
+        }
+    }
+    fn manifest(pairs: &[(&str, ManifestEntry)]) -> BTreeMap<String, ManifestEntry> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn two_way_propagates_one_sided_change() {
+        // 上次两侧一致(MD5_A)。本地改成 MD5_B,云端没变 → 上传。
+        let man = manifest(&[("f", me(1, Some(MD5_A)))]);
+        let l = local(&[("f", lf(2, Some(MD5_B)))]); // size 变了 → Modified
+        let r = remote(&[("f", rf(1, Some(MD5_A)))]);
+        assert_eq!(
+            action_of(&diff_two_way(&l, &r, &man), "f"),
+            Some(&SyncAction::Upload)
+        );
+    }
+
+    #[test]
+    fn two_way_deletion_propagates() {
+        // 上次有,本地删了,云端没动 → 删云端。
+        let man = manifest(&[("f", me(1, Some(MD5_A)))]);
+        let l = local(&[]);
+        let r = remote(&[("f", rf(1, Some(MD5_A)))]);
+        assert_eq!(
+            action_of(&diff_two_way(&l, &r, &man), "f"),
+            Some(&SyncAction::DeleteRemote)
+        );
+    }
+
+    #[test]
+    fn two_way_new_on_remote_downloads() {
+        // manifest 里没有,只有云端有 → 下载(新增)。
+        let man = manifest(&[]);
+        let l = local(&[]);
+        let r = remote(&[("f", rf(1, Some(MD5_A)))]);
+        assert_eq!(
+            action_of(&diff_two_way(&l, &r, &man), "f"),
+            Some(&SyncAction::Download)
+        );
+    }
+
+    #[test]
+    fn two_way_both_changed_is_conflict() {
+        // 上次一致,本地改成 B、云端改成不同内容(size 不同)→ 冲突。
+        let man = manifest(&[("f", me(1, Some(MD5_A)))]);
+        let l = local(&[("f", lf(2, Some(MD5_B)))]);
+        let r = remote(&[("f", rf(3, Some("deadbeef00000000000000000000dead")))]);
+        assert_eq!(
+            action_of(&diff_two_way(&l, &r, &man), "f"),
+            Some(&SyncAction::Conflict)
+        );
+    }
+
+    #[test]
+    fn two_way_delete_vs_modify_is_conflict() {
+        // 本地删,云端改 → 冲突,不自动丢数据。
+        let man = manifest(&[("f", me(1, Some(MD5_A)))]);
+        let l = local(&[]);
+        let r = remote(&[("f", rf(2, Some(MD5_B)))]);
+        assert_eq!(
+            action_of(&diff_two_way(&l, &r, &man), "f"),
+            Some(&SyncAction::Conflict)
+        );
+    }
+
+    #[test]
+    fn two_way_unchanged_skips() {
+        let man = manifest(&[("f", me(1, Some(MD5_A)))]);
+        let l = local(&[("f", lf(1, Some(MD5_A)))]);
+        let r = remote(&[("f", rf(1, Some(MD5_A)))]);
+        assert_eq!(
+            action_of(&diff_two_way(&l, &r, &man), "f"),
+            Some(&SyncAction::Skip)
+        );
     }
 
     #[test]
