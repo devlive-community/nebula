@@ -811,6 +811,31 @@ impl App {
         Ok(self.provider(account)?.set_object_acl(path, public).await?)
     }
 
+    /// 批量把多个对象设为公开读 / 私有。逐个处理,单个出错记失败并继续,`cancel` 置位即中止。
+    /// `progress(已处理, 总数)`。返回成功数。
+    pub async fn set_acl_batch(
+        &self,
+        account: &str,
+        paths: &[String],
+        public: bool,
+        cancel: &AtomicBool,
+        progress: ProgressFn<'_>,
+    ) -> Result<usize> {
+        let provider = self.provider(account)?;
+        let total = paths.len() as u64;
+        let mut ok = 0usize;
+        for (i, path) in paths.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            if provider.set_object_acl(path, public).await.is_ok() {
+                ok += 1;
+            }
+            progress((i + 1) as u64, total);
+        }
+        Ok(ok)
+    }
+
     /// 对象的永久公共直链(不签名);未支持返回 `None`。
     ///
     /// 若该账号配了自定义公共域名(CDN / CNAME),用它拼直链 `https://{域名}/{key}`

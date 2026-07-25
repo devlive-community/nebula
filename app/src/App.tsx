@@ -991,6 +991,30 @@ export default function App() {
     }
   };
 
+  // 批量设置 ACL(公开读 / 私有)。
+  const batchAcl = async (isPublic: boolean) => {
+    if (!current || selected.size === 0) return;
+    setBusy(true);
+    try {
+      const ok = await api.setAclBatch(
+        `acl-${Date.now()}`,
+        current,
+        [...selected],
+        isPublic,
+      );
+      setNotice({
+        tone: "ok",
+        text: isPublic
+          ? t("✓ 已把 {n} 项设为公开读", { n: String(ok) })
+          : t("✓ 已把 {n} 项设为私有", { n: String(ok) }),
+      });
+      clearSelection();
+    } catch (e) {
+      setNotice({ tone: "err", text: String(e) });
+    }
+    setBusy(false);
+  };
+
   const batchDownload = async () => {
     if (!current || selected.size === 0) return;
     const dir = await open({ directory: true, title: "选择下载到的文件夹" });
@@ -1998,6 +2022,12 @@ export default function App() {
                 </button>
                 <button className="btn" onClick={() => setShowBatchTags(true)}>
                   {t("批量标签")}
+                </button>
+                <button className="btn" onClick={() => batchAcl(true)}>
+                  {t("批量公开")}
+                </button>
+                <button className="btn" onClick={() => batchAcl(false)}>
+                  {t("批量私有")}
                 </button>
                 <button
                   className="btn btn--danger"

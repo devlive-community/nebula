@@ -381,6 +381,39 @@ async fn set_tags_batch(
     .map_err(|e| e.to_string())
 }
 
+/// 批量把多个对象设为公开读 / 私有。进度经 `folder-progress`(op = `acl`)推送,可用 `id` 取消。
+#[tauri::command]
+async fn set_acl_batch(
+    app: AppHandle,
+    state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    id: String,
+    account: String,
+    paths: Vec<String>,
+    public: bool,
+) -> Result<usize, String> {
+    let core = state.inner().clone();
+    let cancel = transfers.begin(&id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: id.clone(),
+    };
+    let handle = app.clone();
+    core.set_acl_batch(&account, &paths, public, &cancel, &move |done, total| {
+        let _ = handle.emit(
+            "folder-progress",
+            FolderProgress {
+                op: "acl".into(),
+                path: id.clone(),
+                done,
+                total,
+            },
+        );
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// 导出 `root` 下的文件清单为 CSV,写到本地 `dest`。
 #[tauri::command]
 async fn export_manifest(
@@ -1810,6 +1843,7 @@ pub fn run() {
             largest_files,
             export_manifest,
             set_tags_batch,
+            set_acl_batch,
             upload_file,
             download_file,
             delete,

@@ -210,6 +210,14 @@ export const setTagsBatch = (
   merge: boolean,
 ) => invoke<number>("set_tags_batch", { id, account, paths, tags, merge });
 
+/** 批量把多个对象设为公开读 / 私有。返回成功数。 */
+export const setAclBatch = (
+  id: string,
+  account: string,
+  paths: string[],
+  isPublic: boolean,
+) => invoke<number>("set_acl_batch", { id, account, paths, public: isPublic });
+
 export const search = (
   account: string,
   root: string,
