@@ -51,3 +51,21 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </LocaleProvider>
   </React.StrictMode>,
 );
+
+// 启动页只属于主窗口;图片 / PDF 独立编辑窗口(带 ?view=)立即移除,不显示品牌启动页。
+const splashEl = document.getElementById("splash");
+if (view) {
+  splashEl?.remove();
+} else if (splashEl) {
+  // 主窗口:等 React 首帧(双 rAF)+ 最短展示时间后淡出,避免一闪而过。
+  const SPLASH_MIN_MS = 500;
+  const started = performance.now();
+  const hideSplash = () => {
+    const wait = Math.max(0, SPLASH_MIN_MS - (performance.now() - started));
+    setTimeout(() => {
+      splashEl.classList.add("hide");
+      setTimeout(() => splashEl.remove(), 400);
+    }, wait);
+  };
+  requestAnimationFrame(() => requestAnimationFrame(hideSplash));
+}
