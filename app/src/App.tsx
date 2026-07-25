@@ -303,6 +303,7 @@ export default function App() {
   const [batchRestore, setBatchRestore] = useState(false);
   const [showBatchRename, setShowBatchRename] = useState(false);
   const [showBatchTags, setShowBatchTags] = useState(false);
+  const [showBatchMove, setShowBatchMove] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
@@ -1009,6 +1010,33 @@ export default function App() {
           : t("✓ 已把 {n} 项设为私有", { n: String(ok) }),
       });
       clearSelection();
+    } catch (e) {
+      setNotice({ tone: "err", text: String(e) });
+    }
+    setBusy(false);
+  };
+
+  // 批量移动 / 复制选中对象到目标目录。
+  const batchMoveCopy = async (dstDir: string, isMove: boolean) => {
+    setShowBatchMove(false);
+    if (!current || selected.size === 0) return;
+    setBusy(true);
+    try {
+      const ok = await api.moveCopyBatch(
+        `movecopy-${Date.now()}`,
+        current,
+        [...selected],
+        dstDir,
+        isMove,
+      );
+      setNotice({
+        tone: "ok",
+        text: isMove
+          ? t("✓ 已移动 {n} 项", { n: String(ok) })
+          : t("✓ 已复制 {n} 项", { n: String(ok) }),
+      });
+      clearSelection();
+      await load();
     } catch (e) {
       setNotice({ tone: "err", text: String(e) });
     }
@@ -1776,6 +1804,7 @@ export default function App() {
     batchRestore ||
     showBatchRename ||
     showBatchTags ||
+    showBatchMove ||
     !!shareUrl ||
     showNewFolder ||
     showNewBucket ||
@@ -1811,6 +1840,7 @@ export default function App() {
       else if (batchRestore) setBatchRestore(false);
       else if (showBatchRename) setShowBatchRename(false);
       else if (showBatchTags) setShowBatchTags(false);
+      else if (showBatchMove) setShowBatchMove(false);
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
       else if (showNewBucket) setShowNewBucket(false);
@@ -2019,6 +2049,9 @@ export default function App() {
                 </button>
                 <button className="btn" onClick={() => setShowBatchRename(true)}>
                   {t("批量重命名")}
+                </button>
+                <button className="btn" onClick={() => setShowBatchMove(true)}>
+                  {t("批量移动 / 复制")}
                 </button>
                 <button className="btn" onClick={() => setShowBatchTags(true)}>
                   {t("批量标签")}
@@ -2251,6 +2284,17 @@ export default function App() {
               text: t("✓ 已给 {n} 项打标签", { n: String(selected.size) }),
             });
           }}
+        />
+      )}
+
+      {showBatchMove && current && (
+        <MoveCopyDialog
+          account={current}
+          from=""
+          batchCount={selected.size}
+          onCopy={(dir) => void batchMoveCopy(dir, false)}
+          onMove={(dir) => void batchMoveCopy(dir, true)}
+          onCancel={() => setShowBatchMove(false)}
         />
       )}
 

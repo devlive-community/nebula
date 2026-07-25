@@ -381,6 +381,48 @@ async fn set_tags_batch(
     .map_err(|e| e.to_string())
 }
 
+/// 批量把多个对象移动 / 复制到 `dst_dir`。进度经 `folder-progress`(op = `movecopy`)推送,可取消。
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn move_copy_batch(
+    app: AppHandle,
+    state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    id: String,
+    account: String,
+    paths: Vec<String>,
+    dst_dir: String,
+    is_move: bool,
+) -> Result<usize, String> {
+    let core = state.inner().clone();
+    let cancel = transfers.begin(&id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: id.clone(),
+    };
+    let handle = app.clone();
+    core.move_copy_batch(
+        &account,
+        &paths,
+        &dst_dir,
+        is_move,
+        &cancel,
+        &move |done, total| {
+            let _ = handle.emit(
+                "folder-progress",
+                FolderProgress {
+                    op: "movecopy".into(),
+                    path: id.clone(),
+                    done,
+                    total,
+                },
+            );
+        },
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// 批量把多个对象设为公开读 / 私有。进度经 `folder-progress`(op = `acl`)推送,可用 `id` 取消。
 #[tauri::command]
 async fn set_acl_batch(
@@ -1844,6 +1886,7 @@ pub fn run() {
             export_manifest,
             set_tags_batch,
             set_acl_batch,
+            move_copy_batch,
             upload_file,
             download_file,
             delete,

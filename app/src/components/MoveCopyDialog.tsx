@@ -8,15 +8,24 @@ import { useI18n } from "../i18n";
 
 interface Props {
   account: string;
-  /** 源对象完整路径,如 bucket/a/b.txt。 */
+  /** 源对象完整路径,如 bucket/a/b.txt。批量模式下可传空串。 */
   from: string;
+  /** 批量模式:传选中项数;此时 onCopy/onMove 回调收到的是目标**目录**而非单文件路径。 */
+  batchCount?: number;
   onCopy: (to: string) => void;
   onMove: (to: string) => void;
   onCancel: () => void;
 }
 
 /** 级联浏览选择目标目录,再复制 / 移动过去(支持跨目录、跨桶)。 */
-export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Props) {
+export function MoveCopyDialog({
+  account,
+  from,
+  batchCount,
+  onCopy,
+  onMove,
+  onCancel,
+}: Props) {
   const { t } = useI18n();
   const [pickPath, setPickPath] = useState("");
   const [dirs, setDirs] = useState<Entry[]>([]);
@@ -41,10 +50,12 @@ export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Prop
     load();
   }, [load]);
 
+  const batch = batchCount !== undefined;
   // 源可能是文件夹(带结尾斜杠),取末段作为落点名前先去掉结尾斜杠。
   const leaf = baseName(from.replace(/\/+$/, ""));
-  const target = pickPath ? joinRemote(pickPath, leaf) : "";
-  const canConfirm = target !== "" && target !== from;
+  // 批量:回调目标目录(pickPath);单个:回调完整落点路径。
+  const target = batch ? pickPath : pickPath ? joinRemote(pickPath, leaf) : "";
+  const canConfirm = batch ? pickPath !== "" : target !== "" && target !== from;
   const crumbs = breadcrumbs(pickPath);
 
   return (
@@ -105,7 +116,9 @@ export function MoveCopyDialog({ account, from, onCopy, onMove, onCancel }: Prop
           </div>
 
           <div className="picker__target">
-            {t("目标")}:{target || t("请进入一个 bucket / 目录")}
+            {batch
+              ? `${t("移动 / 复制 {n} 项到", { n: String(batchCount) })}${target || t("请进入一个 bucket / 目录")}`
+              : `${t("目标")}:${target || t("请进入一个 bucket / 目录")}`}
           </div>
         </div>
 

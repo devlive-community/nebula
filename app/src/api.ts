@@ -218,6 +218,22 @@ export const setAclBatch = (
   isPublic: boolean,
 ) => invoke<number>("set_acl_batch", { id, account, paths, public: isPublic });
 
+/** 批量把多个对象移动 / 复制到目标目录。返回成功数。 */
+export const moveCopyBatch = (
+  id: string,
+  account: string,
+  paths: string[],
+  dstDir: string,
+  isMove: boolean,
+) =>
+  invoke<number>("move_copy_batch", {
+    id,
+    account,
+    paths,
+    dstDir,
+    isMove,
+  });
+
 export const search = (
   account: string,
   root: string,

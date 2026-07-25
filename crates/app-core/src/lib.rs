@@ -811,6 +811,43 @@ impl App {
         Ok(self.provider(account)?.set_object_acl(path, public).await?)
     }
 
+    /// 批量把多个对象移动 / 复制到目标目录 `dst_dir` 下(各自保留原文件名)。
+    /// `is_move = true` 为移动(服务端复制后删原对象),否则复制。逐个处理,失败记下继续,
+    /// `cancel` 置位即中止。`progress(已处理, 总数)`。返回成功数。
+    pub async fn move_copy_batch(
+        &self,
+        account: &str,
+        paths: &[String],
+        dst_dir: &str,
+        is_move: bool,
+        cancel: &AtomicBool,
+        progress: ProgressFn<'_>,
+    ) -> Result<usize> {
+        let provider = self.provider(account)?;
+        let dir = dst_dir.trim_end_matches('/');
+        let total = paths.len() as u64;
+        let mut ok = 0usize;
+        for (i, from) in paths.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            let name = from.rsplit('/').next().unwrap_or(from);
+            let to = format!("{dir}/{name}");
+            if to != *from {
+                let res = if is_move {
+                    provider.rename(from, &to).await
+                } else {
+                    provider.copy(from, &to).await
+                };
+                if res.is_ok() {
+                    ok += 1;
+                }
+            }
+            progress((i + 1) as u64, total);
+        }
+        Ok(ok)
+    }
+
     /// 批量把多个对象设为公开读 / 私有。逐个处理,单个出错记失败并继续,`cancel` 置位即中止。
     /// `progress(已处理, 总数)`。返回成功数。
     pub async fn set_acl_batch(
