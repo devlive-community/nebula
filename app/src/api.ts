@@ -201,6 +201,15 @@ export const largestFiles = (account: string, root: string, top: number) =>
 export const exportManifest = (account: string, root: string, dest: string) =>
   invoke<void>("export_manifest", { account, root, dest });
 
+/** 批量给多个对象打标签(merge=保留其它键;否则整体替换)。返回成功数。 */
+export const setTagsBatch = (
+  id: string,
+  account: string,
+  paths: string[],
+  tags: [string, string][],
+  merge: boolean,
+) => invoke<number>("set_tags_batch", { id, account, paths, tags, merge });
+
 export const search = (
   account: string,
   root: string,

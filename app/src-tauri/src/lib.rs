@@ -338,6 +338,49 @@ async fn search_content(
         .map_err(|e| e.to_string())
 }
 
+/// 批量给多个对象打标签。`merge` 保留其它已有标签、只 upsert 传入键;否则整体替换。
+/// 进度经 `folder-progress`(op = `tags`)推送,可用 `id` 取消。返回成功数。
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn set_tags_batch(
+    app: AppHandle,
+    state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    id: String,
+    account: String,
+    paths: Vec<String>,
+    tags: Vec<(String, String)>,
+    merge: bool,
+) -> Result<usize, String> {
+    let core = state.inner().clone();
+    let cancel = transfers.begin(&id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: id.clone(),
+    };
+    let handle = app.clone();
+    core.set_tags_batch(
+        &account,
+        &paths,
+        &tags,
+        merge,
+        &cancel,
+        &move |done, total| {
+            let _ = handle.emit(
+                "folder-progress",
+                FolderProgress {
+                    op: "tags".into(),
+                    path: id.clone(),
+                    done,
+                    total,
+                },
+            );
+        },
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// 导出 `root` 下的文件清单为 CSV,写到本地 `dest`。
 #[tauri::command]
 async fn export_manifest(
@@ -1766,6 +1809,7 @@ pub fn run() {
             find_duplicates,
             largest_files,
             export_manifest,
+            set_tags_batch,
             upload_file,
             download_file,
             delete,

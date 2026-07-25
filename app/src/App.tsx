@@ -52,6 +52,7 @@ import {
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
+import { BatchTagsDialog } from "./components/BatchTagsDialog";
 import { StatsDialog } from "./components/StatsDialog";
 import { CleanupDialog } from "./components/CleanupDialog";
 import { TransferPanel } from "./components/TransferPanel";
@@ -301,6 +302,7 @@ export default function App() {
   const [batchStorageClass, setBatchStorageClass] = useState(false);
   const [batchRestore, setBatchRestore] = useState(false);
   const [showBatchRename, setShowBatchRename] = useState(false);
+  const [showBatchTags, setShowBatchTags] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
@@ -1749,6 +1751,7 @@ export default function App() {
     batchStorageClass ||
     batchRestore ||
     showBatchRename ||
+    showBatchTags ||
     !!shareUrl ||
     showNewFolder ||
     showNewBucket ||
@@ -1783,6 +1786,7 @@ export default function App() {
       else if (batchStorageClass) setBatchStorageClass(false);
       else if (batchRestore) setBatchRestore(false);
       else if (showBatchRename) setShowBatchRename(false);
+      else if (showBatchTags) setShowBatchTags(false);
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
       else if (showNewBucket) setShowNewBucket(false);
@@ -1992,6 +1996,9 @@ export default function App() {
                 <button className="btn" onClick={() => setShowBatchRename(true)}>
                   {t("批量重命名")}
                 </button>
+                <button className="btn" onClick={() => setShowBatchTags(true)}>
+                  {t("批量标签")}
+                </button>
                 <button
                   className="btn btn--danger"
                   onClick={() => setPendingBatchDelete(true)}
@@ -2198,6 +2205,21 @@ export default function App() {
           onError={(msg) => {
             setTagsTarget(null);
             setError(msg);
+          }}
+        />
+      )}
+
+      {showBatchTags && current && (
+        <BatchTagsDialog
+          account={current}
+          paths={[...selected]}
+          onClose={() => setShowBatchTags(false)}
+          onDone={() => {
+            setShowBatchTags(false);
+            setNotice({
+              tone: "ok",
+              text: t("✓ 已给 {n} 项打标签", { n: String(selected.size) }),
+            });
           }}
         />
       )}

@@ -886,6 +886,47 @@ impl App {
         Ok(self.provider(account)?.set_object_tags(path, tags).await?)
     }
 
+    /// 给多个对象批量打标签。`merge = true` 时保留各对象已有的其它标签、只 upsert 传入的键;
+    /// `merge = false` 时把每个对象的标签整体替换为 `tags`。逐个处理,单个出错记失败并继续,
+    /// `cancel` 置位即中止。`progress(已处理, 总数)`。返回成功数。
+    pub async fn set_tags_batch(
+        &self,
+        account: &str,
+        paths: &[String],
+        tags: &[(String, String)],
+        merge: bool,
+        cancel: &AtomicBool,
+        progress: ProgressFn<'_>,
+    ) -> Result<usize> {
+        let provider = self.provider(account)?;
+        let total = paths.len() as u64;
+        let mut ok = 0usize;
+        for (i, path) in paths.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            let final_tags = if merge {
+                // 读旧标签,用传入的键覆盖 / 新增,其余保留。
+                let mut existing = provider.object_tags(path).await.unwrap_or_default();
+                for (k, v) in tags {
+                    if let Some(slot) = existing.iter_mut().find(|(ek, _)| ek == k) {
+                        slot.1 = v.clone();
+                    } else {
+                        existing.push((k.clone(), v.clone()));
+                    }
+                }
+                existing
+            } else {
+                tags.to_vec()
+            };
+            if provider.set_object_tags(path, &final_tags).await.is_ok() {
+                ok += 1;
+            }
+            progress((i + 1) as u64, total);
+        }
+        Ok(ok)
+    }
+
     /// 在某账号下新建一个 bucket。
     pub async fn create_bucket(&self, account: &str, bucket: &str) -> Result<()> {
         Ok(self.provider(account)?.create_bucket(bucket).await?)
