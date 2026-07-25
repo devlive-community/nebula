@@ -58,6 +58,7 @@ import { TransferPanel } from "./components/TransferPanel";
 import { SearchResults } from "./components/SearchResults";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SyncDialog } from "./components/SyncDialog";
+import { matchBinding, resolveBindings, type Bindings } from "./shortcuts";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { PreviewModal } from "./components/PreviewModal";
 import { AboutDialog } from "./components/AboutDialog";
@@ -209,7 +210,10 @@ export default function App() {
     rate_limit_kib_per_sec: 0,
   });
   const [showSettings, setShowSettings] = useState(false);
-  const [showSync, setShowSync] = useState(false);
+  // 备份/同步对话框的云端前缀(null = 未打开);从命令面板用当前路径,从右键用该目录路径。
+  const [syncPrefix, setSyncPrefix] = useState<string | null>(null);
+  // 自定义快捷键(动作 id → 绑定串;仅存用户改过的项),持久化在 ui_prefs。
+  const [shortcuts, setShortcuts] = useState<Bindings>({});
   const [showAbout, setShowAbout] = useState(false);
   const [update, setUpdate] = useState<Update | null>(null);
   const [updateFlash, setUpdateFlash] = useState<string | null>(null);
@@ -294,6 +298,11 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
     if (prefsHydrated.current) api.setPref("theme", theme).catch(() => {});
   }, [theme]);
+  // 快捷键改动后持久化(仅存用户覆盖的项)。
+  useEffect(() => {
+    if (prefsHydrated.current)
+      api.setPref("shortcuts", JSON.stringify(shortcuts)).catch(() => {});
+  }, [shortcuts]);
   const [transfers, setTransfers] = useState<Record<string, TransferItem>>({});
 
   // 每个传输的上次采样,用于算瞬时速度(EMA 平滑)。不入 state,不持久化。
@@ -590,15 +599,23 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [sw, v, th] = await Promise.all([
+        const [sw, v, th, sc] = await Promise.all([
           api.getPref("sidebar_width"),
           api.getPref("view"),
           api.getPref("theme"),
+          api.getPref("shortcuts"),
         ]);
         const n = Number(sw);
         if (n >= 180 && n <= 480) setSidebarWidth(n);
         if (v === "list" || v === "grid") setView(v);
         if (th === "dark" || th === "light") setTheme(th);
+        if (sc) {
+          try {
+            setShortcuts(JSON.parse(sc));
+          } catch {
+            // 忽略损坏的偏好
+          }
+        }
       } catch {
         // 忽略:无存储时保持默认值
       } finally {
@@ -1635,8 +1652,9 @@ export default function App() {
     const typing =
       !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
 
-    // 命令面板:Cmd/Ctrl+K 全局开关(即使正在输入框里也可唤起)。
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    const keys = resolveBindings(shortcuts);
+    // 命令面板全局开关(即使正在输入框里也可唤起)。
+    if (matchBinding(e, keys.palette)) {
       e.preventDefault();
       setShowPalette((v) => !v);
       return;
@@ -1669,17 +1687,28 @@ export default function App() {
     }
 
     if (typing || anyModalOpen || !current) return;
-    const mod = e.metaKey || e.ctrlKey;
 
-    if (mod && e.key.toLowerCase() === "a") {
+    if (matchBinding(e, keys.selectAll)) {
       e.preventDefault();
       setSelected(new Set(visibleFiles.map((f) => f.path)));
-    } else if ((e.key === "Delete" || e.key === "Backspace") && selected.size > 0) {
+    } else if (matchBinding(e, keys.deleteSelected) && selected.size > 0) {
       e.preventDefault();
       setPendingBatchDelete(true);
-    } else if (mod && e.key === "ArrowUp" && path !== "") {
+    } else if (matchBinding(e, keys.parent) && path !== "") {
       e.preventDefault();
       setPath(parentPath(path));
+    } else if (matchBinding(e, keys.refresh)) {
+      e.preventDefault();
+      void load();
+    } else if (matchBinding(e, keys.upload) && path !== "") {
+      e.preventDefault();
+      void upload();
+    } else if (matchBinding(e, keys.newFolder) && path !== "") {
+      e.preventDefault();
+      setShowNewFolder(true);
+    } else if (matchBinding(e, keys.sync)) {
+      e.preventDefault();
+      setSyncPrefix(path);
     }
   };
 
@@ -1725,7 +1754,7 @@ export default function App() {
     paletteCommands.push({
       id: "sync",
       label: t("备份 / 同步"),
-      run: () => setShowSync(true),
+      run: () => setSyncPrefix(path),
     });
   paletteCommands.push({
     id: "settings",
@@ -2173,17 +2202,19 @@ export default function App() {
       {showSettings && (
         <SettingsDialog
           settings={settings}
+          shortcuts={shortcuts}
+          onShortcutsChange={setShortcuts}
           onSave={saveSettings}
           onClose={() => setShowSettings(false)}
         />
       )}
 
-      {showSync && (
+      {syncPrefix !== null && (
         <SyncDialog
           accounts={accounts}
           defaultAccount={current}
-          defaultPrefix={path}
-          onClose={() => setShowSync(false)}
+          defaultPrefix={syncPrefix}
+          onClose={() => setSyncPrefix(null)}
         />
       )}
 
@@ -2235,6 +2266,7 @@ export default function App() {
       return [
         { label: t("打开"), onClick: () => openDir(entry) },
         { label: t("统计信息"), onClick: () => showFolderStats(entry) },
+        { label: t("备份 / 同步"), onClick: () => setSyncPrefix(entry.path) },
         { label: t("清理未完成上传"), onClick: () => setCleanupTarget(entry) },
         {
           label: t("删除 Bucket"),
@@ -2248,6 +2280,7 @@ export default function App() {
         { label: t("打开"), onClick: () => openDir(entry) },
         { label: t("统计信息"), onClick: () => showFolderStats(entry) },
         { label: t("下载文件夹"), onClick: () => downloadFolderEntry(entry) },
+        { label: t("备份 / 同步"), onClick: () => setSyncPrefix(entry.path) },
         { label: t("重命名"), onClick: () => setRenameTarget(entry) },
         { label: t("复制 / 移动到"), onClick: () => setMoveCopyTarget(entry) },
       ];

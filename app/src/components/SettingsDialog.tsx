@@ -2,16 +2,26 @@ import { useState } from "react";
 import type { Settings } from "../types";
 import { Select } from "./Select";
 import { MattingPluginCard } from "./MattingPluginCard";
+import { ShortcutsEditor } from "./ShortcutsEditor";
 import { useI18n } from "../i18n";
 import { LOCALES } from "../locales";
+import type { Bindings } from "../shortcuts";
 
 interface Props {
   settings: Settings;
+  shortcuts: Bindings;
+  onShortcutsChange: (next: Bindings) => void;
   onSave: (settings: Settings) => void;
   onClose: () => void;
 }
 
-export function SettingsDialog({ settings, onSave, onClose }: Props) {
+export function SettingsDialog({
+  settings,
+  shortcuts,
+  onShortcutsChange,
+  onSave,
+  onClose,
+}: Props) {
   const { t, locale, setLocale } = useI18n();
   const [minutes, setMinutes] = useState(
     Math.round(settings.share_expiry_secs / 60),
@@ -66,6 +76,14 @@ export function SettingsDialog({ settings, onSave, onClose }: Props) {
               onChange={(e) => setRateLimit(Number(e.target.value))}
             />
           </label>
+
+          <div className="field">
+            <span>{t("快捷键")}</span>
+            <ShortcutsEditor
+              bindings={shortcuts}
+              onChange={onShortcutsChange}
+            />
+          </div>
 
           <div className="field">
             <span>{t("插件")}</span>

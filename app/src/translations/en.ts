@@ -103,6 +103,14 @@ export const EN: Record<string, string> = {
   容差: "Tolerance",
   点击要去掉的区域: "Click the area to remove",
   在图上按住涂抹擦除: "Press and drag to erase",
+  // 快捷键
+  快捷键: "Shortcuts",
+  命令面板: "Command palette",
+  删除选中: "Delete selection",
+  "按下按键…": "Press keys…",
+  点击后按下新的组合键: "Click, then press a new key combo",
+  恢复默认: "Reset to default",
+
   // 备份 / 同步
   "备份 / 同步": "Backup / Sync",
   本地目录: "Local folder",

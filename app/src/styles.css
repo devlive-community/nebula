@@ -3448,3 +3448,57 @@ input[type="range"]:disabled {
   background: var(--primary);
   transition: width 0.2s;
 }
+
+/* ── 自定义快捷键编辑器 ───────────────────────────────── */
+.shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.shortcuts__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+}
+.shortcuts__label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+}
+.shortcuts__key {
+  min-width: 84px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.shortcuts__key:hover {
+  border-color: var(--primary);
+}
+.shortcuts__key--rec {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.shortcuts__reset {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.shortcuts__reset:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.shortcuts__reset:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
