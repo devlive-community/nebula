@@ -12,7 +12,7 @@ interface Props {
   loading: boolean;
   thumbs: Record<string, string>;
   selected: Set<string>;
-  onToggleSelect: (path: string) => void;
+  onToggleSelect: (path: string, shift?: boolean) => void;
   onOpenDir: (entry: Entry) => void;
   onOpenFile: (entry: Entry) => void;
   onContext: (entry: Entry, x: number, y: number) => void;
@@ -89,7 +89,7 @@ export function FileGrid({
               <span className="card__check">
                 <Checkbox
                   checked={selected.has(entry.path)}
-                  onChange={() => onToggleSelect(entry.path)}
+                  onChange={(shift) => onToggleSelect(entry.path, shift)}
                 />
               </span>
             )}

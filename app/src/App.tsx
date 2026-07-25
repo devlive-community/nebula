@@ -585,13 +585,34 @@ export default function App() {
   const allSelected =
     visibleFiles.length > 0 && visibleFiles.every((f) => selected.has(f.path));
 
-  const toggleSelect = (p: string) =>
+  // 上次点选的锚点路径(Shift 范围多选用)。
+  const selAnchor = useRef<string | null>(null);
+  const toggleSelect = (p: string, shift?: boolean) => {
+    // 当前视图有序文件路径:搜索结果里用搜索列表,否则用可见文件。
+    const ordered = (
+      search ? search.results.filter((e) => e.kind === "file") : visibleFiles
+    ).map((f) => f.path);
+    if (shift && selAnchor.current) {
+      const a = ordered.indexOf(selAnchor.current);
+      const b = ordered.indexOf(p);
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        setSelected((prev) => {
+          const next = new Set(prev);
+          for (let i = lo; i <= hi; i++) next.add(ordered[i]);
+          return next;
+        });
+        return;
+      }
+    }
+    selAnchor.current = p;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(p)) next.delete(p);
       else next.add(p);
       return next;
     });
+  };
 
   const toggleSelectAll = () =>
     setSelected((prev) => {

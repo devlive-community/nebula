@@ -5,7 +5,8 @@ interface Props {
   checked: boolean;
   indeterminate?: boolean;
   title?: string;
-  onChange: () => void;
+  /** 勾选变化;`shift` 表示点击时按住了 Shift(用于范围多选)。 */
+  onChange: (shift?: boolean) => void;
 }
 
 /** 自定义勾选框(button 实现),契合深色主题,支持选中 / 半选。 */
@@ -20,7 +21,7 @@ export function Checkbox({ checked, indeterminate, title, onChange }: Props) {
       className={`checkbox ${on ? "checkbox--on" : ""}`}
       onClick={(e) => {
         e.stopPropagation();
-        onChange();
+        onChange(e.shiftKey);
       }}
     >
       {indeterminate ? (

@@ -18,7 +18,7 @@ interface Props {
   selected: Set<string>;
   onFilter: (minSize: number, ext: string) => void;
   onOpen: (entry: Entry) => void;
-  onToggleSelect: (path: string) => void;
+  onToggleSelect: (path: string, shift?: boolean) => void;
   onToggleSelectAll: () => void;
   /** 内容搜索时:路径 → 命中片段。 */
   snippets?: Record<string, string>;
@@ -142,7 +142,12 @@ export function SearchResults({
                 type="checkbox"
                 className="search-results__check"
                 checked={selected.has(entry.path)}
-                onChange={() => onToggleSelect(entry.path)}
+                onChange={(e) =>
+                  onToggleSelect(
+                    entry.path,
+                    (e.nativeEvent as MouseEvent).shiftKey,
+                  )
+                }
                 onClick={(e) => e.stopPropagation()}
               />
               <button

@@ -23,7 +23,7 @@ interface Props {
   selected: Set<string>;
   allSelected: boolean;
   onSort: (key: SortKey) => void;
-  onToggleSelect: (path: string) => void;
+  onToggleSelect: (path: string, shift?: boolean) => void;
   onToggleSelectAll: () => void;
   onOpenDir: (entry: Entry) => void;
   onOpenFile: (entry: Entry) => void;
@@ -136,7 +136,7 @@ export function FileList({
                 {!isDir && (
                   <Checkbox
                     checked={selected.has(entry.path)}
-                    onChange={() => onToggleSelect(entry.path)}
+                    onChange={(shift) => onToggleSelect(entry.path, shift)}
                   />
                 )}
               </span>
