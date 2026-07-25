@@ -338,6 +338,24 @@ async fn search_content(
         .map_err(|e| e.to_string())
 }
 
+/// 导出 `root` 下的文件清单为 CSV,写到本地 `dest`。
+#[tauri::command]
+async fn export_manifest(
+    state: State<'_, App>,
+    account: String,
+    root: String,
+    dest: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    let csv = app
+        .folder_manifest_csv(&account, &root)
+        .await
+        .map_err(|e| e.to_string())?;
+    tokio::fs::write(&dest, csv)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 列出 `root` 下最大的 `top` 个文件(成本治理)。
 #[tauri::command]
 async fn largest_files(
@@ -1747,6 +1765,7 @@ pub fn run() {
             search_content,
             find_duplicates,
             largest_files,
+            export_manifest,
             upload_file,
             download_file,
             delete,

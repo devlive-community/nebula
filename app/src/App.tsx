@@ -811,6 +811,23 @@ export default function App() {
     if (search) void runSearch(search.query, searchFilter, next);
   };
 
+  // 导出文件夹清单为 CSV(盘点 / 审计)。
+  const exportManifest = async (root: string) => {
+    if (!current) return;
+    const base = root === "" ? "root" : root.split("/").filter(Boolean).pop();
+    const dest = await save({
+      defaultPath: `${base}-manifest.csv`,
+      filters: [{ name: "CSV", extensions: ["csv"] }],
+    });
+    if (typeof dest !== "string") return;
+    try {
+      await api.exportManifest(current, root, dest);
+      setNotice({ tone: "ok", text: t("✓ 已导出清单") });
+    } catch (e) {
+      setNotice({ tone: "err", text: String(e) });
+    }
+  };
+
   // 打开搜索结果:跳到其所在目录并退出搜索。
   const openSearchResult = (entry: Entry) => {
     setSearch(null);
@@ -1864,6 +1881,12 @@ export default function App() {
       label: t("大文件排行"),
       run: () => setLargeRoot(path),
     });
+  if (current && path !== "")
+    paletteCommands.push({
+      id: "export-manifest",
+      label: t("导出清单 CSV"),
+      run: () => void exportManifest(path),
+    });
   paletteCommands.push({
     id: "settings",
     label: t("设置"),
@@ -2415,6 +2438,7 @@ export default function App() {
         { label: t("备份 / 同步"), onClick: () => setSyncPrefix(entry.path) },
         { label: t("查找重复文件"), onClick: () => setDupRoot(entry.path) },
         { label: t("大文件排行"), onClick: () => setLargeRoot(entry.path) },
+        { label: t("导出清单 CSV"), onClick: () => void exportManifest(entry.path) },
         { label: t("重命名"), onClick: () => setRenameTarget(entry) },
         { label: t("复制 / 移动到"), onClick: () => setMoveCopyTarget(entry) },
       ];

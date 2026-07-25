@@ -17,6 +17,7 @@ mod imaging;
 mod integrity;
 mod largest;
 mod limits;
+mod manifest;
 mod matting_plugin;
 mod pdf;
 mod preview;

@@ -197,6 +197,10 @@ export const largestFiles = (account: string, root: string, top: number) =>
     top,
   });
 
+/** 导出文件夹清单为 CSV,写到本地 dest。 */
+export const exportManifest = (account: string, root: string, dest: string) =>
+  invoke<void>("export_manifest", { account, root, dest });
+
 export const search = (
   account: string,
   root: string,

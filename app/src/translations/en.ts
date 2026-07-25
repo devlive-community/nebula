@@ -433,6 +433,8 @@ export const EN: Record<string, string> = {
   "在文本 / PDF 文件内容里搜索": "Search inside text / PDF files",
   查找重复文件: "Find duplicates",
   大文件排行: "Largest files",
+  "导出清单 CSV": "Export manifest CSV",
+  "✓ 已导出清单": "✓ Manifest exported",
   "共 {n} 个文件 · {b}": "{n} files · {b} total",
   该目录没有文件: "No files in this folder",
   "扫描中…": "Scanning…",
