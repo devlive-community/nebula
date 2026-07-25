@@ -8,9 +8,9 @@ use std::sync::{Arc, Mutex};
 
 use app_core::{
     AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, DiffItem,
-    DiffSummary, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload, Integrity, Ops,
-    Page, PageNumbers, PdfInfo, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown,
-    SyncJob, SyncReport, SyncSpec, TextPreview, TransferRecord, Watermark,
+    DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload,
+    Integrity, Ops, Page, PageNumbers, PdfInfo, RenamePlan, RenameRule, SearchResult, Settings,
+    StorageBreakdown, SyncJob, SyncReport, SyncSpec, TextPreview, TransferRecord, Watermark,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -333,6 +333,19 @@ async fn search_content(
 ) -> Result<ContentSearchResult, String> {
     let app = state.inner().clone();
     app.search_content(&account, &root, &query, max_hits)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 查找 `root` 下内容重复的对象(按大小 + ETag 分组)。
+#[tauri::command]
+async fn find_duplicates(
+    state: State<'_, App>,
+    account: String,
+    root: String,
+) -> Result<DupResult, String> {
+    let app = state.inner().clone();
+    app.find_duplicates(&account, &root)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1717,6 +1730,7 @@ pub fn run() {
             delete_transfer,
             search,
             search_content,
+            find_duplicates,
             upload_file,
             download_file,
             delete,

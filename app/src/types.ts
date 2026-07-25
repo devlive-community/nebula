@@ -359,6 +359,22 @@ export interface ContentSearchResult {
   truncated: boolean;
 }
 
+/** 一组内容重复的对象(与 app_core::DupGroup 对应)。 */
+export interface DupGroup {
+  size: number;
+  etag: string;
+  entries: Entry[];
+  wasted: number;
+}
+
+/** 重复查找结果(与 app_core::DupResult 对应)。 */
+export interface DupResult {
+  groups: DupGroup[];
+  total_wasted: number;
+  scanned: number;
+  truncated: boolean;
+}
+
 /** 与 Rust 端 nebula_provider::Entry 对应。 */
 export interface Entry {
   name: string;

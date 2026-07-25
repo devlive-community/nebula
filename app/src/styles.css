@@ -3640,3 +3640,65 @@ input[type="range"]:disabled {
   border-left: 2px solid var(--primary);
   word-break: break-word;
 }
+
+/* ── 查找重复文件对话框 ───────────────────────────────── */
+.modal--sm {
+  max-width: 360px;
+}
+.dup__state,
+.dup__summary {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.dup__summary {
+  color: var(--text);
+}
+.dup__list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dup__group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dup__group-head {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border);
+}
+.dup__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.dup__row:hover {
+  background: var(--bg-hover);
+}
+.dup__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.dup__keep {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+  color: #34c759;
+}
+.dup__error {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--danger);
+  word-break: break-word;
+}

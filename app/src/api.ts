@@ -185,6 +185,10 @@ export const searchContent = (
     maxHits,
   });
 
+/** 查找某文件夹下内容重复的对象。 */
+export const findDuplicates = (account: string, root: string) =>
+  invoke<import("./types").DupResult>("find_duplicates", { account, root });
+
 export const search = (
   account: string,
   root: string,
