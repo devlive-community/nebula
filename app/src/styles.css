@@ -3629,31 +3629,45 @@ input[type="range"]:disabled {
   width: 90vw;
   max-width: 560px;
 }
+/* 分段控件(pill card):圆角轨道 + 选中项浮起卡片 + 品牌色文字 */
 .settings-tabs {
-  display: flex;
+  display: inline-flex;
   gap: 4px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--border);
+  margin: 14px 20px 0;
+  padding: 4px;
+  /* 轨道用更「凹」的底色,选中卡片才显得浮起(深浅色各自取向见下方覆盖)。 */
+  background: var(--bg);
+  border-radius: 12px;
 }
 .settings-tab {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 10px 14px;
+  padding: 7px 16px;
   border: none;
   background: transparent;
   color: var(--text-dim);
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+  border-radius: 9px;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
-.settings-tab:hover {
+.settings-tab:hover:not(.settings-tab--on) {
   color: var(--text);
 }
 .settings-tab--on {
   color: var(--primary);
-  border-bottom-color: var(--primary);
+  background: var(--bg-elev-2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+/* 浅色主题:灰色轨道 + 纯白卡片(与截图一致),弹性方向和深色相反,单独覆盖。 */
+:root[data-theme="light"] .settings-tabs {
+  background: var(--bg-elev-2);
+}
+:root[data-theme="light"] .settings-tab--on {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* 已保存的同步任务列表 */
