@@ -514,6 +514,13 @@ export default function App() {
   const [filter, setFilter] = useState("");
   const [sortKey, setSortKey] = useState<"name" | "size" | "modified">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // 排序偏好持久化(重启后记住按什么列、升降序)。
+  useEffect(() => {
+    if (prefsHydrated.current) {
+      api.setPref("sort_key", sortKey).catch(() => {});
+      api.setPref("sort_dir", sortDir).catch(() => {});
+    }
+  }, [sortKey, sortDir]);
 
   // 切换账号 / 目录时清空过滤词、选择、详情与搜索结果。
   useEffect(() => {
@@ -686,16 +693,20 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [sw, v, th, sc] = await Promise.all([
+        const [sw, v, th, sc, sk, sd] = await Promise.all([
           api.getPref("sidebar_width"),
           api.getPref("view"),
           api.getPref("theme"),
           api.getPref("shortcuts"),
+          api.getPref("sort_key"),
+          api.getPref("sort_dir"),
         ]);
         const n = Number(sw);
         if (n >= 180 && n <= 480) setSidebarWidth(n);
         if (v === "list" || v === "grid") setView(v);
         if (th === "dark" || th === "light" || th === "system") setThemePref(th);
+        if (sk === "name" || sk === "size" || sk === "modified") setSortKey(sk);
+        if (sd === "asc" || sd === "desc") setSortDir(sd);
         if (sc) {
           try {
             setShortcuts(JSON.parse(sc));
