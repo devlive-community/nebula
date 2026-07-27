@@ -53,6 +53,7 @@ import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
 import { BatchTagsDialog } from "./components/BatchTagsDialog";
+import { NewTextFileDialog } from "./components/NewTextFileDialog";
 import { StatsDialog } from "./components/StatsDialog";
 import { CleanupDialog } from "./components/CleanupDialog";
 import { TransferPanel } from "./components/TransferPanel";
@@ -304,6 +305,7 @@ export default function App() {
   const [showBatchRename, setShowBatchRename] = useState(false);
   const [showBatchTags, setShowBatchTags] = useState(false);
   const [showBatchMove, setShowBatchMove] = useState(false);
+  const [showNewText, setShowNewText] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   // 主题偏好:深色 / 浅色 / 跟随系统。实际生效主题由偏好 + 系统色推导。
   const [themePref, setThemePref] = useState<"dark" | "light" | "system">("system");
@@ -1889,6 +1891,7 @@ export default function App() {
     showBatchRename ||
     showBatchTags ||
     showBatchMove ||
+    showNewText ||
     !!shareUrl ||
     showNewFolder ||
     showNewBucket ||
@@ -1925,6 +1928,7 @@ export default function App() {
       else if (showBatchRename) setShowBatchRename(false);
       else if (showBatchTags) setShowBatchTags(false);
       else if (showBatchMove) setShowBatchMove(false);
+      else if (showNewText) setShowNewText(false);
       else if (renameTarget) setRenameTarget(null);
       else if (showNewFolder) setShowNewFolder(false);
       else if (showNewBucket) setShowNewBucket(false);
@@ -1999,6 +2003,11 @@ export default function App() {
       id: "new-folder",
       label: t("新建文件夹"),
       run: () => setShowNewFolder(true),
+    });
+    paletteCommands.push({
+      id: "new-text",
+      label: t("新建文本文件"),
+      run: () => setShowNewText(true),
     });
   }
   if (path === "" && current)
@@ -2395,6 +2404,18 @@ export default function App() {
           onCopy={(dir) => void batchMoveCopy(dir, false)}
           onMove={(dir) => void batchMoveCopy(dir, true)}
           onCancel={() => setShowBatchMove(false)}
+        />
+      )}
+
+      {showNewText && current && (
+        <NewTextFileDialog
+          account={current}
+          dir={path}
+          onClose={() => setShowNewText(false)}
+          onCreated={() => {
+            setNotice({ tone: "ok", text: t("✓ 已创建文本文件") });
+            void load();
+          }}
         />
       )}
 

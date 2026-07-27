@@ -114,6 +114,15 @@ export const EN: Record<string, string> = {
   点击后按下新的组合键: "Click, then press a new key combo",
   恢复默认: "Reset to default",
 
+  // 新建文本文件
+  新建文本文件: "New text file",
+  文件名: "File name",
+  "如 readme.md": "e.g. readme.md",
+  "在此输入文件内容…": "Type the file content here…",
+  "创建中…": "Creating…",
+  请输入文件名: "Enter a file name",
+  "✓ 已创建文本文件": "✓ Text file created",
+
   // 导航
   后退: "Back",
   前进: "Forward",

@@ -3862,3 +3862,18 @@ input[type="range"]:disabled {
 .btn--icon {
   padding: 7px 10px;
 }
+
+/* 新建文本文件:内容编辑区 */
+.newtext__body {
+  width: 100%;
+  resize: vertical;
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 13px;
+  line-height: 1.55;
+}
