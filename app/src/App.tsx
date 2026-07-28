@@ -1670,6 +1670,16 @@ export default function App() {
     }
   };
 
+  // 复制任意文本到剪贴板并提示。
+  const copyToClipboard = async (text: string, okMsg: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice({ tone: "ok", text: okMsg });
+    } catch (e) {
+      setNotice({ tone: "err", text: String(e) });
+    }
+  };
+
   const shareUpload = async (entry: Entry) => {
     if (!current) return;
     setError(null);
@@ -2660,6 +2670,11 @@ export default function App() {
         { label: t("导出清单 CSV"), onClick: () => void exportManifest(entry.path) },
         { label: t("重命名"), onClick: () => setRenameTarget(entry) },
         { label: t("复制 / 移动到"), onClick: () => setMoveCopyTarget(entry) },
+        {
+          label: t("复制完整路径"),
+          onClick: () =>
+            void copyToClipboard(entry.path, t("✓ 已复制完整路径")),
+        },
       ];
       if (accounts.length > 1) {
         dirItems.push({
@@ -2690,6 +2705,16 @@ export default function App() {
       { label: t("取回归档"), onClick: () => setRestoreTarget(entry) },
       { label: t("重命名"), onClick: () => setRenameTarget(entry) },
       { label: t("复制 / 移动到"), onClick: () => setMoveCopyTarget(entry) },
+      {
+        label: t("复制对象名"),
+        onClick: () =>
+          void copyToClipboard(entry.name, t("✓ 已复制对象名")),
+      },
+      {
+        label: t("复制完整路径"),
+        onClick: () =>
+          void copyToClipboard(entry.path, t("✓ 已复制完整路径")),
+      },
     );
     if (accounts.length > 1) {
       items.push({
