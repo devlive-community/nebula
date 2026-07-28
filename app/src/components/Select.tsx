@@ -107,7 +107,7 @@ export function Select({ value, options, onChange, disabled }: Props) {
             className="select__panel select__panel--portal"
             style={{
               left: coords.left,
-              width: coords.width,
+              minWidth: coords.width,
               top: coords.top,
               bottom: coords.bottom,
             }}

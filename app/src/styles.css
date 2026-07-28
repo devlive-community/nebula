@@ -2615,8 +2615,14 @@ body.resizing {
   right: auto;
   bottom: auto;
   z-index: 3000;
+  width: max-content;
+  max-width: 280px;
   max-height: 280px;
   overflow-y: auto;
+}
+/* 选项不换行(面板已按内容自适应宽度) */
+.select__panel--portal .select__option span {
+  white-space: nowrap;
 }
 
 .select__option {
