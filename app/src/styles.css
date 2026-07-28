@@ -3891,3 +3891,22 @@ input[type="range"]:disabled {
   font-size: 13px;
   line-height: 1.55;
 }
+
+/* 强调色色板 */
+.accent-swatches {
+  display: flex;
+  gap: 8px;
+}
+.accent-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.accent-swatch--on {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--bg-elev);
+}

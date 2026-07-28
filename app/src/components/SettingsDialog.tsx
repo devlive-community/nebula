@@ -8,6 +8,7 @@ import { ShortcutsEditor } from "./ShortcutsEditor";
 import { useI18n } from "../i18n";
 import { LOCALES } from "../locales";
 import type { Bindings } from "../shortcuts";
+import { ACCENTS, type Accent } from "../accents";
 
 type Tab = "general" | "shortcuts" | "plugins";
 
@@ -19,6 +20,8 @@ interface Props {
   onShortcutsChange: (next: Bindings) => void;
   themePref: ThemePref;
   onThemeChange: (t: ThemePref) => void;
+  accent: Accent;
+  onAccentChange: (a: Accent) => void;
   onSave: (settings: Settings) => void;
   onClose: () => void;
 }
@@ -29,6 +32,8 @@ export function SettingsDialog({
   onShortcutsChange,
   themePref,
   onThemeChange,
+  accent,
+  onAccentChange,
   onSave,
   onClose,
 }: Props) {
@@ -90,6 +95,21 @@ export function SettingsDialog({
                   ]}
                   onChange={(v) => onThemeChange(v as ThemePref)}
                 />
+              </label>
+              <label className="field">
+                <span>{t("强调色")}</span>
+                <div className="accent-swatches">
+                  {ACCENTS.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      className={`accent-swatch ${accent === a.id ? "accent-swatch--on" : ""}`}
+                      style={{ background: a.color }}
+                      title={a.id}
+                      onClick={() => onAccentChange(a.id)}
+                    />
+                  ))}
+                </div>
               </label>
               <label className="field">
                 <span>{t("分享链接有效期(分钟)")}</span>

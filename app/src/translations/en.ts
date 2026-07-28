@@ -106,6 +106,7 @@ export const EN: Record<string, string> = {
   // 设置 / 快捷键
   基础: "General",
   主题: "Theme",
+  强调色: "Accent",
   跟随系统: "Follow system",
   快捷键: "Shortcuts",
   命令面板: "Command palette",

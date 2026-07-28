@@ -54,6 +54,7 @@ import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
 import { BatchTagsDialog } from "./components/BatchTagsDialog";
 import { NewTextFileDialog } from "./components/NewTextFileDialog";
+import { applyAccent, ACCENTS, type Accent } from "./accents";
 import { StatsDialog } from "./components/StatsDialog";
 import { CleanupDialog } from "./components/CleanupDialog";
 import { TransferPanel } from "./components/TransferPanel";
@@ -523,6 +524,13 @@ export default function App() {
       api.setPref("sort_dir", sortDir).catch(() => {});
     }
   }, [sortKey, sortDir]);
+  // 强调色:预设色,持久化,覆盖 --primary。
+  const [accent, setAccent] = useState<Accent>("default");
+  useEffect(() => {
+    applyAccent(accent);
+    if (prefsHydrated.current) api.setPref("accent", accent).catch(() => {});
+  }, [accent]);
+
   // 网格卡片大小:小 / 中 / 大,持久化。
   const [gridSize, setGridSize] = useState<"s" | "m" | "l">("m");
   const cardMin = gridSize === "s" ? 110 : gridSize === "l" ? 190 : 140;
@@ -703,7 +711,7 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [sw, v, th, sc, sk, sd, gsz] = await Promise.all([
+        const [sw, v, th, sc, sk, sd, gsz, ac] = await Promise.all([
           api.getPref("sidebar_width"),
           api.getPref("view"),
           api.getPref("theme"),
@@ -711,6 +719,7 @@ export default function App() {
           api.getPref("sort_key"),
           api.getPref("sort_dir"),
           api.getPref("grid_size"),
+          api.getPref("accent"),
         ]);
         const n = Number(sw);
         if (n >= 180 && n <= 480) setSidebarWidth(n);
@@ -719,6 +728,7 @@ export default function App() {
         if (sk === "name" || sk === "size" || sk === "modified") setSortKey(sk);
         if (sd === "asc" || sd === "desc") setSortDir(sd);
         if (gsz === "s" || gsz === "m" || gsz === "l") setGridSize(gsz);
+        if (ac && ACCENTS.some((x) => x.id === ac)) setAccent(ac as Accent);
         if (sc) {
           try {
             setShortcuts(JSON.parse(sc));
@@ -2580,6 +2590,8 @@ export default function App() {
           onShortcutsChange={setShortcuts}
           themePref={themePref}
           onThemeChange={setThemePref}
+          accent={accent}
+          onAccentChange={setAccent}
           onSave={saveSettings}
           onClose={() => setShowSettings(false)}
         />
