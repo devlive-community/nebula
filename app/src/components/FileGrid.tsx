@@ -65,9 +65,9 @@ export function FileGrid({
         return (
           <div
             key={entry.path}
-            className={`card ${selected.has(entry.path) ? "card--selected" : ""} ${
-              dropTarget === entry.path ? "card--drop" : ""
-            }`}
+            className={`card ${isDir ? "card--dir" : ""} ${
+              selected.has(entry.path) ? "card--selected" : ""
+            } ${dropTarget === entry.path ? "card--drop" : ""}`}
             draggable={!isDir}
             onDragStart={() => !isDir && onDragStartFile(entry)}
             onDragOver={

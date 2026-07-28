@@ -1162,6 +1162,28 @@ body.resizing {
   background: var(--bg-elev-2);
 }
 
+/* 文件夹卡片:不做成大块空缩略图,而是紧凑的一行——大号文件夹图标 + 名称。 */
+.card--dir {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.card--dir .card__thumb {
+  height: auto;
+  background: transparent;
+  flex: none;
+}
+.card--dir .card__icon--dir {
+  font-size: 26px;
+}
+.card--dir .card__name {
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
 .card__img {
   width: 100%;
   height: 100%;
