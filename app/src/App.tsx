@@ -523,6 +523,14 @@ export default function App() {
       api.setPref("sort_dir", sortDir).catch(() => {});
     }
   }, [sortKey, sortDir]);
+  // 网格卡片大小:小 / 中 / 大,持久化。
+  const [gridSize, setGridSize] = useState<"s" | "m" | "l">("m");
+  const cardMin = gridSize === "s" ? 110 : gridSize === "l" ? 190 : 140;
+  useEffect(() => {
+    if (prefsHydrated.current) api.setPref("grid_size", gridSize).catch(() => {});
+  }, [gridSize]);
+  const cycleGridSize = () =>
+    setGridSize((s) => (s === "s" ? "m" : s === "m" ? "l" : "s"));
 
   // 切换账号 / 目录时清空过滤词、选择、详情与搜索结果。
   useEffect(() => {
@@ -695,13 +703,14 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [sw, v, th, sc, sk, sd] = await Promise.all([
+        const [sw, v, th, sc, sk, sd, gsz] = await Promise.all([
           api.getPref("sidebar_width"),
           api.getPref("view"),
           api.getPref("theme"),
           api.getPref("shortcuts"),
           api.getPref("sort_key"),
           api.getPref("sort_dir"),
+          api.getPref("grid_size"),
         ]);
         const n = Number(sw);
         if (n >= 180 && n <= 480) setSidebarWidth(n);
@@ -709,6 +718,7 @@ export default function App() {
         if (th === "dark" || th === "light" || th === "system") setThemePref(th);
         if (sk === "name" || sk === "size" || sk === "modified") setSortKey(sk);
         if (sd === "asc" || sd === "desc") setSortDir(sd);
+        if (gsz === "s" || gsz === "m" || gsz === "l") setGridSize(gsz);
         if (sc) {
           try {
             setShortcuts(JSON.parse(sc));
@@ -2137,6 +2147,8 @@ export default function App() {
                 onToggleView={() =>
                   setView((v) => (v === "list" ? "grid" : "list"))
                 }
+                gridSize={gridSize}
+                onCycleGridSize={cycleGridSize}
                 onUpload={upload}
                 onUploadFolder={uploadFolder}
                 onNewFolder={() => setShowNewFolder(true)}
@@ -2247,6 +2259,7 @@ export default function App() {
                 onDragStartFile={onDragStartFile}
                 onDropDir={onDropDir}
                 onReachEnd={loadMore}
+                cardMin={cardMin}
               />
             )}
 

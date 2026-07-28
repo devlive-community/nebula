@@ -10,6 +10,7 @@ import {
   faMagnifyingGlass,
   faRotateRight,
   faTableCells,
+  faUpDownLeftRight,
   faUpload,
 } from "@fortawesome/free-solid-svg-icons";
 import { useI18n } from "../i18n";
@@ -34,6 +35,8 @@ interface Props {
   onUp: () => void;
   onRefresh: () => void;
   onToggleView: () => void;
+  gridSize: "s" | "m" | "l";
+  onCycleGridSize: () => void;
   onUpload: () => void;
   onUploadFolder: () => void;
   onNewFolder: () => void;
@@ -57,6 +60,8 @@ export function Toolbar({
   onUp,
   onRefresh,
   onToggleView,
+  gridSize,
+  onCycleGridSize,
   onUpload,
   onUploadFolder,
   onNewFolder,
@@ -106,6 +111,21 @@ export function Toolbar({
       </div>
       <div className="toolbar__spacer" />
       {busy && <span className="toolbar__busy">{t("处理中…")}</span>}
+      {view === "grid" && (
+        <Tooltip
+          label={
+            gridSize === "s"
+              ? t("卡片:小")
+              : gridSize === "l"
+                ? t("卡片:大")
+                : t("卡片:中")
+          }
+        >
+          <button className="btn btn--icon" onClick={onCycleGridSize}>
+            <FontAwesomeIcon icon={faUpDownLeftRight} />
+          </button>
+        </Tooltip>
+      )}
       <Tooltip label={view === "list" ? t("网格视图") : t("列表视图")}>
         <button className="btn" onClick={onToggleView}>
           <FontAwesomeIcon icon={view === "list" ? faTableCells : faList} />

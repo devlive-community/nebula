@@ -123,6 +123,11 @@ export const EN: Record<string, string> = {
   请输入文件名: "Enter a file name",
   "✓ 已创建文本文件": "✓ Text file created",
 
+  // 网格卡片大小
+  "卡片:小": "Cards: small",
+  "卡片:中": "Cards: medium",
+  "卡片:大": "Cards: large",
+
   // 复制到剪贴板
   复制对象名: "Copy name",
   复制完整路径: "Copy full path",

@@ -19,6 +19,8 @@ interface Props {
   onDragStartFile: (entry: Entry) => void;
   onDropDir: (dir: Entry) => void;
   onReachEnd?: () => void;
+  /** 卡片最小宽度(px),控制网格密度(小 / 中 / 大)。 */
+  cardMin: number;
 }
 
 export function FileGrid({
@@ -33,6 +35,7 @@ export function FileGrid({
   onDragStartFile,
   onDropDir,
   onReachEnd,
+  cardMin,
 }: Props) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const { shown, shownCount, total, hasMore, onScroll } = useIncremental(
@@ -49,7 +52,13 @@ export function FileGrid({
   }
 
   return (
-    <div className="grid" onScroll={onScroll}>
+    <div
+      className="grid"
+      onScroll={onScroll}
+      style={{
+        gridTemplateColumns: `repeat(auto-fill, minmax(${cardMin}px, 1fr))`,
+      }}
+    >
       {shown.map((entry) => {
         const isDir = entry.kind === "directory";
         const thumb = thumbs[entry.path];
