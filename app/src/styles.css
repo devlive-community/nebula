@@ -2606,10 +2606,14 @@ body.resizing {
   animation: select-drop 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Portal 到 body 的面板:fixed 定位(坐标由 JS 计算),置于最上层,不被 modal 裁切。 */
+/* Portal 到 body 的面板:fixed 定位(坐标由 JS 计算),置于最上层,不被 modal 裁切。
+   显式重置四个方向,避免基类的 top/left/right 泄漏导致 fixed 下定位错误(如飞出屏幕)。 */
 .select__panel--portal {
   position: fixed;
+  top: auto;
+  left: auto;
   right: auto;
+  bottom: auto;
   z-index: 3000;
   max-height: 280px;
   overflow-y: auto;
