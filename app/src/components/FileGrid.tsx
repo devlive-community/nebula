@@ -38,11 +38,8 @@ export function FileGrid({
   cardMin,
 }: Props) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const { shown, shownCount, total, hasMore, onScroll } = useIncremental(
-    entries,
-    120,
-    onReachEnd,
-  );
+  const { shown, shownCount, total, hasMore, onScroll, containerRef } =
+    useIncremental(entries, 120, onReachEnd);
   const { t } = useI18n();
   if (loading) {
     return <div className="filelist__state">{t("加载中…")}</div>;
@@ -53,6 +50,7 @@ export function FileGrid({
 
   return (
     <div
+      ref={containerRef}
       className="grid"
       onScroll={onScroll}
       style={{

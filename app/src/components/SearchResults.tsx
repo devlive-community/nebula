@@ -57,7 +57,7 @@ export function SearchResults({
   onClear,
 }: Props) {
   const { t } = useI18n();
-  const { shown, onScroll } = useIncremental(results);
+  const { shown, onScroll, containerRef } = useIncremental(results);
   const [extInput, setExtInput] = useState(ext);
   useEffect(() => setExtInput(ext), [ext]);
   const allSelected =
@@ -125,7 +125,7 @@ export function SearchResults({
         )}
       </div>
 
-      <div className="search-results__body" onScroll={onScroll}>
+      <div ref={containerRef} className="search-results__body" onScroll={onScroll}>
         {loading ? (
           <div className="filelist__state">{t("搜索中…")}</div>
         ) : results.length === 0 ? (

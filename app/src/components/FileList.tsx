@@ -53,11 +53,8 @@ export function FileList({
   onReachEnd,
 }: Props) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const { shown, shownCount, total, hasMore, onScroll } = useIncremental(
-    entries,
-    120,
-    onReachEnd,
-  );
+  const { shown, shownCount, total, hasMore, onScroll, containerRef } =
+    useIncremental(entries, 120, onReachEnd);
   const { t } = useI18n();
   const someSelected = entries.some(
     (e) => e.kind === "file" && selected.has(e.path),
@@ -97,7 +94,7 @@ export function FileList({
         {header("size", t("大小"), "col-size")}
         {header("modified", t("修改时间"), "col-modified")}
       </div>
-      <div className="filelist__body" onScroll={onScroll}>
+      <div ref={containerRef} className="filelist__body" onScroll={onScroll}>
         {shown.map((entry) => {
           const isDir = entry.kind === "directory";
           return (
