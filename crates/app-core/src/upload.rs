@@ -7,11 +7,16 @@
 //!
 //! 只对超过一个分片大小的文件启用;小文件、以及 `resumable_upload` 能力为 false 的 provider
 //! 回退到整体上传。出错时**不**放弃服务端已上传分片(不 abort),以便下次续传。
+//!
+//! 分片之间**并发**上传(并发度复用 [`Settings::concurrency`](crate::Settings) 这一个
+//! 用户已可调的旋钮,不单独引入新设置),每个分片各开一个文件句柄独立 seek+读,避免共享游标。
 
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use bytes::{Bytes, BytesMut};
+use futures::stream::{self, StreamExt};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use crate::content_type::guess_content_type;
@@ -81,7 +86,7 @@ impl App {
         let key = session_key(account, remote_path, local_path);
 
         // 恢复匹配的会话,否则新开一个。
-        let (upload_id, mut done) = match self.load_session(&key, size, mtime, part_size) {
+        let (upload_id, done) = match self.load_session(&key, size, mtime, part_size) {
             Some(resumed) => resumed,
             None => {
                 let uid = provider.begin_multipart(remote_path, content_type).await?;
@@ -93,37 +98,79 @@ impl App {
 
         let num_parts = size.div_ceil(part_size) as u32;
         let done_nums: HashSet<u32> = done.iter().map(|(n, _)| *n).collect();
-        let mut uploaded: u64 = done_nums
+        let uploaded_init: u64 = done_nums
             .iter()
             .map(|n| part_len(*n, num_parts, size, part_size))
             .sum();
-        progress(uploaded, size);
+        progress(uploaded_init, size);
 
-        let mut file = tokio::fs::File::open(local_path).await?;
-        for n in 1..=num_parts {
-            if done_nums.contains(&n) {
-                continue;
-            }
-            // 取消:中止但保留会话与已传分片,重发即续传。
-            if cancel.load(Ordering::Relaxed) {
-                return Err(AppError::Cancelled);
-            }
+        let pending: Vec<u32> = (1..=num_parts).filter(|n| !done_nums.contains(n)).collect();
+        // 并发度复用「批量传输并发数」这一个设置,1..=10(前端已限定范围),这里再兜底一次。
+        let concurrency = (self.settings().concurrency as usize).clamp(1, 10);
+        let done = Mutex::new(done);
+        let uploaded = AtomicU64::new(uploaded_init);
+        // 提前把非 Copy 的捕获量重绑成引用:`async move` 按值捕获,若不这样做,
+        // 外层 `map` 闭包在第二次调用时会尝试重新移动已经移走的值,导致只能实现 FnOnce。
+        let provider = &provider;
+        let key = &key;
+        let upload_id = &upload_id;
+        let done_ref = &done;
+        let uploaded_ref = &uploaded;
+
+        let upload_one = move |n: u32| async move {
             let len = part_len(n, num_parts, size, part_size);
+            // 各分片独立开文件句柄各自 seek+读,避免共享一个游标在并发下互相踩。
+            let mut file = tokio::fs::File::open(local_path).await?;
             let bytes = read_part(&mut file, (n as u64 - 1) * part_size, len).await?;
             let etag = provider
-                .upload_part(remote_path, &upload_id, n, bytes)
+                .upload_part(remote_path, upload_id, n, bytes)
                 .await?;
-            done.push((n, etag));
-            self.save_session(&key, &upload_id, size, mtime, part_size, &done);
-            uploaded += len;
-            progress(uploaded, size);
+            {
+                let mut d = done_ref.lock().unwrap();
+                d.push((n, etag));
+                self.save_session(key, upload_id, size, mtime, part_size, &d);
+            }
+            let total = uploaded_ref.fetch_add(len, Ordering::SeqCst) + len;
+            progress(total, size);
+            Ok(())
+        };
+
+        // 按并发度分波:每一波内的分片并发上传、**全部落定**(不管成败)后才决定要不要下一波。
+        // 这样一波内和分片 X 同批调度的其它分片不会因为 X 失败而被半路丢弃、白白浪费已发出的请求;
+        // 但失败的那一波过后就不再开新的一波——已完成的进度全部存进会话,供下次续传。
+        let mut first_err: Option<AppError> = None;
+        for chunk in pending.chunks(concurrency) {
+            if cancel.load(Ordering::Relaxed) {
+                first_err = Some(AppError::Cancelled);
+                break;
+            }
+            let results: Vec<Result<()>> = stream::iter(chunk.iter().copied().map(upload_one))
+                .buffer_unordered(chunk.len())
+                .collect()
+                .await;
+            let mut wave_failed = false;
+            for r in results {
+                if let Err(e) = r {
+                    wave_failed = true;
+                    if first_err.is_none() {
+                        first_err = Some(e);
+                    }
+                }
+            }
+            if wave_failed {
+                break;
+            }
+        }
+        if let Some(e) = first_err {
+            return Err(e);
         }
 
+        let mut done = done.into_inner().unwrap();
         done.sort_by_key(|(n, _)| *n);
         provider
-            .complete_multipart(remote_path, &upload_id, &done)
+            .complete_multipart(remote_path, upload_id, &done)
             .await?;
-        self.delete_session(&key);
+        self.delete_session(key);
         Ok(())
     }
 
@@ -318,6 +365,10 @@ mod tests {
     async fn resumable_upload_sends_all_parts_in_order() {
         let rec = Arc::new(ResumableRec::new(None));
         let (app, db) = app_with_store("all", rec.clone());
+        // 并发度钉在 1:这个用例要测的是"分片按顺序传完",并发下完成顺序不再保证。
+        let mut s = app.settings();
+        s.concurrency = 1;
+        app.save_settings(&s).unwrap();
         let file = temp_file("all", &[7u8; 10]); // 10 字节,分片 4 → (4,4,2)
 
         app.upload_resumable_parted(
@@ -348,9 +399,13 @@ mod tests {
 
     #[tokio::test]
     async fn resume_after_interruption_skips_completed_parts() {
-        // 让分片 2 首次失败。
+        // 并发度钉在 1:这个用例要测的是"续传跳过已完成分片",不是并发本身——
+        // 并发>1 时分片 2 失败不妨碍同批次的分片 3 照样成功,断言会变得依赖调度顺序。
         let rec = Arc::new(ResumableRec::new(Some(2)));
         let (app, db) = app_with_store("resume", rec.clone());
+        let mut s = app.settings();
+        s.concurrency = 1;
+        app.save_settings(&s).unwrap();
         let file = temp_file("resume", &[9u8; 10]); // (4,4,2)
         let path = file.to_str().unwrap();
 
@@ -390,9 +445,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn concurrent_parts_sharing_a_failure_still_persist_their_progress() {
+        // 并发度 3、3 个分片:分片 2 失败不妨碍同批次并发调度的分片 1/3 成功并入会话,
+        // 续传时只需再补分片 2——这正是"并发"相对旧的严格顺序循环带来的行为变化。
+        let rec = Arc::new(ResumableRec::new(Some(2)));
+        let (app, db) = app_with_store("concurrent", rec.clone());
+        let mut s = app.settings();
+        s.concurrency = 3;
+        app.save_settings(&s).unwrap();
+        let file = temp_file("concurrent", &[9u8; 10]); // (4,4,2)
+        let path = file.to_str().unwrap();
+
+        assert!(app
+            .upload_resumable_parted(
+                "rec",
+                "b/k",
+                path,
+                None,
+                4,
+                &AtomicBool::new(false),
+                &|_, _| {}
+            )
+            .await
+            .is_err());
+        let mut got = rec.parts.lock().unwrap().clone();
+        got.sort();
+        assert_eq!(got, vec![(1, 4), (3, 2)], "分片 1、3 应已并发完成并持久化");
+        assert!(rec.completed.lock().unwrap().is_none());
+
+        app.upload_resumable_parted(
+            "rec",
+            "b/k",
+            path,
+            None,
+            4,
+            &AtomicBool::new(false),
+            &|_, _| {},
+        )
+        .await
+        .unwrap();
+        let mut got = rec.parts.lock().unwrap().clone();
+        got.sort();
+        assert_eq!(got, vec![(1, 4), (2, 4), (3, 2)], "续传只应再补分片 2");
+        assert!(rec.completed.lock().unwrap().is_some());
+
+        let _ = std::fs::remove_file(&file);
+        let _ = std::fs::remove_file(&db);
+    }
+
+    #[tokio::test]
     async fn cancelled_upload_stops_and_resumes_later() {
         let rec = Arc::new(ResumableRec::new(None));
         let (app, db) = app_with_store("cancel", rec.clone());
+        // 并发度钉在 1,让续传后的分片顺序断言保持确定性。
+        let mut s = app.settings();
+        s.concurrency = 1;
+        app.save_settings(&s).unwrap();
         let file = temp_file("cancel", &[5u8; 10]); // (4,4,2)
         let path = file.to_str().unwrap();
 
