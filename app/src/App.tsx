@@ -21,6 +21,7 @@ import * as api from "./api";
 import {
   baseName,
   formatBytes,
+  guessMimeType,
   isBucket,
   joinRemote,
   parentPath,
@@ -2384,7 +2385,7 @@ export default function App() {
         <PromptDialog
           title={t("修改内容类型")}
           placeholder={t("如 image/png、application/pdf")}
-          initial={editTypeTarget.content_type ?? ""}
+          initial={editTypeTarget.content_type ?? guessMimeType(editTypeTarget.name)}
           submitLabel={t("保存")}
           onSubmit={doSetContentType}
           onCancel={() => setEditTypeTarget(null)}

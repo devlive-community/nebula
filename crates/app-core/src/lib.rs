@@ -10,6 +10,7 @@
 mod breakdown;
 mod cancel;
 mod content_search;
+mod content_type;
 mod dedup;
 mod duplicates;
 mod error;

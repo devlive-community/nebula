@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use bytes::{Bytes, BytesMut};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
+use crate::content_type::guess_content_type;
 use crate::store::UploadSessionRow;
 use crate::{App, AppError, ProgressFn, Result};
 
@@ -62,6 +63,9 @@ impl App {
         progress: ProgressFn<'_>,
     ) -> Result<()> {
         let provider = self.provider(account)?;
+        // 调用方未显式指定时,按远端路径的扩展名推断,避免对象存储端把 Content-Type
+        // 留空(通常回退成 application/octet-stream),导致图片/视频/PDF 无法预览。
+        let content_type = content_type.or_else(|| guess_content_type(remote_path));
         let meta = tokio::fs::metadata(local_path).await?;
         let size = meta.len();
 
