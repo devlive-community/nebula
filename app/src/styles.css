@@ -3543,7 +3543,6 @@ input[type="range"]:disabled {
   font-size: 13px;
 }
 
-.pv__field select,
 .pv__field input {
   flex: 1;
   max-width: 190px;
@@ -3553,6 +3552,11 @@ input[type="range"]:disabled {
   border-radius: 6px;
   color: var(--text);
   font-size: 13px;
+}
+
+.pv__select {
+  flex: 1;
+  max-width: 190px;
 }
 
 .pv__field-hint {

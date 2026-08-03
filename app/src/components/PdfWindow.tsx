@@ -28,6 +28,7 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { formatBytes } from "../util";
+import { Select } from "./Select";
 import { Tooltip } from "./Tooltip";
 import type {
   PdfAssembly,
@@ -775,17 +776,20 @@ export function PdfWindow({ account, path, name }: Props) {
               <div className="pv__modal-title">{t("加页码")}</div>
               <label className="pv__field">
                 <span>{t("位置")}</span>
-                <select
-                  value={numPos}
-                  onChange={(e) => setNumPos(e.target.value as PdfNumberPos)}
-                >
-                  <option value="bottom_center">{t("底部居中")}</option>
-                  <option value="bottom_right">{t("底部右")}</option>
-                  <option value="bottom_left">{t("底部左")}</option>
-                  <option value="top_center">{t("顶部居中")}</option>
-                  <option value="top_right">{t("顶部右")}</option>
-                  <option value="top_left">{t("顶部左")}</option>
-                </select>
+                <div className="pv__select">
+                  <Select
+                    value={numPos}
+                    options={[
+                      { value: "bottom_center", label: t("底部居中") },
+                      { value: "bottom_right", label: t("底部右") },
+                      { value: "bottom_left", label: t("底部左") },
+                      { value: "top_center", label: t("顶部居中") },
+                      { value: "top_right", label: t("顶部右") },
+                      { value: "top_left", label: t("顶部左") },
+                    ]}
+                    onChange={(v) => setNumPos(v as PdfNumberPos)}
+                  />
+                </div>
               </label>
               <label className="pv__field">
                 <span>{t("起始编号")}</span>
