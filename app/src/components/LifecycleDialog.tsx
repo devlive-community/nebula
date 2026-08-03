@@ -5,6 +5,7 @@ import * as api from "../api";
 import { useI18n } from "../i18n";
 import { STORAGE_CLASSES } from "./StorageClassDialog";
 import { Select } from "./Select";
+import { Checkbox } from "./Checkbox";
 import type { LifecycleRule } from "../types";
 
 interface Props {
@@ -134,10 +135,9 @@ export function LifecycleDialog({
                       onChange={(e) => updateRule(i, { prefix: e.target.value })}
                     />
                     <label className="lifecycle__enabled">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={rule.enabled}
-                        onChange={(e) => updateRule(i, { enabled: e.target.checked })}
+                        onChange={() => updateRule(i, { enabled: !rule.enabled })}
                       />
                       {t("启用")}
                     </label>

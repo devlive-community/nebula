@@ -5,6 +5,7 @@ import type { Entry } from "../types";
 import { formatBytes } from "../util";
 import { useIncremental } from "../hooks";
 import { Select } from "./Select";
+import { Checkbox } from "./Checkbox";
 import { useI18n } from "../i18n";
 
 interface Props {
@@ -114,12 +115,8 @@ export function SearchResults({
           </>
         )}
         {!loading && results.length > 0 && (
-          <label className="search-results__selall">
-            <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={onToggleSelectAll}
-            />
+          <label className="search-results__selall" onClick={onToggleSelectAll}>
+            <Checkbox checked={allSelected} onChange={onToggleSelectAll} />
             {t("全选")}
           </label>
         )}
@@ -138,18 +135,12 @@ export function SearchResults({
                 selected.has(entry.path) ? "search-results__row--selected" : ""
               }`}
             >
-              <input
-                type="checkbox"
-                className="search-results__check"
-                checked={selected.has(entry.path)}
-                onChange={(e) =>
-                  onToggleSelect(
-                    entry.path,
-                    (e.nativeEvent as MouseEvent).shiftKey,
-                  )
-                }
-                onClick={(e) => e.stopPropagation()}
-              />
+              <span className="search-results__check">
+                <Checkbox
+                  checked={selected.has(entry.path)}
+                  onChange={(shift) => onToggleSelect(entry.path, shift)}
+                />
+              </span>
               <button
                 className="search-results__open"
                 onClick={() => onOpen(entry)}

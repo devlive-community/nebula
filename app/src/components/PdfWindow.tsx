@@ -29,6 +29,7 @@ import * as api from "../api";
 import { useI18n } from "../i18n";
 import { formatBytes } from "../util";
 import { Select } from "./Select";
+import { Checkbox } from "./Checkbox";
 import { Tooltip } from "./Tooltip";
 import type {
   PdfAssembly,
@@ -879,11 +880,7 @@ export function PdfWindow({ account, path, name }: Props) {
               </label>
               <label className="pv__field">
                 <span>{t("平铺铺满")}</span>
-                <input
-                  type="checkbox"
-                  checked={wmTile}
-                  onChange={(e) => setWmTile(e.target.checked)}
-                />
+                <Checkbox checked={wmTile} onChange={() => setWmTile((v) => !v)} />
               </label>
               <div className="pv__modal-actions">
                 <button className="pv__btn" onClick={() => setWmOpen(false)}>

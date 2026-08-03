@@ -5,6 +5,7 @@ import * as api from "../api";
 import { useI18n } from "../i18n";
 import { formatBytes } from "../util";
 import { Select } from "./Select";
+import { Checkbox } from "./Checkbox";
 import type {
   AccountInfo,
   ConflictChoice,
@@ -247,11 +248,7 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
           </label>
           {mode !== "two_way" && (
             <label className="field field--check">
-              <input
-                type="checkbox"
-                checked={deleteExtra}
-                onChange={(e) => setDeleteExtra(e.target.checked)}
-              />
+              <Checkbox checked={deleteExtra} onChange={() => setDeleteExtra((v) => !v)} />
               <span>
                 {mode === "mirror_up"
                   ? t("删除云端多余对象(镜像)")

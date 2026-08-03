@@ -4,6 +4,7 @@ import { faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { listen } from "@tauri-apps/api/event";
 import * as api from "../api";
 import { useI18n } from "../i18n";
+import { Checkbox } from "./Checkbox";
 
 interface Props {
   account: string;
@@ -111,11 +112,7 @@ export function BatchTagsDialog({ account, paths, onClose, onDone }: Props) {
           </button>
 
           <label className="field field--check" style={{ marginTop: 12 }}>
-            <input
-              type="checkbox"
-              checked={merge}
-              onChange={(e) => setMerge(e.target.checked)}
-            />
+            <Checkbox checked={merge} onChange={() => setMerge((m) => !m)} />
             <span>{t("保留各对象已有的其它标签(合并)")}</span>
           </label>
 

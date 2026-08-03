@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { formatBytes } from "../util";
+import { Checkbox } from "./Checkbox";
 import type { DupResult } from "../types";
 
 interface Props {
@@ -117,12 +118,12 @@ export function DuplicatesDialog({ account, root, onClose, onDeleted }: Props) {
                       })}
                     </div>
                     {g.entries.map((e, i) => (
-                      <label className="dup__row" key={e.path}>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(e.path)}
-                          onChange={() => toggle(e.path)}
-                        />
+                      <label
+                        className="dup__row"
+                        key={e.path}
+                        onClick={() => toggle(e.path)}
+                      >
+                        <Checkbox checked={selected.has(e.path)} onChange={() => toggle(e.path)} />
                         <span className="dup__path" title={e.path}>
                           {e.path}
                         </span>

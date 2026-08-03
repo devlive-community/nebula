@@ -36,6 +36,7 @@ import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { formatBytes } from "../util";
+import { Checkbox } from "./Checkbox";
 import { Tooltip } from "./Tooltip";
 import type { ExifInfo, ImageData, ImageOps } from "../types";
 
@@ -1886,11 +1887,7 @@ export function ImageWindow({ account, path, name, etag, size }: Props) {
                 </label>
               </div>
               <label className="iv__resize-lock">
-                <input
-                  type="checkbox"
-                  checked={resizeLock}
-                  onChange={(e) => setResizeLock(e.target.checked)}
-                />
+                <Checkbox checked={resizeLock} onChange={() => setResizeLock((v) => !v)} />
                 {t("锁定宽高比")}
               </label>
               <div className="iv__resize-actions">
