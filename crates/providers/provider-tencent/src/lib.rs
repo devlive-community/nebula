@@ -8,8 +8,8 @@ use bytes::Bytes;
 use futures::StreamExt;
 
 use nebula_provider::{
-    path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ObjectVersion,
-    ProgressFn, ProviderError, Result, StorageProvider,
+    path, ByteStream, Capabilities, CorsRule, Entry, IncompleteUpload, LifecycleRule,
+    ObjectVersion, ProgressFn, ProviderError, Result, StorageProvider, WebsiteConfig,
 };
 use tencent_cos::{CosClient, CosError, ListEntry};
 
@@ -90,6 +90,46 @@ fn rule_to_sdk(r: &LifecycleRule) -> tencent_cos::LifecycleRule {
     }
 }
 
+/// 把 SDK 的 CORS 规则映射到统一 provider 模型(字段一一对应)。
+fn cors_from_sdk(r: tencent_cos::bucket::CorsRule) -> CorsRule {
+    CorsRule {
+        id: r.id,
+        allowed_origins: r.allowed_origins,
+        allowed_methods: r.allowed_methods,
+        allowed_headers: r.allowed_headers,
+        expose_headers: r.expose_headers,
+        max_age_seconds: r.max_age_seconds,
+    }
+}
+
+/// 把统一 provider 模型映射回 SDK 的 CORS 规则。
+fn cors_to_sdk(r: &CorsRule) -> tencent_cos::bucket::CorsRule {
+    tencent_cos::bucket::CorsRule {
+        id: r.id.clone(),
+        allowed_origins: r.allowed_origins.clone(),
+        allowed_methods: r.allowed_methods.clone(),
+        allowed_headers: r.allowed_headers.clone(),
+        expose_headers: r.expose_headers.clone(),
+        max_age_seconds: r.max_age_seconds,
+    }
+}
+
+/// 把 SDK 的静态网站托管配置映射到统一 provider 模型(字段一一对应)。
+fn website_from_sdk(c: tencent_cos::bucket::WebsiteConfig) -> WebsiteConfig {
+    WebsiteConfig {
+        index_document: c.index_document,
+        error_document: c.error_document,
+    }
+}
+
+/// 把统一 provider 模型映射回 SDK 的静态网站托管配置。
+fn website_to_sdk(c: &WebsiteConfig) -> tencent_cos::bucket::WebsiteConfig {
+    tencent_cos::bucket::WebsiteConfig {
+        index_document: c.index_document.clone(),
+        error_document: c.error_document.clone(),
+    }
+}
+
 fn map_err(err: CosError) -> ProviderError {
     match err {
         CosError::Api { code, message, .. } => match code.as_str() {
@@ -124,6 +164,8 @@ impl StorageProvider for TencentProvider {
             hierarchical: false,
             bucket_lifecycle: true,
             versioning: true,
+            bucket_cors: true,
+            bucket_website: true,
         }
     }
 
@@ -413,6 +455,36 @@ impl StorageProvider for TencentProvider {
         let rules: Vec<_> = rules.iter().map(rule_to_sdk).collect();
         self.client
             .set_bucket_lifecycle(bucket, &rules)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn bucket_cors(&self, bucket: &str) -> Result<Vec<CorsRule>> {
+        let rules = self.client.get_bucket_cors(bucket).await.map_err(map_err)?;
+        Ok(rules.into_iter().map(cors_from_sdk).collect())
+    }
+
+    async fn set_bucket_cors(&self, bucket: &str, rules: &[CorsRule]) -> Result<()> {
+        let rules: Vec<_> = rules.iter().map(cors_to_sdk).collect();
+        self.client
+            .set_bucket_cors(bucket, &rules)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn bucket_website(&self, bucket: &str) -> Result<Option<WebsiteConfig>> {
+        let config = self
+            .client
+            .get_bucket_website(bucket)
+            .await
+            .map_err(map_err)?;
+        Ok(config.map(website_from_sdk))
+    }
+
+    async fn set_bucket_website(&self, bucket: &str, config: Option<&WebsiteConfig>) -> Result<()> {
+        let config = config.map(website_to_sdk);
+        self.client
+            .set_bucket_website(bucket, config.as_ref())
             .await
             .map_err(map_err)
     }

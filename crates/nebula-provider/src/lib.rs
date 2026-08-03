@@ -14,6 +14,7 @@
 //! - [`path`] — `bucket/key` 路径解析工具(供适配层复用)
 
 pub mod capabilities;
+pub mod cors;
 pub mod entry;
 pub mod error;
 pub mod lifecycle;
@@ -21,8 +22,10 @@ pub mod path;
 pub mod provider;
 pub mod registry;
 pub mod version;
+pub mod website;
 
 pub use capabilities::Capabilities;
+pub use cors::CorsRule;
 pub use entry::{Entry, EntryKind};
 pub use error::{ProviderError, Result};
 pub use lifecycle::LifecycleRule;
@@ -31,3 +34,4 @@ pub use provider::{
 };
 pub use registry::ProviderRegistry;
 pub use version::ObjectVersion;
+pub use website::WebsiteConfig;

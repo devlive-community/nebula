@@ -12,8 +12,8 @@
 
 pub use s3_core::{bucket, client, error, multipart, object};
 pub use s3_core::{
-    BucketSummary, LifecycleRule, ListEntry, ObjectMeta, ObjectSummary, ObjectVersion, Result,
-    S3Client, S3Error, MIN_PART_SIZE,
+    BucketSummary, CorsRule, LifecycleRule, ListEntry, ObjectMeta, ObjectSummary, ObjectVersion,
+    Result, S3Client, S3Error, WebsiteConfig, MIN_PART_SIZE,
 };
 
 /// 用 R2 endpoint 创建客户端。R2 的 SigV4 region 固定为 `auto`,这里自动设好。

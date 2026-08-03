@@ -124,6 +124,11 @@ impl StorageProvider for MinioProvider {
             hierarchical: false,
             bucket_lifecycle: true,
             versioning: true,
+            // 社区版 MinIO 没有 bucket 级 CORS API(2024 年加此 API 的 PR 被官方关闭、
+            // 导流到商业版);静态网站托管官方文档明确建议用 nginx/caddy 代替。两者都不
+            // 覆盖对应 trait 方法。
+            bucket_cors: false,
+            bucket_website: false,
         }
     }
 

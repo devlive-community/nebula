@@ -7,11 +7,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use app_core::{
-    AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, DiffItem,
+    AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, CorsRule, DiffItem,
     DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload,
     Integrity, LargestFiles, LifecycleRule, ObjectVersion, Ops, Page, PageNumbers, PdfInfo,
     RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport,
-    SyncSpec, TextPreview, TransferRecord, Watermark,
+    SyncSpec, TextPreview, TransferRecord, Watermark, WebsiteConfig,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -854,6 +854,60 @@ async fn set_bucket_lifecycle(
 ) -> Result<(), String> {
     let app = state.inner().clone();
     app.set_bucket_lifecycle(&account, &bucket, &rules)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 读取一个 bucket 的 CORS 规则。
+#[tauri::command]
+async fn bucket_cors(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+) -> Result<Vec<CorsRule>, String> {
+    let app = state.inner().clone();
+    app.bucket_cors(&account, &bucket)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 设置一个 bucket 的 CORS 规则(整套替换)。
+#[tauri::command]
+async fn set_bucket_cors(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+    rules: Vec<CorsRule>,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_bucket_cors(&account, &bucket, &rules)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 读取一个 bucket 的静态网站托管配置。
+#[tauri::command]
+async fn bucket_website(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+) -> Result<Option<WebsiteConfig>, String> {
+    let app = state.inner().clone();
+    app.bucket_website(&account, &bucket)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 设置(`Some`)或取消(`None`)一个 bucket 的静态网站托管配置。
+#[tauri::command]
+async fn set_bucket_website(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+    config: Option<WebsiteConfig>,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_bucket_website(&account, &bucket, config.as_ref())
         .await
         .map_err(|e| e.to_string())
 }
@@ -1990,6 +2044,10 @@ pub fn run() {
             delete_bucket,
             bucket_lifecycle,
             set_bucket_lifecycle,
+            bucket_cors,
+            set_bucket_cors,
+            bucket_website,
+            set_bucket_website,
             bucket_versioning,
             set_bucket_versioning,
             list_object_versions,

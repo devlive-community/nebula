@@ -2546,6 +2546,58 @@ input[type="number"]::-webkit-outer-spin-button {
   width: 90px;
 }
 
+/* Bucket CORS 规则编辑器 */
+.cors__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.cors__rule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.cors__rule-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cors__id {
+  flex: 1;
+}
+
+.cors__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.cors__methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cors__method {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* 对象版本历史 */
 .version__rows {
   display: flex;

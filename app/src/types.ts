@@ -349,6 +349,22 @@ export interface LifecycleRule {
   transitions: [number, string][];
 }
 
+/** 一条 CORS 规则(与 Rust 端 app_core::CorsRule 对应)。 */
+export interface CorsRule {
+  id: string | null;
+  allowed_origins: string[];
+  allowed_methods: string[];
+  allowed_headers: string[];
+  expose_headers: string[];
+  max_age_seconds: number | null;
+}
+
+/** 静态网站托管配置(与 Rust 端 app_core::WebsiteConfig 对应)。 */
+export interface WebsiteConfig {
+  index_document: string;
+  error_document: string | null;
+}
+
 /** 对象的一条历史版本(与 Rust 端 app_core::ObjectVersion 对应)。 */
 export interface ObjectVersion {
   version_id: string;

@@ -321,6 +321,118 @@ impl S3Client {
         Ok(())
     }
 
+    /// 读取一个 bucket 的 CORS 规则:`GET /{bucket}?cors`。未配置时服务端返回
+    /// `NoSuchCORSConfiguration`,视为空规则列表。
+    pub async fn get_bucket_cors(&self, bucket: &str) -> Result<Vec<CorsRule>> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::GET,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[("cors".to_string(), String::new())],
+            content_type: None,
+            amz_headers: &[],
+            body: None,
+        })?;
+        let resp = match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => resp,
+            Err(S3Error::Api { code, .. }) if code == "NoSuchCORSConfiguration" => {
+                return Ok(Vec::new())
+            }
+            Err(e) => return Err(e),
+        };
+        let body = resp.text().await.map_err(CoreError::from)?;
+        parse_cors(&body)
+    }
+
+    /// 设置一个 bucket 的 CORS 规则(整套替换):`PUT /{bucket}?cors`。空列表时改发
+    /// `DELETE /{bucket}?cors`——服务端不接受没有任何 `CORSRule` 的配置。
+    pub async fn set_bucket_cors(&self, bucket: &str, rules: &[CorsRule]) -> Result<()> {
+        if rules.is_empty() {
+            return self.delete_bucket_cors(bucket).await;
+        }
+        let body = build_cors_xml(rules);
+        let request = self.build_signed(RequestSpec {
+            method: Method::PUT,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[("cors".to_string(), String::new())],
+            content_type: Some("application/xml"),
+            amz_headers: &[],
+            body: Some(body.into_bytes().into()),
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    async fn delete_bucket_cors(&self, bucket: &str) -> Result<()> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::DELETE,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[("cors".to_string(), String::new())],
+            content_type: None,
+            amz_headers: &[],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 读取一个 bucket 的静态网站托管配置:`GET /{bucket}?website`。未配置时服务端返回
+    /// `NoSuchWebsiteConfiguration`,视为 `None`。
+    pub async fn get_bucket_website(&self, bucket: &str) -> Result<Option<WebsiteConfig>> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::GET,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[("website".to_string(), String::new())],
+            content_type: None,
+            amz_headers: &[],
+            body: None,
+        })?;
+        let resp = match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => resp,
+            Err(S3Error::Api { code, .. }) if code == "NoSuchWebsiteConfiguration" => {
+                return Ok(None)
+            }
+            Err(e) => return Err(e),
+        };
+        let body = resp.text().await.map_err(CoreError::from)?;
+        parse_website(&body).map(Some)
+    }
+
+    /// 设置(`Some`)或取消(`None`,发 `DELETE`)一个 bucket 的静态网站托管配置:
+    /// `PUT`/`DELETE /{bucket}?website`。
+    pub async fn set_bucket_website(
+        &self,
+        bucket: &str,
+        config: Option<&WebsiteConfig>,
+    ) -> Result<()> {
+        let Some(config) = config else {
+            return self.delete_bucket_website(bucket).await;
+        };
+        let body = build_website_xml(config);
+        let request = self.build_signed(RequestSpec {
+            method: Method::PUT,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[("website".to_string(), String::new())],
+            content_type: Some("application/xml"),
+            amz_headers: &[],
+            body: Some(body.into_bytes().into()),
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    async fn delete_bucket_website(&self, bucket: &str) -> Result<()> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::DELETE,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[("website".to_string(), String::new())],
+            content_type: None,
+            amz_headers: &[],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 查询一个 bucket 是否已启用版本控制:`GET /{bucket}?versioning`。从未配置过时
     /// 响应是空的 `<VersioningConfiguration/>`(没有 `Status` 子元素),视为未启用。
     pub async fn get_bucket_versioning(&self, bucket: &str) -> Result<bool> {
@@ -595,6 +707,149 @@ fn build_lifecycle_xml(rules: &[LifecycleRule]) -> String {
     body
 }
 
+/// 一条 CORS 规则(本 crate 的本地表示;适配层负责映射到上层统一模型)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CorsRule {
+    pub id: Option<String>,
+    pub allowed_origins: Vec<String>,
+    pub allowed_methods: Vec<String>,
+    pub allowed_headers: Vec<String>,
+    pub expose_headers: Vec<String>,
+    pub max_age_seconds: Option<u32>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct CorsConfigurationXml {
+    #[serde(default, rename = "CORSRule")]
+    cors_rule: Vec<CorsRuleXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct CorsRuleXml {
+    #[serde(rename = "ID", default)]
+    id: Option<String>,
+    #[serde(rename = "AllowedOrigin", default)]
+    allowed_origin: Vec<String>,
+    #[serde(rename = "AllowedMethod", default)]
+    allowed_method: Vec<String>,
+    #[serde(rename = "AllowedHeader", default)]
+    allowed_header: Vec<String>,
+    #[serde(rename = "ExposeHeader", default)]
+    expose_header: Vec<String>,
+    #[serde(default)]
+    max_age_seconds: Option<u32>,
+}
+
+/// 解析 `GetBucketCors` 的 XML 响应。
+fn parse_cors(xml: &str) -> Result<Vec<CorsRule>> {
+    let doc: CorsConfigurationXml = quick_xml::de::from_str(xml)
+        .map_err(|e| S3Error::Core(CoreError::InvalidResponse(e.to_string())))?;
+    Ok(doc
+        .cors_rule
+        .into_iter()
+        .map(|r| CorsRule {
+            id: r.id,
+            allowed_origins: r.allowed_origin,
+            allowed_methods: r.allowed_method,
+            allowed_headers: r.allowed_header,
+            expose_headers: r.expose_header,
+            max_age_seconds: r.max_age_seconds,
+        })
+        .collect())
+}
+
+/// 生成 `PutBucketCors` 的请求体 XML。
+fn build_cors_xml(rules: &[CorsRule]) -> String {
+    let mut body = String::from("<CORSConfiguration>");
+    for r in rules {
+        body.push_str("<CORSRule>");
+        if let Some(id) = &r.id {
+            body.push_str("<ID>");
+            body.push_str(&xml_escape(id));
+            body.push_str("</ID>");
+        }
+        for o in &r.allowed_origins {
+            body.push_str("<AllowedOrigin>");
+            body.push_str(&xml_escape(o));
+            body.push_str("</AllowedOrigin>");
+        }
+        for m in &r.allowed_methods {
+            body.push_str("<AllowedMethod>");
+            body.push_str(&xml_escape(m));
+            body.push_str("</AllowedMethod>");
+        }
+        for h in &r.allowed_headers {
+            body.push_str("<AllowedHeader>");
+            body.push_str(&xml_escape(h));
+            body.push_str("</AllowedHeader>");
+        }
+        for h in &r.expose_headers {
+            body.push_str("<ExposeHeader>");
+            body.push_str(&xml_escape(h));
+            body.push_str("</ExposeHeader>");
+        }
+        if let Some(secs) = r.max_age_seconds {
+            body.push_str(&format!("<MaxAgeSeconds>{secs}</MaxAgeSeconds>"));
+        }
+        body.push_str("</CORSRule>");
+    }
+    body.push_str("</CORSConfiguration>");
+    body
+}
+
+/// 静态网站托管配置(本 crate 的本地表示;适配层负责映射到上层统一模型)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebsiteConfig {
+    pub index_document: String,
+    pub error_document: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct WebsiteConfigurationXml {
+    index_document: IndexDocumentXml,
+    #[serde(default)]
+    error_document: Option<ErrorDocumentXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct IndexDocumentXml {
+    suffix: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ErrorDocumentXml {
+    key: String,
+}
+
+/// 解析 `GetBucketWebsite` 的 XML 响应。
+fn parse_website(xml: &str) -> Result<WebsiteConfig> {
+    let doc: WebsiteConfigurationXml = quick_xml::de::from_str(xml)
+        .map_err(|e| S3Error::Core(CoreError::InvalidResponse(e.to_string())))?;
+    Ok(WebsiteConfig {
+        index_document: doc.index_document.suffix,
+        error_document: doc.error_document.map(|e| e.key),
+    })
+}
+
+/// 生成 `PutBucketWebsite` 的请求体 XML。
+fn build_website_xml(config: &WebsiteConfig) -> String {
+    let mut body = String::from("<WebsiteConfiguration><IndexDocument><Suffix>");
+    body.push_str(&xml_escape(&config.index_document));
+    body.push_str("</Suffix></IndexDocument>");
+    if let Some(err) = &config.error_document {
+        body.push_str("<ErrorDocument><Key>");
+        body.push_str(&xml_escape(err));
+        body.push_str("</Key></ErrorDocument>");
+    }
+    body.push_str("</WebsiteConfiguration>");
+    body
+}
+
 /// 构造 ListObjectsV2 的查询参数(未编码;签名器内部会排序 + 编码)。
 fn list_query(prefix: Option<&str>, delimiter: Option<&str>, token: &str) -> Vec<(String, String)> {
     let mut q = vec![
@@ -790,5 +1045,53 @@ mod tests {
         assert_eq!(versions[1].version_id, "v-old");
         assert_eq!(versions[1].size, 100);
         assert_eq!(versions[1].etag.as_deref(), Some("\"E1\""));
+    }
+
+    #[test]
+    fn cors_xml_round_trips_multiple_rules() {
+        let rules = vec![
+            CorsRule {
+                id: Some("allow-all-get".into()),
+                allowed_origins: vec!["*".into()],
+                allowed_methods: vec!["GET".into(), "HEAD".into()],
+                allowed_headers: vec!["*".into()],
+                expose_headers: vec!["ETag".into()],
+                max_age_seconds: Some(3600),
+            },
+            CorsRule {
+                id: None,
+                allowed_origins: vec!["https://a.example".into(), "https://b.example".into()],
+                allowed_methods: vec!["PUT".into()],
+                allowed_headers: vec![],
+                expose_headers: vec![],
+                max_age_seconds: None,
+            },
+        ];
+        let xml = build_cors_xml(&rules);
+        let parsed = parse_cors(&xml).unwrap();
+        assert_eq!(parsed, rules);
+    }
+
+    #[test]
+    fn empty_cors_rules_build_valid_empty_configuration() {
+        let xml = build_cors_xml(&[]);
+        assert_eq!(xml, "<CORSConfiguration></CORSConfiguration>");
+    }
+
+    #[test]
+    fn website_xml_round_trips_with_and_without_error_document() {
+        let with_error = WebsiteConfig {
+            index_document: "index.html".into(),
+            error_document: Some("error.html".into()),
+        };
+        let xml = build_website_xml(&with_error);
+        assert_eq!(parse_website(&xml).unwrap(), with_error);
+
+        let without_error = WebsiteConfig {
+            index_document: "home.htm".into(),
+            error_document: None,
+        };
+        let xml2 = build_website_xml(&without_error);
+        assert_eq!(parse_website(&xml2).unwrap(), without_error);
     }
 }

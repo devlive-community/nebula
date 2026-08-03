@@ -528,6 +528,24 @@ export const EN: Record<string, string> = {
   新增规则: "Add rule",
   "✓ 生命周期规则已保存": "✓ Lifecycle rules saved",
 
+  // Bucket CORS 规则
+  "CORS 规则": "CORS rules",
+  "没有 CORS 规则,点下方添加。": "No CORS rules yet — add one below.",
+  "规则名称(可选)": "Rule name (optional)",
+  "允许来源(用逗号分隔)": "Allowed origins (comma-separated)",
+  允许方法: "Allowed methods",
+  "允许请求头(用逗号分隔)": "Allowed headers (comma-separated)",
+  "暴露的响应头(用逗号分隔)": "Exposed headers (comma-separated)",
+  "缓存时间(秒,留空则不设置)": "Max age (seconds, blank = unset)",
+  "✓ CORS 规则已保存": "✓ CORS rules saved",
+
+  // Bucket 静态网站托管
+  静态网站托管: "Static website hosting",
+  首页文档: "Index document",
+  "错误页文档(可选)": "Error document (optional)",
+  禁用静态网站托管: "Disable website hosting",
+  "✓ 网站托管已更新": "✓ Website hosting updated",
+
   // 对象版本控制
   版本控制: "Versioning",
   版本历史: "Version history",

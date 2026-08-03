@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Bookmark, Entry, ExifInfo, FolderStats, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, ObjectVersion, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Bookmark, CorsRule, Entry, ExifInfo, FolderStats, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, ObjectVersion, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry, WebsiteConfig } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -341,6 +341,24 @@ export const setBucketLifecycle = (
   bucket: string,
   rules: LifecycleRule[],
 ) => invoke<void>("set_bucket_lifecycle", { account, bucket, rules });
+
+export const bucketCors = (account: string, bucket: string) =>
+  invoke<CorsRule[]>("bucket_cors", { account, bucket });
+
+export const setBucketCors = (
+  account: string,
+  bucket: string,
+  rules: CorsRule[],
+) => invoke<void>("set_bucket_cors", { account, bucket, rules });
+
+export const bucketWebsite = (account: string, bucket: string) =>
+  invoke<WebsiteConfig | null>("bucket_website", { account, bucket });
+
+export const setBucketWebsite = (
+  account: string,
+  bucket: string,
+  config: WebsiteConfig | null,
+) => invoke<void>("set_bucket_website", { account, bucket, config });
 
 export const bucketVersioning = (account: string, bucket: string) =>
   invoke<boolean>("bucket_versioning", { account, bucket });

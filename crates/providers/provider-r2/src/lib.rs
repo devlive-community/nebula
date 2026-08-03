@@ -9,8 +9,8 @@ use futures::StreamExt;
 
 use cloudflare_r2::{ListEntry, S3Client, S3Error};
 use nebula_provider::{
-    path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ObjectVersion,
-    ProgressFn, ProviderError, Result, StorageProvider,
+    path, ByteStream, Capabilities, CorsRule, Entry, IncompleteUpload, LifecycleRule,
+    ObjectVersion, ProgressFn, ProviderError, Result, StorageProvider,
 };
 
 const MULTIPART_THRESHOLD: usize = 16 * 1024 * 1024;
@@ -90,6 +90,30 @@ fn rule_to_sdk(r: &LifecycleRule) -> cloudflare_r2::LifecycleRule {
     }
 }
 
+/// 把 SDK 的 CORS 规则映射到统一 provider 模型(字段一一对应)。
+fn cors_from_sdk(r: cloudflare_r2::CorsRule) -> CorsRule {
+    CorsRule {
+        id: r.id,
+        allowed_origins: r.allowed_origins,
+        allowed_methods: r.allowed_methods,
+        allowed_headers: r.allowed_headers,
+        expose_headers: r.expose_headers,
+        max_age_seconds: r.max_age_seconds,
+    }
+}
+
+/// 把统一 provider 模型映射回 SDK 的 CORS 规则。
+fn cors_to_sdk(r: &CorsRule) -> cloudflare_r2::CorsRule {
+    cloudflare_r2::CorsRule {
+        id: r.id.clone(),
+        allowed_origins: r.allowed_origins.clone(),
+        allowed_methods: r.allowed_methods.clone(),
+        allowed_headers: r.allowed_headers.clone(),
+        expose_headers: r.expose_headers.clone(),
+        max_age_seconds: r.max_age_seconds,
+    }
+}
+
 fn map_err(err: S3Error) -> ProviderError {
     match err {
         S3Error::Api { code, message, .. } => match code.as_str() {
@@ -124,6 +148,10 @@ impl StorageProvider for R2Provider {
             hierarchical: false,
             bucket_lifecycle: true,
             versioning: true,
+            // R2 官方文档确认支持标准 CORS API。
+            bucket_cors: true,
+            // R2 没有静态网站托管的概念(官方建议用 Worker 代替),不覆盖对应 trait 方法。
+            bucket_website: false,
         }
     }
 
@@ -413,6 +441,19 @@ impl StorageProvider for R2Provider {
         let rules: Vec<_> = rules.iter().map(rule_to_sdk).collect();
         self.client
             .set_bucket_lifecycle(bucket, &rules)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn bucket_cors(&self, bucket: &str) -> Result<Vec<CorsRule>> {
+        let rules = self.client.get_bucket_cors(bucket).await.map_err(map_err)?;
+        Ok(rules.into_iter().map(cors_from_sdk).collect())
+    }
+
+    async fn set_bucket_cors(&self, bucket: &str, rules: &[CorsRule]) -> Result<()> {
+        let rules: Vec<_> = rules.iter().map(cors_to_sdk).collect();
+        self.client
+            .set_bucket_cors(bucket, &rules)
             .await
             .map_err(map_err)
     }

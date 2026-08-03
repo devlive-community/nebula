@@ -7,10 +7,12 @@ use bytes::Bytes;
 use futures::Stream;
 
 use crate::capabilities::Capabilities;
+use crate::cors::CorsRule;
 use crate::entry::Entry;
 use crate::error::{ProviderError, Result};
 use crate::lifecycle::LifecycleRule;
 use crate::version::ObjectVersion;
+use crate::website::WebsiteConfig;
 
 /// 进度回调:`(已处理字节, 总字节)`。适配层在传输过程中多次调用。
 pub type ProgressFn<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
@@ -262,6 +264,34 @@ pub trait StorageProvider: Send + Sync {
     /// `PUT lifecycle` 语义都是整体覆盖)。默认 [`ProviderError::Unsupported`]。
     async fn set_bucket_lifecycle(&self, _bucket: &str, _rules: &[LifecycleRule]) -> Result<()> {
         Err(ProviderError::Unsupported("bucket lifecycle".into()))
+    }
+
+    /// 读取一个 bucket 的 CORS 规则。默认 [`ProviderError::Unsupported`];支持的适配层
+    /// 覆盖并在 [`capabilities`](Self::capabilities) 置 `bucket_cors = true`。
+    async fn bucket_cors(&self, _bucket: &str) -> Result<Vec<CorsRule>> {
+        Err(ProviderError::Unsupported("bucket cors".into()))
+    }
+
+    /// 设置一个 bucket 的 CORS 规则(**整套替换**;空列表发 DELETE,因为各家都不接受
+    /// 没有任何 Rule 的空配置)。默认 [`ProviderError::Unsupported`]。
+    async fn set_bucket_cors(&self, _bucket: &str, _rules: &[CorsRule]) -> Result<()> {
+        Err(ProviderError::Unsupported("bucket cors".into()))
+    }
+
+    /// 读取一个 bucket 的静态网站托管配置;未配置过返回 `Ok(None)`(不是报错)。
+    /// 默认 [`ProviderError::Unsupported`];支持的适配层覆盖并置 `bucket_website = true`。
+    async fn bucket_website(&self, _bucket: &str) -> Result<Option<WebsiteConfig>> {
+        Err(ProviderError::Unsupported("bucket website".into()))
+    }
+
+    /// 设置(`Some`)或取消(`None` → 发 DELETE)一个 bucket 的静态网站托管配置。
+    /// 默认 [`ProviderError::Unsupported`]。
+    async fn set_bucket_website(
+        &self,
+        _bucket: &str,
+        _config: Option<&WebsiteConfig>,
+    ) -> Result<()> {
+        Err(ProviderError::Unsupported("bucket website".into()))
     }
 
     /// 查询一个 bucket 是否已启用版本控制。默认 [`ProviderError::Unsupported`];支持的

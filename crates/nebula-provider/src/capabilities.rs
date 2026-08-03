@@ -18,6 +18,10 @@ pub struct Capabilities {
     /// 支持 bucket 版本控制开关与对象版本历史(bucket_versioning / list_object_versions
     /// / restore_object_version / delete_object_version 已实现)。
     pub versioning: bool,
+    /// 支持读写 bucket CORS 规则(bucket_cors / set_bucket_cors 已实现)。
+    pub bucket_cors: bool,
+    /// 支持读写 bucket 静态网站托管配置(bucket_website / set_bucket_website 已实现)。
+    pub bucket_website: bool,
     /// 支持修改对象元数据(set_content_type 已实现)。
     pub metadata_ops: bool,
     /// 支持读写对象标签(object_tags / set_object_tags 已实现)。

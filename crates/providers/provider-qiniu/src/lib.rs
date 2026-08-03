@@ -97,6 +97,10 @@ impl StorageProvider for QiniuProvider {
             bucket_lifecycle: false,
             // 同上:七牛的版本控制(如果有)不是标准 S3 兼容路径,本轮不接入。
             versioning: false,
+            // 七牛的 CORS / 静态网站托管都只能在控制台配置,比生命周期规则更彻底——
+            // 连专有管理台 API 都没查到,本轮不接入。
+            bucket_cors: false,
+            bucket_website: false,
         }
     }
 

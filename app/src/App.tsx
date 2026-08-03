@@ -54,6 +54,8 @@ import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
 import { LifecycleDialog } from "./components/LifecycleDialog";
+import { CorsDialog } from "./components/CorsDialog";
+import { WebsiteDialog } from "./components/WebsiteDialog";
 import { BucketVersioningDialog } from "./components/BucketVersioningDialog";
 import { VersionHistoryDialog } from "./components/VersionHistoryDialog";
 import { BatchTagsDialog } from "./components/BatchTagsDialog";
@@ -164,6 +166,8 @@ export default function App() {
   const [editTypeTarget, setEditTypeTarget] = useState<Entry | null>(null);
   const [tagsTarget, setTagsTarget] = useState<Entry | null>(null);
   const [lifecycleTarget, setLifecycleTarget] = useState<Entry | null>(null);
+  const [corsTarget, setCorsTarget] = useState<Entry | null>(null);
+  const [websiteTarget, setWebsiteTarget] = useState<Entry | null>(null);
   const [versioningTarget, setVersioningTarget] = useState<Entry | null>(null);
   const [versionsTarget, setVersionsTarget] = useState<Entry | null>(null);
   const [statsTarget, setStatsTarget] = useState<Entry | null>(null);
@@ -1935,6 +1939,8 @@ export default function App() {
     !!editTypeTarget ||
     !!tagsTarget ||
     !!lifecycleTarget ||
+    !!corsTarget ||
+    !!websiteTarget ||
     !!versioningTarget ||
     !!versionsTarget ||
     !!statsTarget ||
@@ -1975,6 +1981,8 @@ export default function App() {
       else if (editTypeTarget) setEditTypeTarget(null);
       else if (tagsTarget) setTagsTarget(null);
       else if (lifecycleTarget) setLifecycleTarget(null);
+      else if (corsTarget) setCorsTarget(null);
+      else if (websiteTarget) setWebsiteTarget(null);
       else if (versioningTarget) setVersioningTarget(null);
       else if (versionsTarget) setVersionsTarget(null);
       else if (statsTarget) {
@@ -2445,6 +2453,40 @@ export default function App() {
         />
       )}
 
+      {corsTarget && current && (
+        <CorsDialog
+          account={current}
+          bucket={corsTarget.path}
+          name={corsTarget.name}
+          onSaved={() => {
+            setCorsTarget(null);
+            setNotice({ tone: "ok", text: t("✓ CORS 规则已保存") });
+          }}
+          onCancel={() => setCorsTarget(null)}
+          onError={(msg) => {
+            setCorsTarget(null);
+            setError(msg);
+          }}
+        />
+      )}
+
+      {websiteTarget && current && (
+        <WebsiteDialog
+          account={current}
+          bucket={websiteTarget.path}
+          name={websiteTarget.name}
+          onSaved={() => {
+            setWebsiteTarget(null);
+            setNotice({ tone: "ok", text: t("✓ 网站托管已更新") });
+          }}
+          onCancel={() => setWebsiteTarget(null)}
+          onError={(msg) => {
+            setWebsiteTarget(null);
+            setError(msg);
+          }}
+        />
+      )}
+
       {versioningTarget && current && (
         <BucketVersioningDialog
           account={current}
@@ -2737,6 +2779,8 @@ export default function App() {
         { label: t("备份 / 同步"), onClick: () => setSyncPrefix(entry.path) },
         { label: t("清理未完成上传"), onClick: () => setCleanupTarget(entry) },
         { label: t("生命周期规则"), onClick: () => setLifecycleTarget(entry) },
+        { label: t("CORS 规则"), onClick: () => setCorsTarget(entry) },
+        { label: t("静态网站托管"), onClick: () => setWebsiteTarget(entry) },
         { label: t("版本控制"), onClick: () => setVersioningTarget(entry) },
         {
           label: t("删除 Bucket"),

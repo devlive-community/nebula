@@ -51,8 +51,8 @@ pub use largest::LargestFiles;
 pub use limits::TransferLimits;
 pub use nebula_pdf::{Assembly, NumberPos, PageInfo, PageNumbers, PageSpec, PdfInfo, Watermark};
 pub use nebula_provider::{
-    ByteStream, Capabilities, EntryKind, IncompleteUpload, LifecycleRule, ObjectVersion, Page,
-    ProgressFn,
+    ByteStream, Capabilities, CorsRule, EntryKind, IncompleteUpload, LifecycleRule, ObjectVersion,
+    Page, ProgressFn, WebsiteConfig,
 };
 pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
@@ -1020,6 +1020,46 @@ impl App {
         Ok(self
             .provider(account)?
             .set_bucket_lifecycle(bucket, rules)
+            .await?)
+    }
+
+    /// 读取某账号下一个 bucket 的 CORS 规则。
+    pub async fn bucket_cors(&self, account: &str, bucket: &str) -> Result<Vec<CorsRule>> {
+        Ok(self.provider(account)?.bucket_cors(bucket).await?)
+    }
+
+    /// 设置某账号下一个 bucket 的 CORS 规则(整套替换)。
+    pub async fn set_bucket_cors(
+        &self,
+        account: &str,
+        bucket: &str,
+        rules: &[CorsRule],
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .set_bucket_cors(bucket, rules)
+            .await?)
+    }
+
+    /// 读取某账号下一个 bucket 的静态网站托管配置。
+    pub async fn bucket_website(
+        &self,
+        account: &str,
+        bucket: &str,
+    ) -> Result<Option<WebsiteConfig>> {
+        Ok(self.provider(account)?.bucket_website(bucket).await?)
+    }
+
+    /// 设置(`Some`)或取消(`None`)某账号下一个 bucket 的静态网站托管配置。
+    pub async fn set_bucket_website(
+        &self,
+        account: &str,
+        bucket: &str,
+        config: Option<&WebsiteConfig>,
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .set_bucket_website(bucket, config)
             .await?)
     }
 
