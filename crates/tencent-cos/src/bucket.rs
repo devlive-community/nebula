@@ -437,8 +437,9 @@ impl CosClient {
         Ok(())
     }
 
-    /// 读取一个 bucket 的静态网站托管配置:`GET /?website`。未配置时服务端返回
-    /// `NoSuchWebsiteConfiguration`,视为 `None`。
+    /// 读取一个 bucket 的静态网站托管配置:`GET /?website`。未配置时,有的服务端返回
+    /// `NoSuchWebsiteConfiguration` 错误,有的直接 200 返回一个没有 `IndexDocument` 的
+    /// 空 `<WebsiteConfiguration/>`——两种情况都视为 `None`。
     pub async fn get_bucket_website(&self, bucket: &str) -> Result<Option<WebsiteConfig>> {
         let host = self.bucket_host(bucket);
         let request = self.build_signed(SignSpec {
@@ -459,7 +460,7 @@ impl CosClient {
             Err(e) => return Err(e),
         };
         let body = resp.text().await.map_err(CoreError::from)?;
-        parse_website(&body).map(Some)
+        parse_website(&body)
     }
 
     /// 设置(`Some`)或取消(`None`,发 `DELETE`)一个 bucket 的静态网站托管配置:
@@ -774,10 +775,11 @@ pub struct WebsiteConfig {
     pub error_document: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct WebsiteConfigurationXml {
-    index_document: IndexDocumentXml,
+    #[serde(default)]
+    index_document: Option<IndexDocumentXml>,
     #[serde(default)]
     error_document: Option<ErrorDocumentXml>,
 }
@@ -794,14 +796,15 @@ struct ErrorDocumentXml {
     key: String,
 }
 
-/// 解析 `GetBucketWebsite` 的 XML 响应。
-fn parse_website(xml: &str) -> Result<WebsiteConfig> {
+/// 解析 `GetBucketWebsite` 的 XML 响应。没有 `IndexDocument` 视为未配置(`None`)——
+/// 部分服务端不发错误码,直接 200 返回一个空的 `<WebsiteConfiguration/>`。
+fn parse_website(xml: &str) -> Result<Option<WebsiteConfig>> {
     let doc: WebsiteConfigurationXml = quick_xml::de::from_str(xml)
         .map_err(|e| CosError::Core(CoreError::InvalidResponse(e.to_string())))?;
-    Ok(WebsiteConfig {
-        index_document: doc.index_document.suffix,
+    Ok(doc.index_document.map(|idx| WebsiteConfig {
+        index_document: idx.suffix,
         error_document: doc.error_document.map(|e| e.key),
-    })
+    }))
 }
 
 /// 生成 `PutBucketWebsite` 的请求体 XML。
@@ -1109,13 +1112,18 @@ mod tests {
             error_document: Some("error.html".into()),
         };
         let xml = build_website_xml(&with_error);
-        assert_eq!(parse_website(&xml).unwrap(), with_error);
+        assert_eq!(parse_website(&xml).unwrap(), Some(with_error));
 
         let without_error = WebsiteConfig {
             index_document: "home.htm".into(),
             error_document: None,
         };
         let xml2 = build_website_xml(&without_error);
-        assert_eq!(parse_website(&xml2).unwrap(), without_error);
+        assert_eq!(parse_website(&xml2).unwrap(), Some(without_error));
+    }
+
+    #[test]
+    fn website_not_configured_parses_to_none() {
+        assert_eq!(parse_website("<WebsiteConfiguration/>").unwrap(), None);
     }
 }
