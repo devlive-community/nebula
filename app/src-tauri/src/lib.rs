@@ -9,9 +9,9 @@ use std::sync::{Arc, Mutex};
 use app_core::{
     AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, DiffItem,
     DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload,
-    Integrity, LargestFiles, LifecycleRule, Ops, Page, PageNumbers, PdfInfo, RenamePlan,
-    RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport, SyncSpec,
-    TextPreview, TransferRecord, Watermark,
+    Integrity, LargestFiles, LifecycleRule, ObjectVersion, Ops, Page, PageNumbers, PdfInfo,
+    RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport,
+    SyncSpec, TextPreview, TransferRecord, Watermark,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -854,6 +854,74 @@ async fn set_bucket_lifecycle(
 ) -> Result<(), String> {
     let app = state.inner().clone();
     app.set_bucket_lifecycle(&account, &bucket, &rules)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 查询一个 bucket 是否已启用版本控制。
+#[tauri::command]
+async fn bucket_versioning(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+) -> Result<bool, String> {
+    let app = state.inner().clone();
+    app.bucket_versioning(&account, &bucket)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 启用或暂停一个 bucket 的版本控制。
+#[tauri::command]
+async fn set_bucket_versioning(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_bucket_versioning(&account, &bucket, enabled)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 列出一个对象的全部历史版本。
+#[tauri::command]
+async fn list_object_versions(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<Vec<ObjectVersion>, String> {
+    let app = state.inner().clone();
+    app.list_object_versions(&account, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 把某个历史版本的内容复制回"当前"槽位。
+#[tauri::command]
+async fn restore_object_version(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    version_id: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.restore_object_version(&account, &path, &version_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 永久删除某一个具体版本(不可撤销)。
+#[tauri::command]
+async fn delete_object_version(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    version_id: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.delete_object_version(&account, &path, &version_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1922,6 +1990,11 @@ pub fn run() {
             delete_bucket,
             bucket_lifecycle,
             set_bucket_lifecycle,
+            bucket_versioning,
+            set_bucket_versioning,
+            list_object_versions,
+            restore_object_version,
+            delete_object_version,
             set_content_type,
             object_tags,
             set_object_tags,

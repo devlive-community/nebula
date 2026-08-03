@@ -527,4 +527,20 @@ export const EN: Record<string, string> = {
   "过期天数(留空则不过期)": "Expire after (days, blank = never)",
   新增规则: "Add rule",
   "✓ 生命周期规则已保存": "✓ Lifecycle rules saved",
+
+  // 对象版本控制
+  版本控制: "Versioning",
+  版本历史: "Version history",
+  当前版本: "Current version",
+  还没有版本历史: "No version history yet",
+  恢复此版本: "Restore this version",
+  启用版本控制: "Enable versioning",
+  "确定永久删除此版本?此操作不可恢复。":
+    "Permanently delete this version? This cannot be undone.",
+  未启用: "Not enabled",
+  已启用: "Enabled",
+  已删除: "Deleted",
+  永久删除此版本: "Permanently delete",
+  暂停版本控制: "Suspend versioning",
+  "✓ 版本控制已更新": "✓ Versioning updated",
 };

@@ -359,6 +359,46 @@ impl S3Client {
         Ok(())
     }
 
+    /// 把某个历史版本的内容服务端复制回"当前"槽位(不删除任何历史版本,会新增一条
+    /// 版本记录):`PUT /{bucket}/{key}`,`x-amz-copy-source` 带 `?versionId=`。
+    pub async fn restore_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: &str,
+    ) -> Result<()> {
+        let copy_source = format!("/{bucket}/{}?versionId={version_id}", encode_path(key));
+        let request = self.build_signed(RequestSpec {
+            method: Method::PUT,
+            canonical_uri: &object_uri(bucket, key),
+            query: &[],
+            content_type: None,
+            amz_headers: &[("x-amz-copy-source", copy_source)],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 永久删除某一个具体版本(不可撤销):`DELETE /{bucket}/{key}?versionId=`。
+    pub async fn delete_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: &str,
+    ) -> Result<()> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::DELETE,
+            canonical_uri: &object_uri(bucket, key),
+            query: &[("versionId".to_string(), version_id.to_string())],
+            content_type: None,
+            amz_headers: &[],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 取回归档对象:`POST /{bucket}/{key}?restore`,请求体指定保持天数。
     pub async fn restore_object(&self, bucket: &str, key: &str, days: u32) -> Result<()> {
         let body = format!("<RestoreRequest><Days>{days}</Days></RestoreRequest>");

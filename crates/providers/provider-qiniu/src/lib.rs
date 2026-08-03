@@ -95,6 +95,8 @@ impl StorageProvider for QiniuProvider {
             // 本 crate 目前是 s3-core 门面(共用 AWS 签名),没有实现,吃 trait 默认的
             // Unsupported。以后要支持需单独调研七牛管理台 API 的鉴权方式。
             bucket_lifecycle: false,
+            // 同上:七牛的版本控制(如果有)不是标准 S3 兼容路径,本轮不接入。
+            versioning: false,
         }
     }
 

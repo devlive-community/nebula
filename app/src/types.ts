@@ -349,6 +349,17 @@ export interface LifecycleRule {
   transitions: [number, string][];
 }
 
+/** 对象的一条历史版本(与 Rust 端 app_core::ObjectVersion 对应)。 */
+export interface ObjectVersion {
+  version_id: string;
+  is_latest: boolean;
+  /** true 表示这不是真实内容,而是一次删除操作留下的标记。 */
+  is_delete_marker: boolean;
+  size: number;
+  etag: string | null;
+  last_modified: string;
+}
+
 /** 递归搜索结果(与 Rust 端 app_core::SearchResult 对应)。 */
 export interface SearchResult {
   entries: Entry[];

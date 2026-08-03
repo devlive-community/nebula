@@ -367,6 +367,80 @@ impl ObsClient {
         Ok(())
     }
 
+    /// 查询一个 bucket 是否已启用版本控制:`GET /{bucket}/?versioning`。从未配置过时
+    /// 响应是空的 `<VersioningConfiguration/>`(没有 `Status` 子元素),视为未启用。
+    pub async fn get_bucket_versioning(&self, bucket: &str) -> Result<bool> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::GET,
+                key: "",
+                subresources: &[("versioning", None)],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(CoreError::from)?;
+        let parsed: VersioningConfigurationXml = quick_xml::de::from_str(&body)
+            .map_err(|e| ObsError::Core(CoreError::InvalidResponse(e.to_string())))?;
+        Ok(parsed.status.as_deref() == Some("Enabled"))
+    }
+
+    /// 启用或暂停一个 bucket 的版本控制:`PUT /{bucket}/?versioning`。
+    pub async fn set_bucket_versioning(&self, bucket: &str, enabled: bool) -> Result<()> {
+        let date = now_gmt();
+        let status = if enabled { "Enabled" } else { "Suspended" };
+        let body =
+            format!("<VersioningConfiguration><Status>{status}</Status></VersioningConfiguration>");
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::PUT,
+                key: "",
+                subresources: &[("versioning", None)],
+                content_type: Some("application/xml"),
+                content_md5: None,
+                body: Some(body.into()),
+            },
+            &date,
+        )?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 列出一个对象的全部历史版本(含删除标记):`GET /{bucket}/?versions&prefix={key}`。
+    /// 只取第一页,按 `key` 精确匹配过滤,按修改时间从新到旧排序。
+    pub async fn list_object_versions(
+        &self,
+        bucket: &str,
+        key: &str,
+    ) -> Result<Vec<ObjectVersion>> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::GET,
+                key: "",
+                subresources: &[
+                    ("versions", None),
+                    ("prefix", Some(key)),
+                    ("max-keys", Some(MAX_KEYS)),
+                ],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(CoreError::from)?;
+        parse_object_versions(&body, key)
+    }
+
     /// 拉取全部 bucket(单次请求)。
     async fn list_buckets_once(&self) -> Result<Vec<BucketSummary>> {
         let date = now_gmt();
@@ -594,6 +668,109 @@ fn build_lifecycle_xml(rules: &[LifecycleRule]) -> String {
     }
     body.push_str("</LifecycleConfiguration>");
     body
+}
+
+/// 一条历史版本(本 crate 的本地表示;适配层负责映射到上层统一模型)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjectVersion {
+    pub version_id: String,
+    pub is_latest: bool,
+    pub is_delete_marker: bool,
+    pub size: u64,
+    pub etag: Option<String>,
+    pub last_modified: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct VersioningConfigurationXml {
+    #[serde(rename = "Status", default)]
+    status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct VersionXml {
+    key: String,
+    version_id: String,
+    is_latest: bool,
+    last_modified: String,
+    #[serde(default)]
+    e_tag: Option<String>,
+    #[serde(default)]
+    size: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct DeleteMarkerXml {
+    key: String,
+    version_id: String,
+    is_latest: bool,
+    last_modified: String,
+}
+
+/// 解析 `GetBucketVersions` 的 XML 响应:按 `key` 精确过滤,按修改时间从新到旧排序。
+/// `Version` 与 `DeleteMarker` 交错出现,quick_xml 的 struct+Vec 反序列化处理不了这种
+/// 交错,改用事件流手动扫描顶层子元素、逐个片段反序列化(见 s3-core 的同名函数注释)。
+fn parse_object_versions(xml: &str, key: &str) -> Result<Vec<ObjectVersion>> {
+    use quick_xml::events::Event;
+    use quick_xml::name::QName;
+    use quick_xml::Reader;
+
+    let to_err = |e: quick_xml::Error| ObsError::Core(CoreError::InvalidResponse(e.to_string()));
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+    let mut versions = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf).map_err(to_err)? {
+            Event::Start(e) if e.name() == QName(b"Version") => {
+                let span = reader
+                    .read_to_end_into(QName(b"Version"), &mut Vec::new())
+                    .map_err(to_err)?;
+                let inner = &xml[span.start as usize..span.end as usize];
+                let frag = format!("<Version>{inner}</Version>");
+                let v: VersionXml = quick_xml::de::from_str(&frag)
+                    .map_err(|e| ObsError::Core(CoreError::InvalidResponse(e.to_string())))?;
+                if v.key == key {
+                    versions.push(ObjectVersion {
+                        version_id: v.version_id,
+                        is_latest: v.is_latest,
+                        is_delete_marker: false,
+                        size: v.size,
+                        etag: v.e_tag,
+                        last_modified: v.last_modified,
+                    });
+                }
+            }
+            Event::Start(e) if e.name() == QName(b"DeleteMarker") => {
+                let span = reader
+                    .read_to_end_into(QName(b"DeleteMarker"), &mut Vec::new())
+                    .map_err(to_err)?;
+                let inner = &xml[span.start as usize..span.end as usize];
+                let frag = format!("<DeleteMarker>{inner}</DeleteMarker>");
+                let d: DeleteMarkerXml = quick_xml::de::from_str(&frag)
+                    .map_err(|e| ObsError::Core(CoreError::InvalidResponse(e.to_string())))?;
+                if d.key == key {
+                    versions.push(ObjectVersion {
+                        version_id: d.version_id,
+                        is_latest: d.is_latest,
+                        is_delete_marker: true,
+                        size: 0,
+                        etag: None,
+                        last_modified: d.last_modified,
+                    });
+                }
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    versions.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+    Ok(versions)
 }
 
 #[cfg(test)]
@@ -869,5 +1046,57 @@ mod tests {
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].prefix, "tmp/");
         assert_eq!(parsed[0].expiration_days, Some(7));
+    }
+
+    #[test]
+    fn versioning_configuration_parses_status() {
+        let enabled: VersioningConfigurationXml = quick_xml::de::from_str(
+            "<VersioningConfiguration><Status>Enabled</Status></VersioningConfiguration>",
+        )
+        .unwrap();
+        assert_eq!(enabled.status.as_deref(), Some("Enabled"));
+
+        let never: VersioningConfigurationXml =
+            quick_xml::de::from_str("<VersioningConfiguration/>").unwrap();
+        assert_eq!(never.status, None);
+    }
+
+    #[test]
+    fn parses_and_merges_versions_and_delete_markers_by_key_sorted_newest_first() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<ListVersionsResult>
+  <Name>b</Name>
+  <Prefix>photo.jpg</Prefix>
+  <IsTruncated>false</IsTruncated>
+  <Version>
+    <Key>photo.jpg</Key>
+    <VersionId>v-old</VersionId>
+    <IsLatest>false</IsLatest>
+    <LastModified>2024-01-01T00:00:00.000Z</LastModified>
+    <ETag>"E1"</ETag>
+    <Size>100</Size>
+  </Version>
+  <DeleteMarker>
+    <Key>photo.jpg</Key>
+    <VersionId>v-deleted</VersionId>
+    <IsLatest>true</IsLatest>
+    <LastModified>2024-03-01T00:00:00.000Z</LastModified>
+  </DeleteMarker>
+  <Version>
+    <Key>photo.jpg.bak</Key>
+    <VersionId>v-other-key</VersionId>
+    <IsLatest>true</IsLatest>
+    <LastModified>2024-02-01T00:00:00.000Z</LastModified>
+    <ETag>"E2"</ETag>
+    <Size>50</Size>
+  </Version>
+</ListVersionsResult>"#;
+        let versions = parse_object_versions(xml, "photo.jpg").unwrap();
+        assert_eq!(versions.len(), 2);
+        assert!(versions[0].is_delete_marker);
+        assert_eq!(versions[0].version_id, "v-deleted");
+        assert!(!versions[1].is_delete_marker);
+        assert_eq!(versions[1].version_id, "v-old");
+        assert_eq!(versions[1].size, 100);
     }
 }

@@ -12,8 +12,8 @@ use futures::StreamExt;
 
 use aliyun_oss::{ListEntry, OssClient, OssError};
 use nebula_provider::{
-    path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ProgressFn,
-    ProviderError, Result, StorageProvider,
+    path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ObjectVersion,
+    ProgressFn, ProviderError, Result, StorageProvider,
 };
 
 /// 超过该大小的上传自动改用分片上传。
@@ -74,6 +74,18 @@ fn rule_from_sdk(r: aliyun_oss::LifecycleRule) -> LifecycleRule {
     }
 }
 
+/// 把 SDK 的历史版本映射到统一 provider 模型(字段一一对应)。
+fn version_from_sdk(v: aliyun_oss::ObjectVersion) -> ObjectVersion {
+    ObjectVersion {
+        version_id: v.version_id,
+        is_latest: v.is_latest,
+        is_delete_marker: v.is_delete_marker,
+        size: v.size,
+        etag: v.etag,
+        last_modified: v.last_modified,
+    }
+}
+
 /// 把统一 provider 模型映射回 SDK 的生命周期规则。
 fn rule_to_sdk(r: &LifecycleRule) -> aliyun_oss::LifecycleRule {
     aliyun_oss::LifecycleRule {
@@ -121,6 +133,7 @@ impl StorageProvider for AliyunProvider {
             server_side_copy: true,
             hierarchical: false,
             bucket_lifecycle: true,
+            versioning: true,
         }
     }
 
@@ -413,6 +426,46 @@ impl StorageProvider for AliyunProvider {
         let rules: Vec<_> = rules.iter().map(rule_to_sdk).collect();
         self.client
             .set_bucket_lifecycle(bucket, &rules)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn bucket_versioning(&self, bucket: &str) -> Result<bool> {
+        self.client
+            .get_bucket_versioning(bucket)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn set_bucket_versioning(&self, bucket: &str, enabled: bool) -> Result<()> {
+        self.client
+            .set_bucket_versioning(bucket, enabled)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn list_object_versions(&self, path: &str) -> Result<Vec<ObjectVersion>> {
+        let (bucket, key) = require_object(path)?;
+        let versions = self
+            .client
+            .list_object_versions(bucket, key)
+            .await
+            .map_err(map_err)?;
+        Ok(versions.into_iter().map(version_from_sdk).collect())
+    }
+
+    async fn restore_object_version(&self, path: &str, version_id: &str) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .restore_object_version(bucket, key, version_id)
+            .await
+            .map_err(map_err)
+    }
+
+    async fn delete_object_version(&self, path: &str, version_id: &str) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        self.client
+            .delete_object_version(bucket, key, version_id)
             .await
             .map_err(map_err)
     }

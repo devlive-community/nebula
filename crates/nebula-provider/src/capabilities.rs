@@ -15,6 +15,9 @@ pub struct Capabilities {
     pub bucket_ops: bool,
     /// 支持读写 bucket 生命周期规则(bucket_lifecycle / set_bucket_lifecycle 已实现)。
     pub bucket_lifecycle: bool,
+    /// 支持 bucket 版本控制开关与对象版本历史(bucket_versioning / list_object_versions
+    /// / restore_object_version / delete_object_version 已实现)。
+    pub versioning: bool,
     /// 支持修改对象元数据(set_content_type 已实现)。
     pub metadata_ops: bool,
     /// 支持读写对象标签(object_tags / set_object_tags 已实现)。

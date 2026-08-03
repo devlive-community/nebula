@@ -19,7 +19,7 @@ pub mod error;
 pub mod multipart;
 pub mod object;
 
-pub use bucket::{BucketSummary, LifecycleRule, ListEntry, ObjectSummary};
+pub use bucket::{BucketSummary, LifecycleRule, ListEntry, ObjectSummary, ObjectVersion};
 pub use client::S3Client;
 pub use error::{Result, S3Error};
 pub use multipart::MIN_PART_SIZE;

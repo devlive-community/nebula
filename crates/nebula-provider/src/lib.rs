@@ -20,6 +20,7 @@ pub mod lifecycle;
 pub mod path;
 pub mod provider;
 pub mod registry;
+pub mod version;
 
 pub use capabilities::Capabilities;
 pub use entry::{Entry, EntryKind};
@@ -29,3 +30,4 @@ pub use provider::{
     collect_stream, ByteStream, IncompleteUpload, Page, ProgressFn, StorageProvider,
 };
 pub use registry::ProviderRegistry;
+pub use version::ObjectVersion;

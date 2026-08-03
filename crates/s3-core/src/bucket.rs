@@ -320,6 +320,176 @@ impl S3Client {
         check_status(self.http().execute(request).await?).await?;
         Ok(())
     }
+
+    /// 查询一个 bucket 是否已启用版本控制:`GET /{bucket}?versioning`。从未配置过时
+    /// 响应是空的 `<VersioningConfiguration/>`(没有 `Status` 子元素),视为未启用。
+    pub async fn get_bucket_versioning(&self, bucket: &str) -> Result<bool> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::GET,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[("versioning".to_string(), String::new())],
+            content_type: None,
+            amz_headers: &[],
+            body: None,
+        })?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(CoreError::from)?;
+        let parsed: VersioningConfigurationXml = quick_xml::de::from_str(&body)
+            .map_err(|e| S3Error::Core(CoreError::InvalidResponse(e.to_string())))?;
+        Ok(parsed.status.as_deref() == Some("Enabled"))
+    }
+
+    /// 启用或暂停一个 bucket 的版本控制:`PUT /{bucket}?versioning`。
+    pub async fn set_bucket_versioning(&self, bucket: &str, enabled: bool) -> Result<()> {
+        let status = if enabled { "Enabled" } else { "Suspended" };
+        let body =
+            format!("<VersioningConfiguration><Status>{status}</Status></VersioningConfiguration>");
+        let request = self.build_signed(RequestSpec {
+            method: Method::PUT,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[("versioning".to_string(), String::new())],
+            content_type: Some("application/xml"),
+            amz_headers: &[],
+            body: Some(body.into_bytes().into()),
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 列出一个对象的全部历史版本(含删除标记):`GET /{bucket}?versions&prefix={key}`。
+    /// 只取第一页(最多 1000 条),按 `key` 精确匹配过滤(prefix 匹配可能带出前缀相同的
+    /// 其它 key),再按修改时间从新到旧排序(合并 Version / DeleteMarker 两种元素后,
+    /// 服务端给出的原始交错顺序在 quick_xml 反序列化时已经丢失,需要重新排一次)。
+    pub async fn list_object_versions(
+        &self,
+        bucket: &str,
+        key: &str,
+    ) -> Result<Vec<ObjectVersion>> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::GET,
+            canonical_uri: &format!("/{bucket}"),
+            query: &[
+                ("versions".to_string(), String::new()),
+                ("prefix".to_string(), key.to_string()),
+                ("max-keys".to_string(), MAX_KEYS.to_string()),
+            ],
+            content_type: None,
+            amz_headers: &[],
+            body: None,
+        })?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(CoreError::from)?;
+        parse_object_versions(&body, key)
+    }
+}
+
+/// 一条历史版本(本 crate 的本地表示;适配层负责映射到上层统一模型)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjectVersion {
+    pub version_id: String,
+    pub is_latest: bool,
+    pub is_delete_marker: bool,
+    pub size: u64,
+    pub etag: Option<String>,
+    pub last_modified: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct VersioningConfigurationXml {
+    #[serde(rename = "Status", default)]
+    status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct VersionXml {
+    key: String,
+    version_id: String,
+    is_latest: bool,
+    last_modified: String,
+    #[serde(default)]
+    e_tag: Option<String>,
+    #[serde(default)]
+    size: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct DeleteMarkerXml {
+    key: String,
+    version_id: String,
+    is_latest: bool,
+    last_modified: String,
+}
+
+/// 解析 `ListObjectVersions` 的 XML 响应:按 `key` 精确过滤,合并两种元素并按修改时间
+/// 从新到旧排序。
+///
+/// `Version` 与 `DeleteMarker` 在真实响应里是交错出现的(同一个 key 的删除标记可能夹在
+/// 两个内容版本中间)。quick_xml 的 serde 支持在"结构体里的重复元素字段被其它兄弟元素
+/// 打断"时会报 `duplicate field`——哪怕那个兄弟元素类型压根不在结构体里、会被忽略。
+/// 所以这里改用事件流手动扫描顶层子元素,一次只把**单个** `<Version>`/`<DeleteMarker>`
+/// 片段丢给 `quick_xml::de` 反序列化(和其它地方"整个响应体就是一个对象"的用法一致),
+/// 绕开"同一层多个重复字段"这个 quick_xml 的已知短板。
+fn parse_object_versions(xml: &str, key: &str) -> Result<Vec<ObjectVersion>> {
+    use quick_xml::events::Event;
+    use quick_xml::name::QName;
+    use quick_xml::Reader;
+
+    let to_err = |e: quick_xml::Error| S3Error::Core(CoreError::InvalidResponse(e.to_string()));
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+    let mut versions = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf).map_err(to_err)? {
+            Event::Start(e) if e.name() == QName(b"Version") => {
+                let span = reader
+                    .read_to_end_into(QName(b"Version"), &mut Vec::new())
+                    .map_err(to_err)?;
+                let inner = &xml[span.start as usize..span.end as usize];
+                let frag = format!("<Version>{inner}</Version>");
+                let v: VersionXml = quick_xml::de::from_str(&frag)
+                    .map_err(|e| S3Error::Core(CoreError::InvalidResponse(e.to_string())))?;
+                if v.key == key {
+                    versions.push(ObjectVersion {
+                        version_id: v.version_id,
+                        is_latest: v.is_latest,
+                        is_delete_marker: false,
+                        size: v.size,
+                        etag: v.e_tag,
+                        last_modified: v.last_modified,
+                    });
+                }
+            }
+            Event::Start(e) if e.name() == QName(b"DeleteMarker") => {
+                let span = reader
+                    .read_to_end_into(QName(b"DeleteMarker"), &mut Vec::new())
+                    .map_err(to_err)?;
+                let inner = &xml[span.start as usize..span.end as usize];
+                let frag = format!("<DeleteMarker>{inner}</DeleteMarker>");
+                let d: DeleteMarkerXml = quick_xml::de::from_str(&frag)
+                    .map_err(|e| S3Error::Core(CoreError::InvalidResponse(e.to_string())))?;
+                if d.key == key {
+                    versions.push(ObjectVersion {
+                        version_id: d.version_id,
+                        is_latest: d.is_latest,
+                        is_delete_marker: true,
+                        size: 0,
+                        etag: None,
+                        last_modified: d.last_modified,
+                    });
+                }
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    versions.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+    Ok(versions)
 }
 
 /// 一条 bucket 生命周期规则(本 crate 的本地表示;适配层负责映射到上层统一模型)。
@@ -563,5 +733,62 @@ mod tests {
     fn empty_rules_build_valid_empty_configuration() {
         let xml = build_lifecycle_xml(&[]);
         assert_eq!(xml, "<LifecycleConfiguration></LifecycleConfiguration>");
+    }
+
+    #[test]
+    fn versioning_configuration_parses_status() {
+        let enabled: VersioningConfigurationXml = quick_xml::de::from_str(
+            "<VersioningConfiguration><Status>Enabled</Status></VersioningConfiguration>",
+        )
+        .unwrap();
+        assert_eq!(enabled.status.as_deref(), Some("Enabled"));
+
+        // 从未配置过:空元素,没有 Status。
+        let never: VersioningConfigurationXml =
+            quick_xml::de::from_str("<VersioningConfiguration/>").unwrap();
+        assert_eq!(never.status, None);
+    }
+
+    #[test]
+    fn parses_and_merges_versions_and_delete_markers_by_key_sorted_newest_first() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<ListVersionsResult>
+  <Name>b</Name>
+  <Prefix>photo.jpg</Prefix>
+  <IsTruncated>false</IsTruncated>
+  <Version>
+    <Key>photo.jpg</Key>
+    <VersionId>v-old</VersionId>
+    <IsLatest>false</IsLatest>
+    <LastModified>2024-01-01T00:00:00.000Z</LastModified>
+    <ETag>"E1"</ETag>
+    <Size>100</Size>
+  </Version>
+  <DeleteMarker>
+    <Key>photo.jpg</Key>
+    <VersionId>v-deleted</VersionId>
+    <IsLatest>true</IsLatest>
+    <LastModified>2024-03-01T00:00:00.000Z</LastModified>
+  </DeleteMarker>
+  <Version>
+    <Key>photo.jpg.bak</Key>
+    <VersionId>v-other-key</VersionId>
+    <IsLatest>true</IsLatest>
+    <LastModified>2024-02-01T00:00:00.000Z</LastModified>
+    <ETag>"E2"</ETag>
+    <Size>50</Size>
+  </Version>
+</ListVersionsResult>"#;
+        let versions = parse_object_versions(xml, "photo.jpg").unwrap();
+        // photo.jpg.bak 应被过滤掉(前缀匹配但 key 不精确相等)。
+        assert_eq!(versions.len(), 2);
+        // 按修改时间从新到旧:删除标记(3 月)在前,旧版本(1 月)在后。
+        assert!(versions[0].is_delete_marker);
+        assert_eq!(versions[0].version_id, "v-deleted");
+        assert!(versions[0].is_latest);
+        assert!(!versions[1].is_delete_marker);
+        assert_eq!(versions[1].version_id, "v-old");
+        assert_eq!(versions[1].size, 100);
+        assert_eq!(versions[1].etag.as_deref(), Some("\"E1\""));
     }
 }

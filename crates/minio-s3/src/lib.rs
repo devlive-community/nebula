@@ -12,8 +12,8 @@
 
 pub use s3_core::{bucket, client, error, multipart, object};
 pub use s3_core::{
-    BucketSummary, LifecycleRule, ListEntry, ObjectMeta, ObjectSummary, Result, S3Client, S3Error,
-    MIN_PART_SIZE,
+    BucketSummary, LifecycleRule, ListEntry, ObjectMeta, ObjectSummary, ObjectVersion, Result,
+    S3Client, S3Error, MIN_PART_SIZE,
 };
 
 /// 用 MinIO endpoint 创建客户端。region 默认 `us-east-1`;endpoint 以 `http://` 开头走明文,可带端口。

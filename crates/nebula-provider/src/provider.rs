@@ -10,6 +10,7 @@ use crate::capabilities::Capabilities;
 use crate::entry::Entry;
 use crate::error::{ProviderError, Result};
 use crate::lifecycle::LifecycleRule;
+use crate::version::ObjectVersion;
 
 /// 进度回调:`(已处理字节, 总字节)`。适配层在传输过程中多次调用。
 pub type ProgressFn<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
@@ -261,6 +262,36 @@ pub trait StorageProvider: Send + Sync {
     /// `PUT lifecycle` 语义都是整体覆盖)。默认 [`ProviderError::Unsupported`]。
     async fn set_bucket_lifecycle(&self, _bucket: &str, _rules: &[LifecycleRule]) -> Result<()> {
         Err(ProviderError::Unsupported("bucket lifecycle".into()))
+    }
+
+    /// 查询一个 bucket 是否已启用版本控制。默认 [`ProviderError::Unsupported`];支持的
+    /// 适配层覆盖并在 [`capabilities`](Self::capabilities) 置 `versioning = true`。
+    async fn bucket_versioning(&self, _bucket: &str) -> Result<bool> {
+        Err(ProviderError::Unsupported("bucket versioning".into()))
+    }
+
+    /// 启用或暂停一个 bucket 的版本控制(已产生的历史版本不受影响)。默认
+    /// [`ProviderError::Unsupported`]。
+    async fn set_bucket_versioning(&self, _bucket: &str, _enabled: bool) -> Result<()> {
+        Err(ProviderError::Unsupported("bucket versioning".into()))
+    }
+
+    /// 列出一个对象的全部历史版本(含删除标记),按服务端返回顺序(通常最新在前)。
+    /// 默认 [`ProviderError::Unsupported`]。
+    async fn list_object_versions(&self, _path: &str) -> Result<Vec<ObjectVersion>> {
+        Err(ProviderError::Unsupported("object versioning".into()))
+    }
+
+    /// 把某个历史版本的内容服务端复制回"当前"槽位(不删除任何历史版本,会新增一条
+    /// 版本记录)。默认 [`ProviderError::Unsupported`]。
+    async fn restore_object_version(&self, _path: &str, _version_id: &str) -> Result<()> {
+        Err(ProviderError::Unsupported("object versioning".into()))
+    }
+
+    /// 永久删除某一个具体版本(**不可撤销**)。对着最新的删除标记调用即为"撤销删除"
+    /// ——该 key 会以它的上一个版本重新出现。默认 [`ProviderError::Unsupported`]。
+    async fn delete_object_version(&self, _path: &str, _version_id: &str) -> Result<()> {
+        Err(ProviderError::Unsupported("object versioning".into()))
     }
 
     /// 删除单个对象。

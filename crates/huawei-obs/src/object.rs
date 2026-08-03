@@ -182,6 +182,66 @@ impl ObsClient {
         Ok(())
     }
 
+    /// 把某个历史版本的内容服务端复制回"当前"槽位:`x-obs-copy-source` 带 `?versionId=`
+    /// 的自我复制(不指定 `x-obs-metadata-directive`,默认 `COPY`,保留该版本自己的元数据)。
+    pub async fn restore_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: &str,
+    ) -> Result<()> {
+        let date = now_gmt();
+        let copy_source = format!("/{bucket}/{}?versionId={version_id}", encode_key(key));
+        let obs_headers =
+            sign::canonicalized_obs_headers([("x-obs-copy-source", copy_source.as_str())]);
+        let canonical = format!("/{bucket}/{}", encode_key(key));
+        let sts = sign::string_to_sign("PUT", "", "", &date, &obs_headers, &canonical);
+        let authorization = sign::authorization(self.access_key(), self.secret_key(), &sts);
+        let url = format!("{}/{}", self.bucket_base_url(bucket), encode_key(key));
+        let request = self
+            .http()
+            .inner()
+            .request(Method::PUT, &url)
+            .header(DATE, &date)
+            .header(AUTHORIZATION, authorization)
+            .header("x-obs-copy-source", &copy_source)
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(ObsError::from)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 永久删除某一个具体版本(不可撤销):`DELETE /{key}?versionId=`。
+    pub async fn delete_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: &str,
+    ) -> Result<()> {
+        let date = now_gmt();
+        let canonical = format!("/{bucket}/{}?versionId={version_id}", encode_key(key));
+        let sts = sign::string_to_sign("DELETE", "", "", &date, "", &canonical);
+        let authorization = sign::authorization(self.access_key(), self.secret_key(), &sts);
+        let url = format!(
+            "{}/{}?versionId={}",
+            self.bucket_base_url(bucket),
+            encode_key(key),
+            version_id
+        );
+        let request = self
+            .http()
+            .inner()
+            .request(Method::DELETE, &url)
+            .header(DATE, &date)
+            .header(AUTHORIZATION, authorization)
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(ObsError::from)?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 修改内容类型:带新 `Content-Type` + `x-obs-metadata-directive: REPLACE` 的自我复制。
     pub async fn set_content_type(
         &self,

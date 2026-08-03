@@ -54,6 +54,8 @@ import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
 import { LifecycleDialog } from "./components/LifecycleDialog";
+import { BucketVersioningDialog } from "./components/BucketVersioningDialog";
+import { VersionHistoryDialog } from "./components/VersionHistoryDialog";
 import { BatchTagsDialog } from "./components/BatchTagsDialog";
 import { NewTextFileDialog } from "./components/NewTextFileDialog";
 import { applyAccent, ACCENTS, type Accent } from "./accents";
@@ -162,6 +164,8 @@ export default function App() {
   const [editTypeTarget, setEditTypeTarget] = useState<Entry | null>(null);
   const [tagsTarget, setTagsTarget] = useState<Entry | null>(null);
   const [lifecycleTarget, setLifecycleTarget] = useState<Entry | null>(null);
+  const [versioningTarget, setVersioningTarget] = useState<Entry | null>(null);
+  const [versionsTarget, setVersionsTarget] = useState<Entry | null>(null);
   const [statsTarget, setStatsTarget] = useState<Entry | null>(null);
   const [statsData, setStatsData] = useState<StorageBreakdown | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<Entry | null>(null);
@@ -1931,6 +1935,8 @@ export default function App() {
     !!editTypeTarget ||
     !!tagsTarget ||
     !!lifecycleTarget ||
+    !!versioningTarget ||
+    !!versionsTarget ||
     !!statsTarget ||
     !!cleanupTarget ||
     pendingBatchDelete ||
@@ -1969,6 +1975,8 @@ export default function App() {
       else if (editTypeTarget) setEditTypeTarget(null);
       else if (tagsTarget) setTagsTarget(null);
       else if (lifecycleTarget) setLifecycleTarget(null);
+      else if (versioningTarget) setVersioningTarget(null);
+      else if (versionsTarget) setVersionsTarget(null);
       else if (statsTarget) {
         setStatsTarget(null);
         setStatsData(null);
@@ -2437,6 +2445,34 @@ export default function App() {
         />
       )}
 
+      {versioningTarget && current && (
+        <BucketVersioningDialog
+          account={current}
+          bucket={versioningTarget.path}
+          name={versioningTarget.name}
+          onSaved={() => {
+            setVersioningTarget(null);
+            setNotice({ tone: "ok", text: t("✓ 版本控制已更新") });
+          }}
+          onCancel={() => setVersioningTarget(null)}
+          onError={(msg) => {
+            setVersioningTarget(null);
+            setError(msg);
+          }}
+        />
+      )}
+
+      {versionsTarget && current && (
+        <VersionHistoryDialog
+          account={current}
+          path={versionsTarget.path}
+          name={versionsTarget.name}
+          onClose={() => setVersionsTarget(null)}
+          onChanged={() => void load()}
+          onError={(msg) => setError(msg)}
+        />
+      )}
+
       {showBatchTags && current && (
         <BatchTagsDialog
           account={current}
@@ -2701,6 +2737,7 @@ export default function App() {
         { label: t("备份 / 同步"), onClick: () => setSyncPrefix(entry.path) },
         { label: t("清理未完成上传"), onClick: () => setCleanupTarget(entry) },
         { label: t("生命周期规则"), onClick: () => setLifecycleTarget(entry) },
+        { label: t("版本控制"), onClick: () => setVersioningTarget(entry) },
         {
           label: t("删除 Bucket"),
           danger: true,
@@ -2752,6 +2789,7 @@ export default function App() {
       { label: t("校验完整性"), onClick: () => verifyEntry(entry) },
       { label: t("转换存储类型"), onClick: () => setStorageClassTarget(entry) },
       { label: t("取回归档"), onClick: () => setRestoreTarget(entry) },
+      { label: t("版本历史"), onClick: () => setVersionsTarget(entry) },
       { label: t("重命名"), onClick: () => setRenameTarget(entry) },
       { label: t("复制 / 移动到"), onClick: () => setMoveCopyTarget(entry) },
       {

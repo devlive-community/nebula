@@ -2538,6 +2538,72 @@ body.resizing {
   width: 90px;
 }
 
+/* 对象版本历史 */
+.version__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.version__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.version__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  min-width: 0;
+}
+
+.version__date {
+  white-space: nowrap;
+}
+
+.version__size {
+  color: var(--text-faint);
+}
+
+.version__badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.version__badge--current {
+  background: var(--primary);
+  color: #fff;
+}
+
+.version__badge--deleted {
+  background: var(--danger);
+  color: #fff;
+}
+
+.version__actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.btn--sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 .btn--danger {
   background: var(--danger);
   border-color: var(--danger);

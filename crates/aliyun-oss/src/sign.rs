@@ -44,9 +44,10 @@ where
 /// OSS 签名中被视为"子资源"、需计入 CanonicalizedResource 的参数键。
 ///
 /// 必须涵盖所有我们会发出的子资源:分片上传(`uploads`/`uploadId`/`partNumber`)、
-/// 对象标签(`tagging`)、归档取回(`restore`)、bucket 生命周期规则(`lifecycle`)。漏掉
-/// 任何一个都会导致我们签名时把它从 CanonicalizedResource 里过滤掉,而请求 URL 仍带着它
-/// → 服务端算出不同签名 → 签名不匹配。后续需要 `acl` 等再补。
+/// 对象标签(`tagging`)、归档取回(`restore`)、bucket 生命周期规则(`lifecycle`)、
+/// 版本控制(`versioning`/`versions`/`versionId`)。漏掉任何一个都会导致我们签名时把它从
+/// CanonicalizedResource 里过滤掉,而请求 URL 仍带着它 → 服务端算出不同签名 → 签名不匹配。
+/// 后续需要 `acl` 等再补。
 const SUBRESOURCE_KEYS: &[&str] = &[
     "uploads",
     "uploadId",
@@ -54,6 +55,9 @@ const SUBRESOURCE_KEYS: &[&str] = &[
     "tagging",
     "restore",
     "lifecycle",
+    "versioning",
+    "versions",
+    "versionId",
 ];
 
 /// 构造带子资源的 CanonicalizedResource,如 `/bucket/key?partNumber=1&uploadId=xxx`。

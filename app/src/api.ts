@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Bookmark, Entry, ExifInfo, FolderStats, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Bookmark, Entry, ExifInfo, FolderStats, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, ObjectVersion, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -341,6 +341,40 @@ export const setBucketLifecycle = (
   bucket: string,
   rules: LifecycleRule[],
 ) => invoke<void>("set_bucket_lifecycle", { account, bucket, rules });
+
+export const bucketVersioning = (account: string, bucket: string) =>
+  invoke<boolean>("bucket_versioning", { account, bucket });
+
+export const setBucketVersioning = (
+  account: string,
+  bucket: string,
+  enabled: boolean,
+) => invoke<void>("set_bucket_versioning", { account, bucket, enabled });
+
+export const listObjectVersions = (account: string, path: string) =>
+  invoke<ObjectVersion[]>("list_object_versions", { account, path });
+
+export const restoreObjectVersion = (
+  account: string,
+  path: string,
+  versionId: string,
+) =>
+  invoke<void>("restore_object_version", {
+    account,
+    path,
+    versionId,
+  });
+
+export const deleteObjectVersion = (
+  account: string,
+  path: string,
+  versionId: string,
+) =>
+  invoke<void>("delete_object_version", {
+    account,
+    path,
+    versionId,
+  });
 
 export const deletePath = (account: string, path: string) =>
   invoke<void>("delete", { account, path });

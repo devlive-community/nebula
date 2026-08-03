@@ -226,6 +226,58 @@ impl CosClient {
         Ok(())
     }
 
+    /// 把某个历史版本的内容服务端复制回"当前"槽位:`x-cos-copy-source` 带 `?versionId=`
+    /// 的自我复制(不指定 `x-cos-metadata-directive`,默认 `Copy`,保留该版本自己的元数据)。
+    pub async fn restore_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: &str,
+    ) -> Result<()> {
+        let copy_source = format!(
+            "{}/{}?versionId={version_id}",
+            self.bucket_host(bucket),
+            encode_key(key)
+        );
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let request = self.build_signed(SignSpec {
+            method: Method::PUT,
+            host: &host,
+            uri_path: &uri,
+            query: &[],
+            content_type: None,
+            content_md5: None,
+            cos_headers: &[("x-cos-copy-source", copy_source)],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 永久删除某一个具体版本(不可撤销):`DELETE /{key}?versionId=`。
+    pub async fn delete_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: &str,
+    ) -> Result<()> {
+        let host = self.bucket_host(bucket);
+        let uri = object_uri(key);
+        let request = self.build_signed(SignSpec {
+            method: Method::DELETE,
+            host: &host,
+            uri_path: &uri,
+            query: &[("versionId", Some(version_id))],
+            content_type: None,
+            content_md5: None,
+            cos_headers: &[],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 修改内容类型:带新 `Content-Type` + `x-cos-metadata-directive: Replace` 的自我复制。
     pub async fn set_content_type(
         &self,

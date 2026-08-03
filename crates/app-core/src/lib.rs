@@ -51,7 +51,8 @@ pub use largest::LargestFiles;
 pub use limits::TransferLimits;
 pub use nebula_pdf::{Assembly, NumberPos, PageInfo, PageNumbers, PageSpec, PdfInfo, Watermark};
 pub use nebula_provider::{
-    ByteStream, Capabilities, EntryKind, IncompleteUpload, LifecycleRule, Page, ProgressFn,
+    ByteStream, Capabilities, EntryKind, IncompleteUpload, LifecycleRule, ObjectVersion, Page,
+    ProgressFn,
 };
 pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
@@ -1019,6 +1020,59 @@ impl App {
         Ok(self
             .provider(account)?
             .set_bucket_lifecycle(bucket, rules)
+            .await?)
+    }
+
+    /// 查询某账号下一个 bucket 是否已启用版本控制。
+    pub async fn bucket_versioning(&self, account: &str, bucket: &str) -> Result<bool> {
+        Ok(self.provider(account)?.bucket_versioning(bucket).await?)
+    }
+
+    /// 启用或暂停某账号下一个 bucket 的版本控制。
+    pub async fn set_bucket_versioning(
+        &self,
+        account: &str,
+        bucket: &str,
+        enabled: bool,
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .set_bucket_versioning(bucket, enabled)
+            .await?)
+    }
+
+    /// 列出某账号下一个对象的全部历史版本。
+    pub async fn list_object_versions(
+        &self,
+        account: &str,
+        path: &str,
+    ) -> Result<Vec<ObjectVersion>> {
+        Ok(self.provider(account)?.list_object_versions(path).await?)
+    }
+
+    /// 把某个历史版本的内容复制回"当前"槽位。
+    pub async fn restore_object_version(
+        &self,
+        account: &str,
+        path: &str,
+        version_id: &str,
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .restore_object_version(path, version_id)
+            .await?)
+    }
+
+    /// 永久删除某一个具体版本(不可撤销)。
+    pub async fn delete_object_version(
+        &self,
+        account: &str,
+        path: &str,
+        version_id: &str,
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .delete_object_version(path, version_id)
             .await?)
     }
 

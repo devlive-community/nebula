@@ -23,7 +23,7 @@ pub mod multipart;
 pub mod object;
 pub mod sign;
 
-pub use bucket::{BucketSummary, LifecycleRule, ListEntry, ObjectSummary};
+pub use bucket::{BucketSummary, LifecycleRule, ListEntry, ObjectSummary, ObjectVersion};
 pub use client::CosClient;
 pub use error::{CosError, Result};
 pub use object::ObjectMeta;
