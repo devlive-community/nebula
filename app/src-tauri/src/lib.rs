@@ -2,6 +2,8 @@
 //!
 //! 业务逻辑都在 `app-core`(可 `cargo test`),这里只做 JS ↔ Rust 的桥接与本地文件读写。
 
+mod sync_scheduler;
+
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -110,13 +112,24 @@ struct TransferProgress {
 
 /// 同步进度事件负载,发往前端 `sync-progress`。以**动作数**计量。
 #[derive(Clone, Serialize)]
-struct SyncProgress {
+pub(crate) struct SyncProgress {
     /// 同步任务 id,前端以此定位进度。
-    id: String,
+    pub(crate) id: String,
     /// 已处理动作数。
-    done: u64,
+    pub(crate) done: u64,
     /// 总动作数。
-    total: u64,
+    pub(crate) total: u64,
+}
+
+/// 后台调度器自动触发的同步任务跑完了,发往前端 `sync-job-finished`(只在真的做了事或
+/// 失败时才发,空跑不打扰用户)。
+#[derive(Clone, Serialize)]
+pub(crate) struct SyncJobFinished {
+    pub(crate) name: String,
+    /// 摘要文本:成功时是 `↑上传 ↓下载 ✕删除` 的紧凑格式,失败时是错误信息。
+    pub(crate) result: String,
+    /// `"ok"` | `"warn"`(完成但有文件失败)| `"err"`(整体失败)。
+    pub(crate) tone: String,
 }
 
 /// 文件夹级操作进度事件负载,发往前端 `folder-progress`。以**文件数**计量(非字节)。
@@ -1995,6 +2008,7 @@ pub fn run() {
             // 插件(AI 抠图的模型 + 运行时库)放数据目录,持久保存。
             // 运行时库只在实际用到「去背景」时才懒加载,避免不兼容的库让应用起不来。
             core.set_plugin_dir(dir.join("plugins"));
+            sync_scheduler::spawn_sync_scheduler(app.handle().clone(), core.clone());
             app.manage(core);
             app.manage(Transfers::default());
             Ok(())

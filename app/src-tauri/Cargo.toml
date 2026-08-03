@@ -19,11 +19,16 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["fs", "io-util", "rt-multi-thread"] }
+tokio = { version = "1", features = ["fs", "io-util", "rt-multi-thread", "time", "sync"] }
 futures = "0.3"
 bytes = "1"
 app-core = { path = "../../crates/app-core" }
 nebula-provider = { path = "../../crates/nebula-provider" }
+# 同步任务本地目录的实时监听:notify 做跨平台文件系统事件,notify-debouncer-full
+# 做事件合并/防抖,不用自己再写一层去重逻辑。放在这里(不是 app-core)是因为触发后
+# 要经 AppHandle 发 Tauri 事件,而 app-core 是不依赖 tauri 的框架无关层。
+notify = "6"
+notify-debouncer-full = "0.3"
 
 # 独立于根 workspace 构建
 [workspace]

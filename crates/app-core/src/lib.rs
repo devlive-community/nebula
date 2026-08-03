@@ -59,8 +59,9 @@ pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
 pub use store::{AccountRecord, AccountStore};
 pub use sync::{
-    diff as sync_diff, summarize as sync_summarize, ConflictChoice, DiffItem, DiffSummary,
-    LocalFile, RemoteFile, SyncAction, SyncJob, SyncMode, SyncReport, SyncSpec,
+    diff as sync_diff, summarize as sync_summarize, watch_eligible as sync_watch_eligible,
+    ConflictChoice, DiffItem, DiffSummary, LocalFile, RemoteFile, SyncAction, SyncJob, SyncMode,
+    SyncReport, SyncSpec,
 };
 
 const VENDOR_ALIYUN: &str = "aliyun";

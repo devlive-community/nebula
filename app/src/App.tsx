@@ -13,6 +13,7 @@ import type {
   FolderProgress,
   Settings,
   StorageBreakdown,
+  SyncJobFinished,
   TransferItem,
   TransferProgress,
   UploadProgress,
@@ -688,11 +689,24 @@ export default function App() {
       const { op, path, done, total } = e.payload;
       updateProgress(`folder:${op}:${path}`, done, total);
     });
+    // 定时同步现在完全由 Rust 后端调度(见 sync_scheduler.rs);这里只接收它跑完后的
+    // 通知,空跑(没有任何上传/下载/删除且没失败)不会收到这个事件。
+    const unSyncJob = listen<SyncJobFinished>("sync-job-finished", (e) => {
+      const { name, result, tone } = e.payload;
+      setNotice({
+        tone: tone as "ok" | "warn" | "err",
+        text:
+          tone === "err"
+            ? t("定时同步「{name}」失败:{msg}", { name, msg: result })
+            : t("定时同步「{name}」完成:{result}", { name, result }),
+      });
+    });
     return () => {
       unUpload.then((off) => off());
       unDownload.then((off) => off());
       unTransfer.then((off) => off());
       unFolder.then((off) => off());
+      unSyncJob.then((off) => off());
     };
   }, []);
 
@@ -755,68 +769,9 @@ export default function App() {
     })();
   }, []);
 
-  // 定时同步:应用打开时,每分钟检查已保存任务,到点的静默执行并更新 last_run。
-  const runningJobs = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const tick = async () => {
-      let jobs;
-      try {
-        jobs = await api.syncJobs();
-      } catch {
-        return;
-      }
-      const now = Math.floor(Date.now() / 1000);
-      for (const j of jobs) {
-        if (
-          j.interval_mins > 0 &&
-          !runningJobs.current.has(j.id) &&
-          now - j.last_run >= j.interval_mins * 60
-        ) {
-          runningJobs.current.add(j.id);
-          api
-            .syncRun(`job-run-${j.id}`, j.spec)
-            .then((rep) => {
-              const result = `↑${rep.uploaded} ↓${rep.downloaded} ✕${
-                rep.deleted_remote + rep.deleted_local
-              }${rep.failed ? ` ⚠${rep.failed}` : ""}`;
-              void api.saveSyncJob({
-                ...j,
-                last_run: Math.floor(Date.now() / 1000),
-                last_result: result,
-              });
-              if (rep.uploaded + rep.downloaded + rep.deleted_remote + rep.deleted_local > 0)
-                setNotice({
-                  tone: rep.failed ? "warn" : "ok",
-                  text: t("定时同步「{name}」完成:{result}", {
-                    name: j.name,
-                    result,
-                  }),
-                });
-            })
-            .catch((e) => {
-              void api.saveSyncJob({
-                ...j,
-                last_run: Math.floor(Date.now() / 1000),
-                last_result: t("失败"),
-              });
-              setNotice({
-                tone: "err",
-                text: t("定时同步「{name}」失败:{msg}", {
-                  name: j.name,
-                  msg: String(e),
-                }),
-              });
-            })
-            .finally(() => {
-              runningJobs.current.delete(j.id);
-            });
-        }
-      }
-    };
-    const id = setInterval(tick, 60_000);
-    void tick();
-    return () => clearInterval(id);
-  }, []);
+  // 定时同步的调度已经整体搬到 Rust 后端(sync_scheduler.rs):按 interval_mins 轮询,
+  // 并给 MirrorUp/TwoWay 任务额外挂本地文件系统监听、检测到变化就提速触发。这里不再需要
+  // 前端计时器,跑完的通知通过上面的 "sync-job-finished" 事件接收。
 
   // 拖拽侧栏右边缘调整宽度(限制在 180–480px)。
   const startResize = (e: React.MouseEvent) => {

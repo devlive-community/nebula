@@ -432,6 +432,18 @@ pub struct SyncJob {
     pub last_result: String,
 }
 
+/// 这条任务是否值得给本地目录挂一个实时文件系统监听。
+///
+/// 只有 `interval_mins > 0`(用户已经选择"自动运行",不是仅手动)、模式是
+/// [`SyncMode::MirrorUp`]/[`SyncMode::TwoWay`](本地变化能推动云端,`MirrorDown` 反向,
+/// 本地监听帮不上忙)、且本地目录当下确实存在,才值得监听——不满足任一条件就应该继续走
+/// 现有的按 `interval_mins` 轮询,行为和今天完全一样。
+pub fn watch_eligible(job: &SyncJob) -> bool {
+    job.interval_mins > 0
+        && matches!(job.spec.mode, SyncMode::MirrorUp | SyncMode::TwoWay)
+        && Path::new(&job.spec.local_dir).is_dir()
+}
+
 /// [`SyncMode`] ↔ 存储字符串。
 fn mode_to_str(m: SyncMode) -> &'static str {
     match m {
@@ -1100,5 +1112,58 @@ mod tests {
         assert_eq!(s.upload, 2);
         assert_eq!(s.delete_remote, 1);
         assert_eq!(s.transfer_bytes, 30);
+    }
+
+    fn job_with(mode: SyncMode, interval_mins: u32, local_dir: String) -> SyncJob {
+        SyncJob {
+            id: "j".into(),
+            name: "job".into(),
+            spec: SyncSpec {
+                account: "acct".into(),
+                local_dir,
+                remote_prefix: String::new(),
+                mode,
+                delete_extra: false,
+                excludes: vec![],
+            },
+            interval_mins,
+            last_run: 0,
+            last_result: String::new(),
+        }
+    }
+
+    #[test]
+    fn watch_eligible_requires_auto_mode_and_existing_local_dir() {
+        let dir = std::env::temp_dir();
+        let existing = dir.to_string_lossy().to_string();
+        let missing = dir
+            .join("does-not-exist-nebula-test")
+            .to_string_lossy()
+            .to_string();
+
+        // MirrorUp/TwoWay + interval_mins>0 + 目录存在 → 符合。
+        assert!(watch_eligible(&job_with(
+            SyncMode::MirrorUp,
+            5,
+            existing.clone()
+        )));
+        assert!(watch_eligible(&job_with(
+            SyncMode::TwoWay,
+            5,
+            existing.clone()
+        )));
+
+        // MirrorDown:本地监听帮不上忙,即使目录存在、间隔>0 也不符合。
+        assert!(!watch_eligible(&job_with(
+            SyncMode::MirrorDown,
+            5,
+            existing.clone()
+        )));
+
+        // interval_mins == 0(仅手动):尊重用户选择,不符合。
+        assert!(!watch_eligible(&job_with(SyncMode::MirrorUp, 0, existing)));
+
+        // 本地目录不存在:不符合。
+        assert!(!watch_eligible(&job_with(SyncMode::MirrorUp, 5, missing)));
     }
 }

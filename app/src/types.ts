@@ -31,6 +31,16 @@ export interface FolderProgress {
   total: number;
 }
 
+/** 后台调度器自动触发的同步任务跑完事件负载(Rust 端 SyncJobFinished)。只在真的
+ * 做了事或失败时才发,空跑不打扰用户。 */
+export interface SyncJobFinished {
+  name: string;
+  /** 成功时是 `↑上传 ↓下载 ✕删除` 的紧凑格式,失败时是错误信息。 */
+  result: string;
+  /** "ok" | "warn"(完成但有文件失败) | "err"(整体失败)。 */
+  tone: string;
+}
+
 /** 账号非敏感信息(编辑回填用,与 Rust 端 AccountInfo 对应)。 */
 export interface AccountInfo {
   id: string;
