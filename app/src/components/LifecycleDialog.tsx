@@ -4,6 +4,7 @@ import { faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import * as api from "../api";
 import { useI18n } from "../i18n";
 import { STORAGE_CLASSES } from "./StorageClassDialog";
+import { Select } from "./Select";
 import type { LifecycleRule } from "../types";
 
 interface Props {
@@ -162,17 +163,16 @@ export function LifecycleDialog({
                           }
                         />
                         <span className="lifecycle__days-suffix">{t("天数")}</span>
-                        <select
-                          className="lifecycle__class"
-                          value={cls}
-                          onChange={(e) => updateTransition(i, ti, { cls: e.target.value })}
-                        >
-                          {classOptions.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {t(o.label)}({o.value})
-                            </option>
-                          ))}
-                        </select>
+                        <div className="lifecycle__class">
+                          <Select
+                            value={cls}
+                            options={classOptions.map((o) => ({
+                              value: o.value,
+                              label: `${t(o.label)}(${o.value})`,
+                            }))}
+                            onChange={(v) => updateTransition(i, ti, { cls: v })}
+                          />
+                        </div>
                         <button
                           className="tags__remove"
                           title={t("移除")}

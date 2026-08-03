@@ -2518,12 +2518,6 @@ body.resizing {
 
 .lifecycle__class {
   flex: 1;
-  background: var(--bg-elev);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 5px 8px;
-  font-size: 13px;
 }
 
 .lifecycle__expiration {
