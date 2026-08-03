@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark, faCloudArrowDown } from "@fortawesome/free-solid-svg-icons";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import type { Update } from "../update";
 
 interface Props {
@@ -42,6 +44,14 @@ export function UpdateDialog({ update, onClose }: Props) {
 
   const downloading = phase === "downloading";
 
+  // 更新说明来自发布日志的 Markdown 正文(见 release 工作流),这里渲染成富文本
+  // 而不是原样显示——否则 `##`、`**粗体**`、`- ` 这些标记符都会原样露出来。
+  const notesHtml = useMemo(() => {
+    if (!update.body) return "";
+    const html = marked.parse(update.body, { async: false, gfm: true }) as string;
+    return DOMPurify.sanitize(html);
+  }, [update.body]);
+
   return (
     <div className="modal-backdrop" onClick={downloading ? undefined : onClose}>
       <div className="modal modal--update" onClick={(e) => e.stopPropagation()}>
@@ -63,8 +73,11 @@ export function UpdateDialog({ update, onClose }: Props) {
             </span>
           </div>
 
-          {update.body && (
-            <div className="update__notes">{update.body}</div>
+          {notesHtml && (
+            <div
+              className="update__notes"
+              dangerouslySetInnerHTML={{ __html: notesHtml }}
+            />
           )}
 
           {downloading && (
