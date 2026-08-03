@@ -13,6 +13,7 @@ use serde::Deserialize;
 
 use crate::client::OssClient;
 use crate::error::{OssError, Result};
+use crate::multipart::{xml_escape, PartRequest};
 use crate::object::{check_status, now_gmt};
 use crate::sign;
 
@@ -299,6 +300,74 @@ impl OssClient {
         Ok(())
     }
 
+    /// 读取一个 bucket 的生命周期规则:`GET /{bucket}/?lifecycle`。未配置生命周期时
+    /// 服务端返回 `NoSuchLifecycle`,视为空规则列表。
+    pub async fn get_bucket_lifecycle(&self, bucket: &str) -> Result<Vec<LifecycleRule>> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::GET,
+                key: "",
+                subresources: &[("lifecycle", None)],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        let resp = match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => resp,
+            Err(OssError::Api { code, .. }) if code == "NoSuchLifecycle" => return Ok(Vec::new()),
+            Err(e) => return Err(e),
+        };
+        let body = resp.text().await.map_err(CoreError::from)?;
+        parse_lifecycle(&body)
+    }
+
+    /// 设置一个 bucket 的生命周期规则(整套替换):`PUT /{bucket}/?lifecycle`。空列表时
+    /// 改发 `DELETE /{bucket}/?lifecycle`(OSS 不接受没有任何 `Rule` 的配置)。
+    pub async fn set_bucket_lifecycle(&self, bucket: &str, rules: &[LifecycleRule]) -> Result<()> {
+        if rules.is_empty() {
+            return self.delete_bucket_lifecycle(bucket).await;
+        }
+        let date = now_gmt();
+        let body = bytes::Bytes::from(build_lifecycle_xml(rules));
+        let content_md5 = cloud_core::crypto::content_md5(&body);
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::PUT,
+                key: "",
+                subresources: &[("lifecycle", None)],
+                content_type: Some("application/xml"),
+                content_md5: Some(&content_md5),
+                body: Some(body),
+            },
+            &date,
+        )?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    async fn delete_bucket_lifecycle(&self, bucket: &str) -> Result<()> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::DELETE,
+                key: "",
+                subresources: &[("lifecycle", None)],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 拉取一页 bucket 列表,并算出下一页游标。
     async fn list_buckets_page(&self, marker: String) -> Result<Page<BucketSummary, String>> {
         let date = now_gmt();
@@ -423,6 +492,100 @@ fn next_marker(result: &ListBucketResult) -> Option<String> {
         .clone()
         .filter(|m| !m.is_empty())
         .or_else(|| result.contents.last().map(|c| c.key.clone()))
+}
+
+/// 一条 bucket 生命周期规则(本 crate 的本地表示;适配层负责映射到上层统一模型)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LifecycleRule {
+    pub id: String,
+    pub prefix: String,
+    pub enabled: bool,
+    pub expiration_days: Option<u32>,
+    /// `(天数, 目标存储类型字符串)` 有序对。
+    pub transitions: Vec<(u32, String)>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct LifecycleConfigurationXml {
+    #[serde(default, rename = "Rule")]
+    rule: Vec<RuleXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct RuleXml {
+    #[serde(rename = "ID", default)]
+    id: String,
+    #[serde(default)]
+    prefix: String,
+    status: String,
+    #[serde(default, rename = "Transition")]
+    transition: Vec<TransitionXml>,
+    #[serde(default)]
+    expiration: Option<ExpirationXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct TransitionXml {
+    days: u32,
+    storage_class: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ExpirationXml {
+    #[serde(default)]
+    days: Option<u32>,
+}
+
+/// 解析 `GetBucketLifecycle` 的 XML 响应(OSS 的 `Rule` 下 `Prefix` 是直接子元素,
+/// 不像 S3 那样包一层 `Filter`)。
+fn parse_lifecycle(xml: &str) -> Result<Vec<LifecycleRule>> {
+    let doc: LifecycleConfigurationXml = quick_xml::de::from_str(xml)
+        .map_err(|e| OssError::Core(CoreError::InvalidResponse(e.to_string())))?;
+    Ok(doc
+        .rule
+        .into_iter()
+        .map(|r| LifecycleRule {
+            id: r.id,
+            prefix: r.prefix,
+            enabled: r.status == "Enabled",
+            expiration_days: r.expiration.and_then(|e| e.days),
+            transitions: r
+                .transition
+                .into_iter()
+                .map(|t| (t.days, t.storage_class))
+                .collect(),
+        })
+        .collect())
+}
+
+/// 生成 `PutBucketLifecycle` 的请求体 XML。
+fn build_lifecycle_xml(rules: &[LifecycleRule]) -> String {
+    let mut body = String::from("<LifecycleConfiguration>");
+    for r in rules {
+        body.push_str("<Rule><ID>");
+        body.push_str(&xml_escape(&r.id));
+        body.push_str("</ID><Prefix>");
+        body.push_str(&xml_escape(&r.prefix));
+        body.push_str("</Prefix><Status>");
+        body.push_str(if r.enabled { "Enabled" } else { "Disabled" });
+        body.push_str("</Status>");
+        for (days, class) in &r.transitions {
+            body.push_str(&format!(
+                "<Transition><Days>{days}</Days><StorageClass>{}</StorageClass></Transition>",
+                xml_escape(class)
+            ));
+        }
+        if let Some(days) = r.expiration_days {
+            body.push_str(&format!("<Expiration><Days>{days}</Days></Expiration>"));
+        }
+        body.push_str("</Rule>");
+    }
+    body.push_str("</LifecycleConfiguration>");
+    body
 }
 
 #[cfg(test)]
@@ -679,5 +842,62 @@ mod tests {
             common_prefixes: vec![],
         };
         assert_eq!(next_marker(&fallback).as_deref(), Some("z.txt"));
+    }
+
+    #[test]
+    fn lifecycle_xml_round_trips() {
+        let rules = vec![
+            LifecycleRule {
+                id: "archive-logs".into(),
+                prefix: "logs/".into(),
+                enabled: true,
+                expiration_days: Some(365),
+                transitions: vec![(30, "Archive".into()), (180, "ColdArchive".into())],
+            },
+            LifecycleRule {
+                id: "disabled-rule".into(),
+                prefix: String::new(),
+                enabled: false,
+                expiration_days: None,
+                transitions: vec![],
+            },
+        ];
+        let xml = build_lifecycle_xml(&rules);
+        let parsed = parse_lifecycle(&xml).unwrap();
+        assert_eq!(parsed, rules);
+    }
+
+    #[test]
+    fn set_bucket_lifecycle_request_signs_subresource() {
+        let client = test_client();
+        // 生命周期请求走 build_part_request,和 initiate_multipart_upload 用的是同一个
+        // 签名路径;这里只验证子资源确实进了 CanonicalizedResource(不匹配就会 403)。
+        let date = "Thu, 17 Nov 2005 18:49:58 GMT";
+        let req = client
+            .build_part_request(
+                "b",
+                PartRequest {
+                    method: Method::PUT,
+                    key: "",
+                    subresources: &[("lifecycle", None)],
+                    content_type: Some("application/xml"),
+                    content_md5: None,
+                    body: Some(bytes::Bytes::from_static(
+                        b"<LifecycleConfiguration></LifecycleConfiguration>",
+                    )),
+                },
+                date,
+            )
+            .unwrap();
+        let canonical = sign::canonicalized_resource("b", "", &[("lifecycle", None)]);
+        assert_eq!(canonical, "/b/?lifecycle");
+        let sts = sign::string_to_sign("PUT", "", "application/xml", date, "", &canonical);
+        let expected =
+            sign::authorization(client.access_key_id(), client.access_key_secret(), &sts);
+        assert_eq!(
+            req.headers().get(AUTHORIZATION).unwrap().to_str().unwrap(),
+            expected
+        );
+        assert!(req.url().as_str().ends_with("?lifecycle"));
     }
 }

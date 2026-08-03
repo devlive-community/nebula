@@ -9,6 +9,7 @@ use futures::Stream;
 use crate::capabilities::Capabilities;
 use crate::entry::Entry;
 use crate::error::{ProviderError, Result};
+use crate::lifecycle::LifecycleRule;
 
 /// 进度回调:`(已处理字节, 总字节)`。适配层在传输过程中多次调用。
 pub type ProgressFn<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
@@ -248,6 +249,18 @@ pub trait StorageProvider: Send + Sync {
     /// 删除一个 bucket(通常要求为空)。默认 [`ProviderError::Unsupported`]。
     async fn delete_bucket(&self, _bucket: &str) -> Result<()> {
         Err(ProviderError::Unsupported("delete bucket".into()))
+    }
+
+    /// 读取一个 bucket 的生命周期规则。默认 [`ProviderError::Unsupported`];支持的适配层
+    /// 覆盖并在 [`capabilities`](Self::capabilities) 置 `bucket_lifecycle = true`。
+    async fn bucket_lifecycle(&self, _bucket: &str) -> Result<Vec<LifecycleRule>> {
+        Err(ProviderError::Unsupported("bucket lifecycle".into()))
+    }
+
+    /// 设置一个 bucket 的生命周期规则(**整套替换**,不是增量 patch——各家云的
+    /// `PUT lifecycle` 语义都是整体覆盖)。默认 [`ProviderError::Unsupported`]。
+    async fn set_bucket_lifecycle(&self, _bucket: &str, _rules: &[LifecycleRule]) -> Result<()> {
+        Err(ProviderError::Unsupported("bucket lifecycle".into()))
     }
 
     /// 删除单个对象。

@@ -22,14 +22,15 @@ pub const MIN_PART_SIZE: usize = 100 * 1024;
 /// 分片并发上传的默认并发度。取 4 是吞吐与内存 / 连接数的折中。
 pub const UPLOAD_CONCURRENCY: usize = 4;
 
-/// 一次分片请求的输入。用结构体收拢以避免过多参数。
-struct PartRequest<'a> {
-    method: Method,
-    key: &'a str,
-    subresources: &'a [(&'a str, Option<&'a str>)],
-    content_type: Option<&'a str>,
-    content_md5: Option<&'a str>,
-    body: Option<Bytes>,
+/// 一次「带子资源的签名请求」的输入。用结构体收拢以避免过多参数;`key` 传空串即
+/// bucket 级请求(如生命周期规则),供 `bucket.rs` 复用。
+pub(crate) struct PartRequest<'a> {
+    pub(crate) method: Method,
+    pub(crate) key: &'a str,
+    pub(crate) subresources: &'a [(&'a str, Option<&'a str>)],
+    pub(crate) content_type: Option<&'a str>,
+    pub(crate) content_md5: Option<&'a str>,
+    pub(crate) body: Option<Bytes>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -458,8 +459,9 @@ impl OssClient {
         Ok(parts)
     }
 
-    /// 组装并签名一次分片相关请求(子资源计入 CanonicalizedResource)。
-    fn build_part_request(
+    /// 组装并签名一次带子资源的请求(子资源计入 CanonicalizedResource);`req.key` 为空串时
+    /// 即 bucket 级请求。
+    pub(crate) fn build_part_request(
         &self,
         bucket: &str,
         req: PartRequest<'_>,
@@ -583,7 +585,7 @@ fn build_tagging_xml(tags: &[(String, String)]) -> String {
 }
 
 /// 转义 XML 文本中的保留字符,避免键 / 值里的 `&<>"'` 破坏文档。
-fn xml_escape(s: &str) -> String {
+pub(crate) fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {

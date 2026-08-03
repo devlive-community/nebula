@@ -15,6 +15,7 @@ use serde::Deserialize;
 
 use crate::client::ObsClient;
 use crate::error::{ObsError, Result};
+use crate::multipart::{xml_escape, PartRequest};
 use crate::object::{check_status, now_gmt};
 use crate::sign;
 
@@ -295,6 +296,77 @@ impl ObsClient {
         Ok(())
     }
 
+    /// 读取一个 bucket 的生命周期规则:`GET /{bucket}/?lifecycle`。未配置生命周期时
+    /// 服务端返回 `NoSuchLifecycleConfiguration`,视为空规则列表。
+    pub async fn get_bucket_lifecycle(&self, bucket: &str) -> Result<Vec<LifecycleRule>> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::GET,
+                key: "",
+                subresources: &[("lifecycle", None)],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        let resp = match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => resp,
+            Err(ObsError::Api { code, .. }) if code == "NoSuchLifecycleConfiguration" => {
+                return Ok(Vec::new())
+            }
+            Err(e) => return Err(e),
+        };
+        let body = resp.text().await.map_err(CoreError::from)?;
+        parse_lifecycle(&body)
+    }
+
+    /// 设置一个 bucket 的生命周期规则(整套替换):`PUT /{bucket}/?lifecycle`。空列表时
+    /// 改发 `DELETE /{bucket}/?lifecycle`(OBS 不接受没有任何 `Rule` 的配置)。
+    /// OBS 的 V2 签名不对 body 取哈希,带 XML body 不影响签名(建桶的 `Location` body
+    /// 已印证过这一点)。
+    pub async fn set_bucket_lifecycle(&self, bucket: &str, rules: &[LifecycleRule]) -> Result<()> {
+        if rules.is_empty() {
+            return self.delete_bucket_lifecycle(bucket).await;
+        }
+        let date = now_gmt();
+        let body = bytes::Bytes::from(build_lifecycle_xml(rules));
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::PUT,
+                key: "",
+                subresources: &[("lifecycle", None)],
+                content_type: Some("application/xml"),
+                content_md5: None,
+                body: Some(body),
+            },
+            &date,
+        )?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    async fn delete_bucket_lifecycle(&self, bucket: &str) -> Result<()> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::DELETE,
+                key: "",
+                subresources: &[("lifecycle", None)],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 拉取全部 bucket(单次请求)。
     async fn list_buckets_once(&self) -> Result<Vec<BucketSummary>> {
         let date = now_gmt();
@@ -419,6 +491,109 @@ fn next_marker(result: &ListBucketResult) -> Option<String> {
         .clone()
         .filter(|m| !m.is_empty())
         .or_else(|| result.contents.last().map(|c| c.key.clone()))
+}
+
+/// 一条 bucket 生命周期规则(本 crate 的本地表示;适配层负责映射到上层统一模型)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LifecycleRule {
+    pub id: String,
+    pub prefix: String,
+    pub enabled: bool,
+    pub expiration_days: Option<u32>,
+    /// `(天数, 目标存储类型字符串)` 有序对。
+    pub transitions: Vec<(u32, String)>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct LifecycleConfigurationXml {
+    #[serde(default, rename = "Rule")]
+    rule: Vec<RuleXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct RuleXml {
+    #[serde(rename = "ID", default)]
+    id: String,
+    #[serde(default)]
+    filter: Option<FilterXml>,
+    // 兼容直接把 Prefix 放在 Rule 下(不经 Filter 包一层)的响应。
+    #[serde(default)]
+    prefix: Option<String>,
+    status: String,
+    #[serde(default, rename = "Transition")]
+    transition: Vec<TransitionXml>,
+    #[serde(default)]
+    expiration: Option<ExpirationXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct FilterXml {
+    #[serde(default)]
+    prefix: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct TransitionXml {
+    days: u32,
+    storage_class: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ExpirationXml {
+    #[serde(default)]
+    days: Option<u32>,
+}
+
+/// 解析 `GetBucketLifecycleConfiguration` 的 XML 响应。
+fn parse_lifecycle(xml: &str) -> Result<Vec<LifecycleRule>> {
+    let doc: LifecycleConfigurationXml = quick_xml::de::from_str(xml)
+        .map_err(|e| ObsError::Core(CoreError::InvalidResponse(e.to_string())))?;
+    Ok(doc
+        .rule
+        .into_iter()
+        .map(|r| LifecycleRule {
+            id: r.id,
+            prefix: r.filter.map(|f| f.prefix).or(r.prefix).unwrap_or_default(),
+            enabled: r.status == "Enabled",
+            expiration_days: r.expiration.and_then(|e| e.days),
+            transitions: r
+                .transition
+                .into_iter()
+                .map(|t| (t.days, t.storage_class))
+                .collect(),
+        })
+        .collect())
+}
+
+/// 生成 `PutBucketLifecycleConfiguration` 的请求体 XML。
+fn build_lifecycle_xml(rules: &[LifecycleRule]) -> String {
+    let mut body = String::from("<LifecycleConfiguration>");
+    for r in rules {
+        body.push_str("<Rule><ID>");
+        body.push_str(&xml_escape(&r.id));
+        body.push_str("</ID><Filter><Prefix>");
+        body.push_str(&xml_escape(&r.prefix));
+        body.push_str("</Prefix></Filter><Status>");
+        body.push_str(if r.enabled { "Enabled" } else { "Disabled" });
+        body.push_str("</Status>");
+        for (days, class) in &r.transitions {
+            body.push_str(&format!(
+                "<Transition><Days>{days}</Days><StorageClass>{}</StorageClass></Transition>",
+                xml_escape(class)
+            ));
+        }
+        if let Some(days) = r.expiration_days {
+            body.push_str(&format!("<Expiration><Days>{days}</Days></Expiration>"));
+        }
+        body.push_str("</Rule>");
+    }
+    body.push_str("</LifecycleConfiguration>");
+    body
 }
 
 #[cfg(test)]
@@ -654,5 +829,45 @@ mod tests {
             common_prefixes: vec![],
         };
         assert_eq!(next_marker(&fallback).as_deref(), Some("z.txt"));
+    }
+
+    #[test]
+    fn lifecycle_xml_round_trips() {
+        let rules = vec![
+            LifecycleRule {
+                id: "archive-logs".into(),
+                prefix: "logs/".into(),
+                enabled: true,
+                expiration_days: Some(365),
+                transitions: vec![(30, "WARM".into()), (90, "COLD".into())],
+            },
+            LifecycleRule {
+                id: "disabled-rule".into(),
+                prefix: String::new(),
+                enabled: false,
+                expiration_days: None,
+                transitions: vec![],
+            },
+        ];
+        let xml = build_lifecycle_xml(&rules);
+        let parsed = parse_lifecycle(&xml).unwrap();
+        assert_eq!(parsed, rules);
+    }
+
+    #[test]
+    fn parses_lifecycle_with_legacy_prefix() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<LifecycleConfiguration>
+  <Rule>
+    <ID>expire-tmp</ID>
+    <Prefix>tmp/</Prefix>
+    <Status>Enabled</Status>
+    <Expiration><Days>7</Days></Expiration>
+  </Rule>
+</LifecycleConfiguration>"#;
+        let parsed = parse_lifecycle(xml).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].prefix, "tmp/");
+        assert_eq!(parsed[0].expiration_days, Some(7));
     }
 }

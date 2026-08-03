@@ -13,6 +13,8 @@ pub struct Capabilities {
     pub storage_class_ops: bool,
     /// 支持新建 / 删除 bucket(create_bucket / delete_bucket 已实现)。
     pub bucket_ops: bool,
+    /// 支持读写 bucket 生命周期规则(bucket_lifecycle / set_bucket_lifecycle 已实现)。
+    pub bucket_lifecycle: bool,
     /// 支持修改对象元数据(set_content_type 已实现)。
     pub metadata_ops: bool,
     /// 支持读写对象标签(object_tags / set_object_tags 已实现)。

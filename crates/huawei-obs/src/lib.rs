@@ -24,7 +24,7 @@ pub mod multipart;
 pub mod object;
 pub mod sign;
 
-pub use bucket::{BucketSummary, ListEntry, ObjectSummary};
+pub use bucket::{BucketSummary, LifecycleRule, ListEntry, ObjectSummary};
 pub use client::ObsClient;
 pub use error::{ObsError, Result};
 pub use object::ObjectMeta;

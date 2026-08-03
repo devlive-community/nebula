@@ -9,9 +9,9 @@ use std::sync::{Arc, Mutex};
 use app_core::{
     AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, DiffItem,
     DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload,
-    Integrity, LargestFiles, Ops, Page, PageNumbers, PdfInfo, RenamePlan, RenameRule, SearchResult,
-    Settings, StorageBreakdown, SyncJob, SyncReport, SyncSpec, TextPreview, TransferRecord,
-    Watermark,
+    Integrity, LargestFiles, LifecycleRule, Ops, Page, PageNumbers, PdfInfo, RenamePlan,
+    RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport, SyncSpec,
+    TextPreview, TransferRecord, Watermark,
 };
 use bytes::Bytes;
 use nebula_provider::Entry;
@@ -827,6 +827,33 @@ async fn delete_bucket(
 ) -> Result<(), String> {
     let app = state.inner().clone();
     app.delete_bucket(&account, &bucket)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 读取一个 bucket 的生命周期规则。
+#[tauri::command]
+async fn bucket_lifecycle(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+) -> Result<Vec<LifecycleRule>, String> {
+    let app = state.inner().clone();
+    app.bucket_lifecycle(&account, &bucket)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 设置一个 bucket 的生命周期规则(整套替换)。
+#[tauri::command]
+async fn set_bucket_lifecycle(
+    state: State<'_, App>,
+    account: String,
+    bucket: String,
+    rules: Vec<LifecycleRule>,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_bucket_lifecycle(&account, &bucket, &rules)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1893,6 +1920,8 @@ pub fn run() {
             create_folder,
             create_bucket,
             delete_bucket,
+            bucket_lifecycle,
+            set_bucket_lifecycle,
             set_content_type,
             object_tags,
             set_object_tags,

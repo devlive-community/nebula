@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Bookmark, Entry, ExifInfo, FolderStats, ImageData, ImageOps, IncompleteUpload, Integrity, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
+import type { AccountInfo, Bookmark, Entry, ExifInfo, FolderStats, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -332,6 +332,15 @@ export const createBucket = (account: string, bucket: string) =>
 
 export const deleteBucket = (account: string, bucket: string) =>
   invoke<void>("delete_bucket", { account, bucket });
+
+export const bucketLifecycle = (account: string, bucket: string) =>
+  invoke<LifecycleRule[]>("bucket_lifecycle", { account, bucket });
+
+export const setBucketLifecycle = (
+  account: string,
+  bucket: string,
+  rules: LifecycleRule[],
+) => invoke<void>("set_bucket_lifecycle", { account, bucket, rules });
 
 export const deletePath = (account: string, path: string) =>
   invoke<void>("delete", { account, path });

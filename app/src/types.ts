@@ -339,6 +339,16 @@ export interface StorageBreakdown {
   truncated: boolean;
 }
 
+/** Bucket 生命周期规则(与 Rust 端 app_core::LifecycleRule 对应)。 */
+export interface LifecycleRule {
+  id: string;
+  prefix: string;
+  enabled: boolean;
+  expiration_days: number | null;
+  /** `[天数, 目标存储类型字符串]` 有序对。 */
+  transitions: [number, string][];
+}
+
 /** 递归搜索结果(与 Rust 端 app_core::SearchResult 对应)。 */
 export interface SearchResult {
   entries: Entry[];

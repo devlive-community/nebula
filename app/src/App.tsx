@@ -53,6 +53,7 @@ import {
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
+import { LifecycleDialog } from "./components/LifecycleDialog";
 import { BatchTagsDialog } from "./components/BatchTagsDialog";
 import { NewTextFileDialog } from "./components/NewTextFileDialog";
 import { applyAccent, ACCENTS, type Accent } from "./accents";
@@ -160,6 +161,7 @@ export default function App() {
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [editTypeTarget, setEditTypeTarget] = useState<Entry | null>(null);
   const [tagsTarget, setTagsTarget] = useState<Entry | null>(null);
+  const [lifecycleTarget, setLifecycleTarget] = useState<Entry | null>(null);
   const [statsTarget, setStatsTarget] = useState<Entry | null>(null);
   const [statsData, setStatsData] = useState<StorageBreakdown | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<Entry | null>(null);
@@ -1928,6 +1930,7 @@ export default function App() {
     showNewBucket ||
     !!editTypeTarget ||
     !!tagsTarget ||
+    !!lifecycleTarget ||
     !!statsTarget ||
     !!cleanupTarget ||
     pendingBatchDelete ||
@@ -1965,6 +1968,7 @@ export default function App() {
       else if (showNewBucket) setShowNewBucket(false);
       else if (editTypeTarget) setEditTypeTarget(null);
       else if (tagsTarget) setTagsTarget(null);
+      else if (lifecycleTarget) setLifecycleTarget(null);
       else if (statsTarget) {
         setStatsTarget(null);
         setStatsData(null);
@@ -2415,6 +2419,24 @@ export default function App() {
         />
       )}
 
+      {lifecycleTarget && current && (
+        <LifecycleDialog
+          account={current}
+          vendor={accounts.find((a) => a.id === current)?.vendor ?? ""}
+          bucket={lifecycleTarget.path}
+          name={lifecycleTarget.name}
+          onSaved={() => {
+            setLifecycleTarget(null);
+            setNotice({ tone: "ok", text: t("✓ 生命周期规则已保存") });
+          }}
+          onCancel={() => setLifecycleTarget(null)}
+          onError={(msg) => {
+            setLifecycleTarget(null);
+            setError(msg);
+          }}
+        />
+      )}
+
       {showBatchTags && current && (
         <BatchTagsDialog
           account={current}
@@ -2678,6 +2700,7 @@ export default function App() {
         { label: t("统计信息"), onClick: () => showFolderStats(entry) },
         { label: t("备份 / 同步"), onClick: () => setSyncPrefix(entry.path) },
         { label: t("清理未完成上传"), onClick: () => setCleanupTarget(entry) },
+        { label: t("生命周期规则"), onClick: () => setLifecycleTarget(entry) },
         {
           label: t("删除 Bucket"),
           danger: true,

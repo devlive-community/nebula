@@ -51,7 +51,7 @@ pub use largest::LargestFiles;
 pub use limits::TransferLimits;
 pub use nebula_pdf::{Assembly, NumberPos, PageInfo, PageNumbers, PageSpec, PdfInfo, Watermark};
 pub use nebula_provider::{
-    ByteStream, Capabilities, EntryKind, IncompleteUpload, Page, ProgressFn,
+    ByteStream, Capabilities, EntryKind, IncompleteUpload, LifecycleRule, Page, ProgressFn,
 };
 pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
@@ -998,6 +998,28 @@ impl App {
     /// 删除某账号下的一个 bucket(通常要求为空)。
     pub async fn delete_bucket(&self, account: &str, bucket: &str) -> Result<()> {
         Ok(self.provider(account)?.delete_bucket(bucket).await?)
+    }
+
+    /// 读取某账号下一个 bucket 的生命周期规则。
+    pub async fn bucket_lifecycle(
+        &self,
+        account: &str,
+        bucket: &str,
+    ) -> Result<Vec<LifecycleRule>> {
+        Ok(self.provider(account)?.bucket_lifecycle(bucket).await?)
+    }
+
+    /// 设置某账号下一个 bucket 的生命周期规则(整套替换)。
+    pub async fn set_bucket_lifecycle(
+        &self,
+        account: &str,
+        bucket: &str,
+        rules: &[LifecycleRule],
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .set_bucket_lifecycle(bucket, rules)
+            .await?)
     }
 
     /// 跨账号 / 跨云复制:把 `src_account` 的 `src_path` 搬到 `dst_account` 的 `dst_path`,

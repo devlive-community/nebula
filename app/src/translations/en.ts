@@ -517,4 +517,14 @@ export const EN: Record<string, string> = {
 
   // 关于
   检查更新: "Check for updates",
+
+  // Bucket 生命周期规则
+  生命周期规则: "Lifecycle rules",
+  "没有生命周期规则,点下方添加。": "No lifecycle rules yet — add one below.",
+  规则名称: "Rule name",
+  天数: "days",
+  添加转换规则: "Add transition",
+  "过期天数(留空则不过期)": "Expire after (days, blank = never)",
+  新增规则: "Add rule",
+  "✓ 生命周期规则已保存": "✓ Lifecycle rules saved",
 };

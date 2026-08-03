@@ -8,8 +8,8 @@ use bytes::Bytes;
 use futures::StreamExt;
 
 use nebula_provider::{
-    path, ByteStream, Capabilities, Entry, IncompleteUpload, ProgressFn, ProviderError, Result,
-    StorageProvider,
+    path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ProgressFn,
+    ProviderError, Result, StorageProvider,
 };
 use tencent_cos::{CosClient, CosError, ListEntry};
 
@@ -57,6 +57,28 @@ fn require_object(path: &str) -> Result<(&str, &str)> {
 }
 
 /// 把 COS 错误映射到统一 provider 错误。
+/// 把 SDK 的生命周期规则映射到统一 provider 模型(字段一一对应)。
+fn rule_from_sdk(r: tencent_cos::LifecycleRule) -> LifecycleRule {
+    LifecycleRule {
+        id: r.id,
+        prefix: r.prefix,
+        enabled: r.enabled,
+        expiration_days: r.expiration_days,
+        transitions: r.transitions,
+    }
+}
+
+/// 把统一 provider 模型映射回 SDK 的生命周期规则。
+fn rule_to_sdk(r: &LifecycleRule) -> tencent_cos::LifecycleRule {
+    tencent_cos::LifecycleRule {
+        id: r.id.clone(),
+        prefix: r.prefix.clone(),
+        enabled: r.enabled,
+        expiration_days: r.expiration_days,
+        transitions: r.transitions.clone(),
+    }
+}
+
 fn map_err(err: CosError) -> ProviderError {
     match err {
         CosError::Api { code, message, .. } => match code.as_str() {
@@ -89,6 +111,7 @@ impl StorageProvider for TencentProvider {
             presign: true,
             server_side_copy: true,
             hierarchical: false,
+            bucket_lifecycle: true,
         }
     }
 
@@ -363,6 +386,23 @@ impl StorageProvider for TencentProvider {
 
     async fn delete_bucket(&self, bucket: &str) -> Result<()> {
         self.client.delete_bucket(bucket).await.map_err(map_err)
+    }
+
+    async fn bucket_lifecycle(&self, bucket: &str) -> Result<Vec<LifecycleRule>> {
+        let rules = self
+            .client
+            .get_bucket_lifecycle(bucket)
+            .await
+            .map_err(map_err)?;
+        Ok(rules.into_iter().map(rule_from_sdk).collect())
+    }
+
+    async fn set_bucket_lifecycle(&self, bucket: &str, rules: &[LifecycleRule]) -> Result<()> {
+        let rules: Vec<_> = rules.iter().map(rule_to_sdk).collect();
+        self.client
+            .set_bucket_lifecycle(bucket, &rules)
+            .await
+            .map_err(map_err)
     }
 
     async fn set_content_type(&self, path: &str, content_type: &str) -> Result<()> {

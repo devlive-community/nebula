@@ -9,8 +9,8 @@ use futures::StreamExt;
 
 use aws_s3::{ListEntry, S3Client, S3Error};
 use nebula_provider::{
-    path, ByteStream, Capabilities, Entry, IncompleteUpload, ProgressFn, ProviderError, Result,
-    StorageProvider,
+    path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ProgressFn,
+    ProviderError, Result, StorageProvider,
 };
 
 /// 超过该大小的上传自动改用分片上传。
@@ -59,6 +59,28 @@ fn require_object(path: &str) -> Result<(&str, &str)> {
 }
 
 /// 把 S3 错误映射到统一 provider 错误。
+/// 把 SDK 的生命周期规则映射到统一 provider 模型(字段一一对应)。
+fn rule_from_sdk(r: aws_s3::LifecycleRule) -> LifecycleRule {
+    LifecycleRule {
+        id: r.id,
+        prefix: r.prefix,
+        enabled: r.enabled,
+        expiration_days: r.expiration_days,
+        transitions: r.transitions,
+    }
+}
+
+/// 把统一 provider 模型映射回 SDK 的生命周期规则。
+fn rule_to_sdk(r: &LifecycleRule) -> aws_s3::LifecycleRule {
+    aws_s3::LifecycleRule {
+        id: r.id.clone(),
+        prefix: r.prefix.clone(),
+        enabled: r.enabled,
+        expiration_days: r.expiration_days,
+        transitions: r.transitions.clone(),
+    }
+}
+
 fn map_err(err: S3Error) -> ProviderError {
     match err {
         S3Error::Api { code, message, .. } => match code.as_str() {
@@ -91,6 +113,7 @@ impl StorageProvider for AwsProvider {
             presign: true,
             server_side_copy: true,
             hierarchical: false,
+            bucket_lifecycle: true,
         }
     }
 
@@ -365,6 +388,23 @@ impl StorageProvider for AwsProvider {
 
     async fn delete_bucket(&self, bucket: &str) -> Result<()> {
         self.client.delete_bucket(bucket).await.map_err(map_err)
+    }
+
+    async fn bucket_lifecycle(&self, bucket: &str) -> Result<Vec<LifecycleRule>> {
+        let rules = self
+            .client
+            .get_bucket_lifecycle(bucket)
+            .await
+            .map_err(map_err)?;
+        Ok(rules.into_iter().map(rule_from_sdk).collect())
+    }
+
+    async fn set_bucket_lifecycle(&self, bucket: &str, rules: &[LifecycleRule]) -> Result<()> {
+        let rules: Vec<_> = rules.iter().map(rule_to_sdk).collect();
+        self.client
+            .set_bucket_lifecycle(bucket, &rules)
+            .await
+            .map_err(map_err)
     }
 
     async fn set_content_type(&self, path: &str, content_type: &str) -> Result<()> {

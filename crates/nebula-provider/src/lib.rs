@@ -16,6 +16,7 @@
 pub mod capabilities;
 pub mod entry;
 pub mod error;
+pub mod lifecycle;
 pub mod path;
 pub mod provider;
 pub mod registry;
@@ -23,6 +24,7 @@ pub mod registry;
 pub use capabilities::Capabilities;
 pub use entry::{Entry, EntryKind};
 pub use error::{ProviderError, Result};
+pub use lifecycle::LifecycleRule;
 pub use provider::{
     collect_stream, ByteStream, IncompleteUpload, Page, ProgressFn, StorageProvider,
 };

@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use crate::client::{CosClient, SignSpec};
 use crate::error::{CosError, Result};
-use crate::object::check_status;
+use crate::object::{check_status, xml_escape};
 
 /// 单页返回的每个对象条目。
 #[derive(Debug, Clone)]
@@ -310,6 +310,171 @@ impl CosClient {
         check_status(self.http().execute(request).await?).await?;
         Ok(())
     }
+
+    /// 读取一个 bucket 的生命周期规则:`GET /?lifecycle`。未配置生命周期时服务端返回
+    /// `NoSuchLifecycleConfiguration`,视为空规则列表。
+    pub async fn get_bucket_lifecycle(&self, bucket: &str) -> Result<Vec<LifecycleRule>> {
+        let host = self.bucket_host(bucket);
+        let request = self.build_signed(SignSpec {
+            method: Method::GET,
+            host: &host,
+            uri_path: "/",
+            query: &[("lifecycle", None)],
+            content_type: None,
+            content_md5: None,
+            cos_headers: &[],
+            body: None,
+        })?;
+        let resp = match check_status(self.http().execute(request).await?).await {
+            Ok(resp) => resp,
+            Err(CosError::Api { code, .. }) if code == "NoSuchLifecycleConfiguration" => {
+                return Ok(Vec::new())
+            }
+            Err(e) => return Err(e),
+        };
+        let body = resp.text().await.map_err(CoreError::from)?;
+        parse_lifecycle(&body)
+    }
+
+    /// 设置一个 bucket 的生命周期规则(整套替换):`PUT /?lifecycle`。空列表时改发
+    /// `DELETE /?lifecycle`(COS 不接受没有任何 `Rule` 的配置)。
+    pub async fn set_bucket_lifecycle(&self, bucket: &str, rules: &[LifecycleRule]) -> Result<()> {
+        if rules.is_empty() {
+            return self.delete_bucket_lifecycle(bucket).await;
+        }
+        let host = self.bucket_host(bucket);
+        let body = build_lifecycle_xml(rules);
+        let request = self.build_signed(SignSpec {
+            method: Method::PUT,
+            host: &host,
+            uri_path: "/",
+            query: &[("lifecycle", None)],
+            content_type: Some("application/xml"),
+            content_md5: None,
+            cos_headers: &[],
+            body: Some(bytes::Bytes::from(body)),
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    async fn delete_bucket_lifecycle(&self, bucket: &str) -> Result<()> {
+        let host = self.bucket_host(bucket);
+        let request = self.build_signed(SignSpec {
+            method: Method::DELETE,
+            host: &host,
+            uri_path: "/",
+            query: &[("lifecycle", None)],
+            content_type: None,
+            content_md5: None,
+            cos_headers: &[],
+            body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+}
+
+/// 一条 bucket 生命周期规则(本 crate 的本地表示;适配层负责映射到上层统一模型)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LifecycleRule {
+    pub id: String,
+    pub prefix: String,
+    pub enabled: bool,
+    pub expiration_days: Option<u32>,
+    /// `(天数, 目标存储类型字符串)` 有序对。
+    pub transitions: Vec<(u32, String)>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct LifecycleConfigurationXml {
+    #[serde(default, rename = "Rule")]
+    rule: Vec<RuleXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct RuleXml {
+    #[serde(rename = "ID", default)]
+    id: String,
+    #[serde(default)]
+    filter: Option<FilterXml>,
+    #[serde(default)]
+    prefix: Option<String>,
+    status: String,
+    #[serde(default, rename = "Transition")]
+    transition: Vec<TransitionXml>,
+    #[serde(default)]
+    expiration: Option<ExpirationXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct FilterXml {
+    #[serde(default)]
+    prefix: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct TransitionXml {
+    days: u32,
+    storage_class: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ExpirationXml {
+    #[serde(default)]
+    days: Option<u32>,
+}
+
+/// 解析 `GetBucketLifecycleConfiguration` 的 XML 响应。
+fn parse_lifecycle(xml: &str) -> Result<Vec<LifecycleRule>> {
+    let doc: LifecycleConfigurationXml = quick_xml::de::from_str(xml)
+        .map_err(|e| CosError::Core(CoreError::InvalidResponse(e.to_string())))?;
+    Ok(doc
+        .rule
+        .into_iter()
+        .map(|r| LifecycleRule {
+            id: r.id,
+            prefix: r.filter.map(|f| f.prefix).or(r.prefix).unwrap_or_default(),
+            enabled: r.status == "Enabled",
+            expiration_days: r.expiration.and_then(|e| e.days),
+            transitions: r
+                .transition
+                .into_iter()
+                .map(|t| (t.days, t.storage_class))
+                .collect(),
+        })
+        .collect())
+}
+
+/// 生成 `PutBucketLifecycleConfiguration` 的请求体 XML。
+fn build_lifecycle_xml(rules: &[LifecycleRule]) -> String {
+    let mut body = String::from("<LifecycleConfiguration>");
+    for r in rules {
+        body.push_str("<Rule><ID>");
+        body.push_str(&xml_escape(&r.id));
+        body.push_str("</ID><Filter><Prefix>");
+        body.push_str(&xml_escape(&r.prefix));
+        body.push_str("</Prefix></Filter><Status>");
+        body.push_str(if r.enabled { "Enabled" } else { "Disabled" });
+        body.push_str("</Status>");
+        for (days, class) in &r.transitions {
+            body.push_str(&format!(
+                "<Transition><Days>{days}</Days><StorageClass>{}</StorageClass></Transition>",
+                xml_escape(class)
+            ));
+        }
+        if let Some(days) = r.expiration_days {
+            body.push_str(&format!("<Expiration><Days>{days}</Days></Expiration>"));
+        }
+        body.push_str("</Rule>");
+    }
+    body.push_str("</LifecycleConfiguration>");
+    body
 }
 
 /// 下一页游标:未截断则无;截断时优先 NextMarker,否则退回本页最后一个 Key。
@@ -385,5 +550,28 @@ mod tests {
         let parsed: ListAllMyBucketsResult = quick_xml::de::from_str(xml).unwrap();
         assert_eq!(parsed.buckets.bucket[0].name, "bkt-123");
         assert_eq!(parsed.buckets.bucket[0].location, "ap-beijing");
+    }
+
+    #[test]
+    fn lifecycle_xml_round_trips() {
+        let rules = vec![
+            LifecycleRule {
+                id: "archive-logs".into(),
+                prefix: "logs/".into(),
+                enabled: true,
+                expiration_days: Some(365),
+                transitions: vec![(30, "ARCHIVE".into()), (90, "DEEP_ARCHIVE".into())],
+            },
+            LifecycleRule {
+                id: "disabled-rule".into(),
+                prefix: String::new(),
+                enabled: false,
+                expiration_days: None,
+                transitions: vec![],
+            },
+        ];
+        let xml = build_lifecycle_xml(&rules);
+        let parsed = parse_lifecycle(&xml).unwrap();
+        assert_eq!(parsed, rules);
     }
 }

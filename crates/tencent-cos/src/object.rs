@@ -488,7 +488,7 @@ fn build_tagging_xml(tags: &[(String, String)]) -> String {
 }
 
 /// 转义 XML 文本中的保留字符,避免键 / 值里的 `&<>"'` 破坏文档。
-fn xml_escape(s: &str) -> String {
+pub(crate) fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {

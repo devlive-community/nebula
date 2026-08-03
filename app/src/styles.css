@@ -2453,6 +2453,91 @@ body.resizing {
   border-color: var(--primary);
 }
 
+/* Bucket 生命周期规则编辑器 */
+.lifecycle__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.lifecycle__rule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.lifecycle__rule-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lifecycle__id {
+  flex: 0 0 40%;
+}
+
+.lifecycle__prefix {
+  flex: 1;
+}
+
+.lifecycle__enabled {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.lifecycle__transitions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 4px;
+}
+
+.lifecycle__transition {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lifecycle__days {
+  width: 64px;
+}
+
+.lifecycle__days-suffix {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.lifecycle__class {
+  flex: 1;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.lifecycle__expiration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.lifecycle__expiration input {
+  width: 90px;
+}
+
 .btn--danger {
   background: var(--danger);
   border-color: var(--danger);

@@ -3,7 +3,7 @@ import { Select } from "./Select";
 import { useI18n } from "../i18n";
 
 /** 各厂商可选的存储类型(value 为发给后端的原始字符串)。新增厂商在此追加。 */
-const STORAGE_CLASSES: Record<string, { value: string; label: string }[]> = {
+export const STORAGE_CLASSES: Record<string, { value: string; label: string }[]> = {
   aliyun: [
     { value: "Standard", label: "标准" },
     { value: "IA", label: "低频访问" },
