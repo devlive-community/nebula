@@ -1493,6 +1493,17 @@ body.resizing {
   border-color: var(--primary);
 }
 
+/* 全局去掉数字输入框的原生上下调节钮,统一交给应用自己的主题样式呈现。 */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* 批量重命名 */
 .rename-fields {
   display: flex;

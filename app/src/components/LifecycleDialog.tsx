@@ -156,7 +156,7 @@ export function LifecycleDialog({
                         <input
                           type="number"
                           min={1}
-                          className="lifecycle__days"
+                          className="prompt__input lifecycle__days"
                           value={days}
                           onChange={(e) =>
                             updateTransition(i, ti, { days: Number(e.target.value) })
@@ -192,6 +192,7 @@ export function LifecycleDialog({
                     <input
                       type="number"
                       min={1}
+                      className="prompt__input"
                       value={rule.expiration_days ?? ""}
                       onChange={(e) =>
                         updateRule(i, {
