@@ -1358,6 +1358,9 @@ body.resizing {
 
 .modal {
   width: 420px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2626,6 +2629,7 @@ input[type="number"]::-webkit-outer-spin-button {
   justify-content: space-between;
   padding: 16px 18px;
   border-bottom: 1px solid var(--border);
+  flex: none;
 }
 
 .modal__header h3 {
@@ -2649,6 +2653,10 @@ input[type="number"]::-webkit-outer-spin-button {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow-y: auto;
+  /* 关键:flex 子项默认 min-height 是 auto(按内容撑高),不设成 0 内容再多也不会触发
+     滚动,而是把整个 modal 撑出视口——这也是这次要修的 bug 本身。 */
+  min-height: 0;
 }
 
 .field {
@@ -2852,6 +2860,7 @@ input[type="number"]::-webkit-outer-spin-button {
   gap: 8px;
   padding: 14px 18px;
   border-top: 1px solid var(--border);
+  flex: none;
 }
 
 /* ---------- Scrollbar ---------- */
