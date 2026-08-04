@@ -1003,7 +1003,8 @@ export default function App() {
       | "minio"
       | "tencent"
       | "b2"
-      | "wasabi",
+      | "wasabi"
+      | "do_spaces",
     id: string,
     ak: string,
     sk: string,
@@ -1024,6 +1025,7 @@ export default function App() {
         tencent: api.addTencentAccount,
         b2: api.addB2Account,
         wasabi: api.addWasabiAccount,
+        do_spaces: api.addDoSpacesAccount,
       };
       await adders[vendor](id, ak, sk, endpoint);
       await api.setAccountDomain(id, customDomain.trim());

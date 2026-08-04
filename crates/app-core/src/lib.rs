@@ -36,6 +36,7 @@ use nebula_provider::{Entry, ProviderRegistry, StorageProvider};
 use provider_aliyun::AliyunProvider;
 use provider_aws::AwsProvider;
 use provider_b2::B2Provider;
+use provider_do_spaces::DoSpacesProvider;
 use provider_huawei::HuaweiProvider;
 use provider_minio::MinioProvider;
 use provider_qiniu::QiniuProvider;
@@ -75,6 +76,7 @@ const VENDOR_MINIO: &str = "minio";
 const VENDOR_TENCENT: &str = "tencent";
 const VENDOR_B2: &str = "b2";
 const VENDOR_WASABI: &str = "wasabi";
+const VENDOR_DO_SPACES: &str = "do_spaces";
 
 /// 递归搜索结果:命中条目 + 是否因触及上限而**可能不完整**。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -361,6 +363,12 @@ impl App {
                 secret.to_string(),
                 rec.endpoint.clone(),
             ))),
+            VENDOR_DO_SPACES => self.registry.register(Arc::new(DoSpacesProvider::new(
+                rec.id.clone(),
+                rec.access_key_id.clone(),
+                secret.to_string(),
+                rec.endpoint.clone(),
+            ))),
             _ => {}
         }
     }
@@ -604,6 +612,33 @@ impl App {
         let rec = AccountRecord {
             id,
             vendor: VENDOR_WASABI.to_string(),
+            access_key_id: access_key.into(),
+            access_key_secret: String::new(),
+            endpoint: endpoint.into(),
+            custom_domain: String::new(),
+        };
+        if let Some(store) = &self.store {
+            store.upsert(&rec)?;
+        }
+        self.register_record(&rec, &secret);
+        Ok(())
+    }
+
+    /// 便捷:新增一个 DigitalOcean Spaces 账号。密钥进钥匙串,元信息进 SQLite。
+    pub fn add_do_spaces_account(
+        &self,
+        id: impl Into<String>,
+        access_key: impl Into<String>,
+        secret_key: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Result<()> {
+        let id = id.into();
+        let secret = secret_key.into();
+        self.secrets.set(&id, &secret)?;
+
+        let rec = AccountRecord {
+            id,
+            vendor: VENDOR_DO_SPACES.to_string(),
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),

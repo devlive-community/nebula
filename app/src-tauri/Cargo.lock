@@ -120,6 +120,7 @@ dependencies = [
  "provider-aliyun",
  "provider-aws",
  "provider-b2",
+ "provider-do-spaces",
  "provider-huawei",
  "provider-minio",
  "provider-qiniu",
@@ -992,6 +993,13 @@ dependencies = [
  "block-buffer 0.12.1",
  "const-oid",
  "crypto-common 0.2.2",
+]
+
+[[package]]
+name = "digitalocean-spaces"
+version = "1.13.0"
+dependencies = [
+ "s3-core",
 ]
 
 [[package]]
@@ -3670,6 +3678,17 @@ dependencies = [
  "async-trait",
  "backblaze-b2",
  "bytes",
+ "futures",
+ "nebula-provider",
+]
+
+[[package]]
+name = "provider-do-spaces"
+version = "1.13.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "digitalocean-spaces",
  "futures",
  "nebula-provider",
 ]

@@ -71,6 +71,13 @@ export const addWasabiAccount = (
   endpoint: string,
 ) => invoke<void>("add_wasabi_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addDoSpacesAccount = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_do_spaces_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 /** 设置某账号的自定义公共域名(CDN / CNAME);空串清除。 */

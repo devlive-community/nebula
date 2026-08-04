@@ -72,6 +72,14 @@ export const VENDORS = {
     endpoint: "s3.<region>.wasabisys.com",
     idPlaceholder: "如 wasabi-main",
   },
+  do_spaces: {
+    label: "DigitalOcean Spaces",
+    color: "#0069ff",
+    akLabel: "Access Key",
+    skLabel: "Secret Key",
+    endpoint: "<region>.digitaloceanspaces.com",
+    idPlaceholder: "如 do-spaces-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;
