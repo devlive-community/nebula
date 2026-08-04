@@ -1,0 +1,17 @@
+[package]
+name = "wasabi-s3"
+version.workspace = true
+description = "Hand-written async Rust SDK for Wasabi (S3-Compatible API), a thin facade over s3-core"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["wasabi", "s3", "object-storage", "sigv4"]
+categories = ["api-bindings"]
+
+[dependencies]
+s3-core = { path = "../s3-core", version = "1" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+futures = { workspace = true }

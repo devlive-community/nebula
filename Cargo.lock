@@ -102,6 +102,7 @@ dependencies = [
  "provider-qiniu",
  "provider-r2",
  "provider-tencent",
+ "provider-wasabi",
  "reqwest",
  "rusqlite",
  "serde",
@@ -2052,6 +2053,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "provider-wasabi"
+version = "1.13.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "nebula-provider",
+ "tokio",
+ "wasabi-s3",
+]
+
+[[package]]
 name = "pulp"
 version = "0.22.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3075,6 +3088,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa7760aed19e106de2c7c0b581b509f2f25d3dacaf737cb82ac61bc6d760b0e"
 dependencies = [
  "try-lock",
+]
+
+[[package]]
+name = "wasabi-s3"
+version = "1.13.0"
+dependencies = [
+ "futures",
+ "s3-core",
+ "tokio",
 ]
 
 [[package]]

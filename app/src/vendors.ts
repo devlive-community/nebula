@@ -64,6 +64,14 @@ export const VENDORS = {
     endpoint: "s3.<region>.backblazeb2.com",
     idPlaceholder: "如 b2-main",
   },
+  wasabi: {
+    label: "Wasabi",
+    color: "#22c02e",
+    akLabel: "Access Key",
+    skLabel: "Secret Key",
+    endpoint: "s3.<region>.wasabisys.com",
+    idPlaceholder: "如 wasabi-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;

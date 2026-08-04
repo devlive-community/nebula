@@ -28,6 +28,7 @@ members = [
     "crates/cloudflare-r2",
     "crates/minio-s3",
     "crates/backblaze-b2",
+    "crates/wasabi-s3",
 
     # App 统一抽象 trait(可选发布)
     "crates/nebula-provider",
@@ -53,6 +54,7 @@ members = [
     "crates/providers/provider-r2",
     "crates/providers/provider-minio",
     "crates/providers/provider-b2",
+    "crates/providers/provider-wasabi",
 
     # 桌面 App 后端(独立 workspace,不纳入根)
     # "app/src-tauri",
