@@ -2,7 +2,7 @@
 
 # Nebula
 
-**멀티 클라우드 오브젝트 스토리지를 위한 크로스 플랫폼 데스크톱 관리자** —— Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo, MinIO를 로컬 파일 관리자처럼 하나의 네이티브 앱에서 관리합니다: 탐색, 업로드 / 다운로드, 공유, 클라우드 간 마이그레이션까지 한 곳에서.
+**멀티 클라우드 오브젝트 스토리지를 위한 크로스 플랫폼 데스크톱 관리자** —— Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo, MinIO, Backblaze B2, Wasabi, DigitalOcean Spaces를 로컬 파일 관리자처럼 하나의 네이티브 앱에서 관리합니다: 탐색, 업로드 / 다운로드, 공유, 클라우드 간 마이그레이션까지 한 곳에서.
 
 Rust + Tauri로 제작 —— 가볍고 빠르며 macOS / Windows / Linux에서 네이티브로 동작합니다. 각 클라우드는 집계 라이브러리에 의존하지 않고 직접 작성한 독립 배포 가능한 Rust SDK로 구현되어 있습니다.
 
@@ -21,6 +21,9 @@ Rust + Tauri로 제작 —— 가볍고 빠르며 macOS / Windows / Linux에서 
 | AWS S3 | ✅ | SigV4 |
 | Cloudflare R2 | ✅ | S3 호환(SigV4) |
 | MinIO | ✅ | S3 호환(http / 사용자 지정 포트) |
+| Backblaze B2 | ✅ | S3 호환(`s3-core` 공유) |
+| Wasabi | ✅ | S3 호환(`s3-core` 공유) |
+| DigitalOcean Spaces | ✅ | S3 호환(전용 생성자가 endpoint에서 region 추정) |
 
 > 제공업체 추가 = `<vendor>` SDK 하나 작성(S3 호환은 `s3-core` 재사용) + provider 어댑터 하나 만들어 `app-core`에 등록하면 끝 —— **UI 변경 불필요**.
 
