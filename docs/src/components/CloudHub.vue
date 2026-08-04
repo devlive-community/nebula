@@ -1,5 +1,5 @@
 <template>
-  <div class="relative mx-auto h-[380px] w-full max-w-md">
+  <div class="relative mx-auto h-[480px] w-full max-w-xl">
     <!-- 连接线 -->
     <svg class="absolute inset-0 h-full w-full" preserveAspectRatio="none">
       <line v-for="n in nodes" :key="n.name"
@@ -18,7 +18,7 @@
 
     <!-- 各家云 -->
     <div v-for="n in nodes" :key="n.name"
-         class="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs backdrop-blur"
+         class="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] backdrop-blur"
          :class="n.active
            ? 'border-brand-400/60 bg-brand-500/15 text-brand-100'
            : 'border-white/10 bg-white/5 text-slate-400'"
@@ -26,26 +26,26 @@
       <span class="inline-flex items-center gap-1.5">
         <span class="h-1.5 w-1.5 rounded-full" :class="n.active ? 'bg-brand-400' : 'bg-slate-500'"></span>
         {{ n.name }}
-        <span class="ml-1 text-[10px]" :class="n.active ? 'text-brand-300/80' : 'text-slate-500'">
-          {{ n.active ? '已接入' : '规划中' }}
-        </span>
       </span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-// 10 家云均匀分布在中心 Nebula 周围(椭圆,顺时针)
+// 10 家云均匀分布在中心 Nebula 周围(椭圆,顺时针,rx=44% ry=46%)。节点从 7 个涨到 10 个后
+// 角间距从 51.4° 缩到 36°,原来的容器尺寸 + 字号在长标签(如 DigitalOcean Spaces)相邻时会
+// 挤在一起;这里放大容器、缩小胶囊字号/内边距,并把这一个装饰图里的 "DigitalOcean Spaces"
+// 缩写成 "DO Spaces"(其它 README / 文案里仍用全名,只有这个圆盘图为了排版缩写)。
 const nodes = [
-  {name: '阿里云 OSS', active: true, x: 50, y: 7},
-  {name: '腾讯云 COS', active: true, x: 74, y: 15},
-  {name: '华为云 OBS', active: true, x: 88, y: 37},
-  {name: 'AWS S3', active: true, x: 88, y: 63},
-  {name: 'MinIO', active: true, x: 74, y: 85},
-  {name: '七牛云 Kodo', active: true, x: 50, y: 93},
-  {name: 'Cloudflare R2', active: true, x: 26, y: 85},
-  {name: 'Backblaze B2', active: true, x: 12, y: 63},
-  {name: 'Wasabi', active: true, x: 12, y: 37},
-  {name: 'DigitalOcean Spaces', active: true, x: 26, y: 15}
+  {name: '阿里云 OSS', active: true, x: 50, y: 4},
+  {name: '腾讯云 COS', active: true, x: 76, y: 13},
+  {name: '华为云 OBS', active: true, x: 92, y: 36},
+  {name: 'AWS S3', active: true, x: 92, y: 64},
+  {name: 'MinIO', active: true, x: 76, y: 87},
+  {name: '七牛云 Kodo', active: true, x: 50, y: 96},
+  {name: 'Cloudflare R2', active: true, x: 24, y: 87},
+  {name: 'Backblaze B2', active: true, x: 8, y: 64},
+  {name: 'Wasabi', active: true, x: 8, y: 36},
+  {name: 'DO Spaces', active: true, x: 24, y: 13}
 ]
 </script>
