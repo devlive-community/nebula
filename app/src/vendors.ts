@@ -56,6 +56,14 @@ export const VENDORS = {
     endpoint: "http://minio.example.com:9000",
     idPlaceholder: "如 minio-main",
   },
+  b2: {
+    label: "Backblaze B2",
+    color: "#e21b24",
+    akLabel: "Key ID",
+    skLabel: "Application Key",
+    endpoint: "s3.<region>.backblazeb2.com",
+    idPlaceholder: "如 b2-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;

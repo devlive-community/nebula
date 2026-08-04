@@ -57,6 +57,13 @@ export const addTencentAccount = (
   endpoint: string,
 ) => invoke<void>("add_tencent_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addB2Account = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_b2_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 /** 设置某账号的自定义公共域名(CDN / CNAME);空串清除。 */

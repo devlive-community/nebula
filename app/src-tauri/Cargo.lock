@@ -119,6 +119,7 @@ dependencies = [
  "nebula-provider",
  "provider-aliyun",
  "provider-aws",
+ "provider-b2",
  "provider-huawei",
  "provider-minio",
  "provider-qiniu",
@@ -282,6 +283,13 @@ dependencies = [
 
 [[package]]
 name = "aws-s3"
+version = "1.13.0"
+dependencies = [
+ "s3-core",
+]
+
+[[package]]
+name = "backblaze-b2"
 version = "1.13.0"
 dependencies = [
  "s3-core",
@@ -3649,6 +3657,17 @@ version = "1.13.0"
 dependencies = [
  "async-trait",
  "aws-s3",
+ "bytes",
+ "futures",
+ "nebula-provider",
+]
+
+[[package]]
+name = "provider-b2"
+version = "1.13.0"
+dependencies = [
+ "async-trait",
+ "backblaze-b2",
  "bytes",
  "futures",
  "nebula-provider",

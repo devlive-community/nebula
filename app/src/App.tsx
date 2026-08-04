@@ -994,7 +994,7 @@ export default function App() {
   };
 
   const addAccount = async (
-    vendor: "aliyun" | "huawei" | "qiniu" | "aws" | "r2" | "minio" | "tencent",
+    vendor: "aliyun" | "huawei" | "qiniu" | "aws" | "r2" | "minio" | "tencent" | "b2",
     id: string,
     ak: string,
     sk: string,
@@ -1013,6 +1013,7 @@ export default function App() {
         r2: api.addR2Account,
         minio: api.addMinioAccount,
         tencent: api.addTencentAccount,
+        b2: api.addB2Account,
       };
       await adders[vendor](id, ak, sk, endpoint);
       await api.setAccountDomain(id, customDomain.trim());

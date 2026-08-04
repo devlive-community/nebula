@@ -255,6 +255,20 @@ fn add_tencent_account(
         .map_err(|e| e.to_string())
 }
 
+/// 新增一个 Backblaze B2 账号(持久化到 SQLite)。
+#[tauri::command]
+fn add_b2_account(
+    state: State<'_, App>,
+    id: String,
+    access_key_id: String,
+    access_key_secret: String,
+    endpoint: String,
+) -> Result<(), String> {
+    state
+        .add_b2_account(id, access_key_id, access_key_secret, endpoint)
+        .map_err(|e| e.to_string())
+}
+
 /// 移除账号(从注册表与 SQLite)。
 #[tauri::command]
 fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
@@ -2032,6 +2046,7 @@ pub fn run() {
             add_r2_account,
             add_minio_account,
             add_tencent_account,
+            add_b2_account,
             remove_account,
             get_account,
             browse,
