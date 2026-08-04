@@ -10,7 +10,7 @@ const messages = {
       badge: 'v{version} 已发布',
       title1: '一个界面,管理你的',
       title2: '多云对象存储',
-      subtitle: '在一个原生桌面应用里管理阿里云 OSS、腾讯云 COS、华为云 OBS、AWS S3、Cloudflare R2、七牛 Kodo、MinIO、Backblaze B2、Wasabi、DigitalOcean Spaces —— 浏览、上传下载、分享、跨云迁移,一站搞定。轻量、快速,macOS / Windows / Linux 原生三端。',
+      subtitle: '在一个原生桌面应用里管理阿里云 OSS、腾讯云 COS、华为云 OBS、AWS S3、Cloudflare R2、七牛 Kodo、MinIO、Backblaze B2、Wasabi、DigitalOcean Spaces、Scaleway Object Storage —— 浏览、上传下载、分享、跨云迁移,一站搞定。轻量、快速,macOS / Windows / Linux 原生三端。',
       download: '立即下载',
       github: '在 GitHub 查看'
     },
@@ -64,7 +64,7 @@ const messages = {
       badge: 'v{version} released',
       title1: 'One interface for your',
       title2: 'multi-cloud storage',
-      subtitle: 'Manage Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo, MinIO, Backblaze B2, Wasabi and DigitalOcean Spaces in one native desktop app — browse, upload, download, share and migrate across clouds, all in one place. Lightweight and fast, native on macOS, Windows and Linux.',
+      subtitle: 'Manage Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo, MinIO, Backblaze B2, Wasabi, DigitalOcean Spaces and Scaleway Object Storage in one native desktop app — browse, upload, download, share and migrate across clouds, all in one place. Lightweight and fast, native on macOS, Windows and Linux.',
       download: 'Download now',
       github: 'View on GitHub'
     },
