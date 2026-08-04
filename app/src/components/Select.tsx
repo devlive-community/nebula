@@ -72,17 +72,24 @@ export function Select({ value, options, onChange, disabled }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    // 面板 fixed 定位,滚动 / 缩放后需关闭以免错位。
-    const onScrollResize = () => setOpen(false);
+    // 面板 fixed 定位,背后页面滚动 / 缩放后需关闭以免错位。scroll 事件不冒泡,
+    // 用捕获阶段监听才能感知页面里任意可滚动祖先的滚动——但这也会捕获到面板自身选项
+    // 列表的滚动(面板内容超过 max-height 时靠 overflow-y: auto 滚动),所以要排除
+    // 事件源自面板内部的情况,不然一滚动列表面板就被关掉。
+    const onScroll = (e: Event) => {
+      if (panelRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const onResize = () => setOpen(false);
     window.addEventListener("mousedown", onDown);
     window.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onScrollResize);
-    window.addEventListener("scroll", onScrollResize, true);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       window.removeEventListener("mousedown", onDown);
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onScrollResize);
-      window.removeEventListener("scroll", onScrollResize, true);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
