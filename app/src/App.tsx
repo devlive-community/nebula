@@ -1012,22 +1012,29 @@ export default function App() {
     customDomain: string,
   ) => {
     setShowForm(false);
+    const oldId = editInfo?.id;
     setEditInfo(null);
     setError(null);
     try {
-      const adders = {
-        aliyun: api.addAliyunAccount,
-        huawei: api.addHuaweiAccount,
-        qiniu: api.addQiniuAccount,
-        aws: api.addAwsAccount,
-        r2: api.addR2Account,
-        minio: api.addMinioAccount,
-        tencent: api.addTencentAccount,
-        b2: api.addB2Account,
-        wasabi: api.addWasabiAccount,
-        do_spaces: api.addDoSpacesAccount,
-      };
-      await adders[vendor](id, ak, sk, endpoint);
+      if (oldId && oldId !== id) {
+        await api.renameAccount(oldId, id);
+      }
+      // 纯改别名时 sk 留空(AccountForm 允许这种情况通过校验),不用重复覆盖凭证。
+      if (sk) {
+        const adders = {
+          aliyun: api.addAliyunAccount,
+          huawei: api.addHuaweiAccount,
+          qiniu: api.addQiniuAccount,
+          aws: api.addAwsAccount,
+          r2: api.addR2Account,
+          minio: api.addMinioAccount,
+          tencent: api.addTencentAccount,
+          b2: api.addB2Account,
+          wasabi: api.addWasabiAccount,
+          do_spaces: api.addDoSpacesAccount,
+        };
+        await adders[vendor](id, ak, sk, endpoint);
+      }
       await api.setAccountDomain(id, customDomain.trim());
       await refreshAccounts();
       setCurrent(id);

@@ -660,6 +660,39 @@ impl App {
         Ok(self.registry.remove(id))
     }
 
+    /// 给一个账号改别名(id)。密钥在钥匙串里换 key,SQLite 里把 `accounts` 连同引用它的
+    /// 书签 / 最近访问 / 同步任务 / 传输记录一并改过去(见 [`AccountStore::rename_account`]),
+    /// provider 注册表里也用新 id 重新注册一次。
+    pub fn rename_account(&self, old_id: &str, new_id: &str) -> Result<()> {
+        if new_id.is_empty() {
+            return Err(AppError::InvalidInput("账号别名不能为空".into()));
+        }
+        if new_id == old_id {
+            return Ok(());
+        }
+        let Some(store) = &self.store else {
+            return Err(AppError::InvalidInput("当前未启用本地存储,无法改名".into()));
+        };
+        if store.get(new_id)?.is_some() {
+            return Err(AppError::InvalidInput(format!("别名「{new_id}」已被占用")));
+        }
+        let Some(rec) = store.get(old_id)? else {
+            return Err(AppError::NoSuchProvider(old_id.to_string()));
+        };
+
+        let secret = self.secrets.get(old_id)?;
+        self.secrets.set(new_id, &secret)?;
+        self.secrets.delete(old_id)?;
+
+        store.rename_account(old_id, new_id)?;
+
+        self.registry.remove(old_id);
+        let mut renamed = rec;
+        renamed.id = new_id.to_string();
+        self.register_record(&renamed, &secret);
+        Ok(())
+    }
+
     /// 列出已注册的账号 id(字典序)。
     pub fn accounts(&self) -> Vec<String> {
         self.registry.ids()

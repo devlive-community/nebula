@@ -303,6 +303,14 @@ fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
     state.remove_account(&id).map_err(|e| e.to_string())
 }
 
+/// 给一个账号改别名(id)。
+#[tauri::command]
+fn rename_account(state: State<'_, App>, id: String, new_id: String) -> Result<(), String> {
+    state
+        .rename_account(&id, &new_id)
+        .map_err(|e| e.to_string())
+}
+
 /// 设置某账号的自定义公共域名(CDN / CNAME);空串清除。
 #[tauri::command]
 fn set_account_domain(state: State<'_, App>, id: String, domain: String) -> Result<(), String> {
@@ -2078,6 +2086,7 @@ pub fn run() {
             add_wasabi_account,
             add_do_spaces_account,
             remove_account,
+            rename_account,
             get_account,
             browse,
             browse_page,

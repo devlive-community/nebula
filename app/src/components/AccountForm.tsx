@@ -47,7 +47,17 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
     if (!endpointTouched) setEndpoint(VENDORS[next].endpoint);
   };
 
-  const valid = id && ak && sk && endpoint;
+  // 纯改别名(其它字段都没变)不强制重新输入密钥——密钥只在真的要更新凭证时才必填,
+  // 不然用户光是想改个名字都要翻出密钥重新输一遍。
+  const onlyIdChanged =
+    editing &&
+    id !== initial!.id &&
+    ak === initial!.accessKeyId &&
+    endpoint === initial!.endpoint &&
+    domain === (initial!.customDomain ?? "");
+  const valid = editing
+    ? !!id && !!ak && !!endpoint && (!!sk || onlyIdChanged)
+    : !!id && !!ak && !!sk && !!endpoint;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -82,7 +92,6 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
               value={id}
               onChange={(e) => setId(e.target.value)}
               placeholder={meta.idPlaceholder}
-              disabled={editing}
               autoFocus={!editing}
             />
           </label>
@@ -93,7 +102,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           <label className="field">
             <span>
               {meta.skLabel}
-              {editing ? "(请重新输入)" : ""}
+              {editing ? (onlyIdChanged ? "(仅改别名可留空)" : "(请重新输入)") : ""}
             </span>
             <input
               type="password"

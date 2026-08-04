@@ -190,6 +190,35 @@ impl AccountStore {
         Ok(())
     }
 
+    /// 把一个账号的 id 改名,并把引用它的其它表(书签 / 最近访问 / 同步任务 / 传输记录)
+    /// 一起改过去——这几张表用裸字符串列引用账号、没有外键约束,不手动改就会变成孤儿数据。
+    /// `accounts.id` 是主键,`new_id` 已存在时这里会报唯一约束错误。
+    pub fn rename_account(&self, old_id: &str, new_id: &str) -> rusqlite::Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
+            "UPDATE accounts SET id = ?2 WHERE id = ?1",
+            params![old_id, new_id],
+        )?;
+        tx.execute(
+            "UPDATE bookmarks SET account = ?2 WHERE account = ?1",
+            params![old_id, new_id],
+        )?;
+        tx.execute(
+            "UPDATE recent_locations SET account = ?2 WHERE account = ?1",
+            params![old_id, new_id],
+        )?;
+        tx.execute(
+            "UPDATE sync_jobs SET account = ?2 WHERE account = ?1",
+            params![old_id, new_id],
+        )?;
+        tx.execute(
+            "UPDATE transfers SET account = ?2 WHERE account = ?1",
+            params![old_id, new_id],
+        )?;
+        tx.commit()
+    }
+
     /// 读取一个设置项。
     pub fn get_setting(&self, key: &str) -> rusqlite::Result<Option<String>> {
         let conn = self.conn.lock().unwrap();
@@ -584,6 +613,44 @@ mod tests {
         let listed = store.list().unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, "b");
+    }
+
+    #[test]
+    fn rename_account_updates_the_row_and_moves_cascaded_references() {
+        let store = AccountStore::open(":memory:").unwrap();
+        store.upsert(&record("old")).unwrap();
+        store.add_bookmark("old", "bucket/photos/").unwrap();
+        store
+            .put_transfer(&crate::TransferRecord {
+                id: "dl:bucket/big.bin".into(),
+                kind: "下载".into(),
+                name: "big.bin".into(),
+                account: "old".into(),
+                remote: "bucket/big.bin".into(),
+                local: "/tmp/big.bin".into(),
+                done: 100,
+                total: 500,
+                status: "active".into(),
+            })
+            .unwrap();
+
+        store.rename_account("old", "new").unwrap();
+
+        assert!(store.get("old").unwrap().is_none());
+        assert_eq!(store.get("new").unwrap().unwrap().id, "new");
+        assert_eq!(store.list_bookmarks().unwrap()[0].account, "new");
+        assert_eq!(store.list_transfers().unwrap()[0].account, "new");
+    }
+
+    #[test]
+    fn rename_account_to_existing_id_fails() {
+        let store = AccountStore::open(":memory:").unwrap();
+        store.upsert(&record("a")).unwrap();
+        store.upsert(&record("b")).unwrap();
+        assert!(store.rename_account("a", "b").is_err());
+        // 失败要保持原状,不能把 a 半改一半。
+        assert!(store.get("a").unwrap().is_some());
+        assert!(store.get("b").unwrap().is_some());
     }
 
     #[test]

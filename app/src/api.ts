@@ -80,6 +80,10 @@ export const addDoSpacesAccount = (
 
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
+/** 给一个账号改别名(id)。 */
+export const renameAccount = (id: string, newId: string) =>
+  invoke<void>("rename_account", { id, newId });
+
 /** 设置某账号的自定义公共域名(CDN / CNAME);空串清除。 */
 export const setAccountDomain = (id: string, domain: string) =>
   invoke<void>("set_account_domain", { id, domain });
