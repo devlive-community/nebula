@@ -1,0 +1,19 @@
+[package]
+name = "provider-scaleway"
+version.workspace = true
+description = "Adapter wrapping scaleway-object-storage as a nebula StorageProvider (app-internal, not published)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+nebula-provider = { path = "../../nebula-provider" }
+scaleway-object-storage = { path = "../../scaleway-object-storage" }
+async-trait = "0.1"
+bytes = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

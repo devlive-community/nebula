@@ -80,6 +80,14 @@ export const VENDORS = {
     endpoint: "<region>.digitaloceanspaces.com",
     idPlaceholder: "如 do-spaces-main",
   },
+  scaleway: {
+    label: "Scaleway Object Storage",
+    color: "#4f0599",
+    akLabel: "Access Key",
+    skLabel: "Secret Key",
+    endpoint: "s3.<region>.scw.cloud",
+    idPlaceholder: "如 scaleway-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;

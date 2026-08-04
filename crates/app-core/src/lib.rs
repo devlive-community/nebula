@@ -41,6 +41,7 @@ use provider_huawei::HuaweiProvider;
 use provider_minio::MinioProvider;
 use provider_qiniu::QiniuProvider;
 use provider_r2::R2Provider;
+use provider_scaleway::ScalewayProvider;
 use provider_tencent::TencentProvider;
 use provider_wasabi::WasabiProvider;
 
@@ -77,6 +78,7 @@ const VENDOR_TENCENT: &str = "tencent";
 const VENDOR_B2: &str = "b2";
 const VENDOR_WASABI: &str = "wasabi";
 const VENDOR_DO_SPACES: &str = "do_spaces";
+const VENDOR_SCALEWAY: &str = "scaleway";
 
 /// 递归搜索结果:命中条目 + 是否因触及上限而**可能不完整**。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -369,6 +371,12 @@ impl App {
                 secret.to_string(),
                 rec.endpoint.clone(),
             ))),
+            VENDOR_SCALEWAY => self.registry.register(Arc::new(ScalewayProvider::new(
+                rec.id.clone(),
+                rec.access_key_id.clone(),
+                secret.to_string(),
+                rec.endpoint.clone(),
+            ))),
             _ => {}
         }
     }
@@ -639,6 +647,33 @@ impl App {
         let rec = AccountRecord {
             id,
             vendor: VENDOR_DO_SPACES.to_string(),
+            access_key_id: access_key.into(),
+            access_key_secret: String::new(),
+            endpoint: endpoint.into(),
+            custom_domain: String::new(),
+        };
+        if let Some(store) = &self.store {
+            store.upsert(&rec)?;
+        }
+        self.register_record(&rec, &secret);
+        Ok(())
+    }
+
+    /// 便捷:新增一个 Scaleway Object Storage 账号。密钥进钥匙串,元信息进 SQLite。
+    pub fn add_scaleway_account(
+        &self,
+        id: impl Into<String>,
+        access_key: impl Into<String>,
+        secret_key: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Result<()> {
+        let id = id.into();
+        let secret = secret_key.into();
+        self.secrets.set(&id, &secret)?;
+
+        let rec = AccountRecord {
+            id,
+            vendor: VENDOR_SCALEWAY.to_string(),
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),

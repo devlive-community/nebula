@@ -1004,7 +1004,8 @@ export default function App() {
       | "tencent"
       | "b2"
       | "wasabi"
-      | "do_spaces",
+      | "do_spaces"
+      | "scaleway",
     id: string,
     ak: string,
     sk: string,
@@ -1032,6 +1033,7 @@ export default function App() {
           b2: api.addB2Account,
           wasabi: api.addWasabiAccount,
           do_spaces: api.addDoSpacesAccount,
+          scaleway: api.addScalewayAccount,
         };
         await adders[vendor](id, ak, sk, endpoint);
       }

@@ -102,6 +102,7 @@ dependencies = [
  "provider-minio",
  "provider-qiniu",
  "provider-r2",
+ "provider-scaleway",
  "provider-tencent",
  "provider-wasabi",
  "reqwest",
@@ -2063,6 +2064,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "provider-scaleway"
+version = "1.13.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "nebula-provider",
+ "scaleway-object-storage",
+ "tokio",
+]
+
+[[package]]
 name = "provider-tencent"
 version = "1.13.0"
 dependencies = [
@@ -2541,6 +2554,15 @@ dependencies = [
  "cloud-core",
  "percent-encoding",
  "reqwest",
+]
+
+[[package]]
+name = "scaleway-object-storage"
+version = "1.13.0"
+dependencies = [
+ "futures",
+ "s3-core",
+ "tokio",
 ]
 
 [[package]]
