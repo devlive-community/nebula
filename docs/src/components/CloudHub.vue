@@ -49,7 +49,8 @@ const nodes = [
   {name: 'Backblaze B2', short: 'B2', color: '#e21b24'},
   {name: 'Wasabi', short: 'Was', color: '#22c02e'},
   {name: 'DigitalOcean Spaces', short: 'DO', color: '#0069ff'},
-  {name: 'Scaleway Object Storage', short: 'Scw', color: '#4f0599'}
+  {name: 'Scaleway Object Storage', short: 'Scw', color: '#4f0599'},
+  {name: 'UCloud US3', short: 'US3', color: '#2e5bff'}
 ]
 
 // 均匀分布在中心 Nebula 周围(椭圆,顺时针,rx=42% ry=44%)。徽章现在是统一小尺寸的圆形,

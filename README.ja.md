@@ -2,7 +2,7 @@
 
 # Nebula
 
-**マルチクラウドのオブジェクトストレージを管理するクロスプラットフォームのデスクトップアプリ** —— Aliyun OSS、Tencent COS、Huawei OBS、AWS S3、Cloudflare R2、Qiniu Kodo、MinIO、Backblaze B2、Wasabi、DigitalOcean Spaces、Scaleway Object Storage を、ローカルのファイルマネージャーのように 1 つのネイティブアプリから管理:閲覧、アップロード / ダウンロード、共有、クラウド間の移行まで一括で。
+**マルチクラウドのオブジェクトストレージを管理するクロスプラットフォームのデスクトップアプリ** —— Aliyun OSS、Tencent COS、Huawei OBS、AWS S3、Cloudflare R2、Qiniu Kodo、MinIO、Backblaze B2、Wasabi、DigitalOcean Spaces、Scaleway Object Storage、UCloud US3 を、ローカルのファイルマネージャーのように 1 つのネイティブアプリから管理:閲覧、アップロード / ダウンロード、共有、クラウド間の移行まで一括で。
 
 Rust + Tauri 製 —— 軽量・高速で、macOS / Windows / Linux でネイティブ動作。各クラウドは、集約ライブラリに依存しない手書きの独立公開可能な Rust SDK で実装されています。
 
@@ -25,6 +25,7 @@ Rust + Tauri 製 —— 軽量・高速で、macOS / Windows / Linux でネイ�
 | Wasabi | ✅ | S3 互換(`s3-core` を共用) |
 | DigitalOcean Spaces | ✅ | S3 互換(専用コンストラクタで endpoint から region を推定) |
 | Scaleway Object Storage | ✅ | S3 互換(`s3-core` を共用) |
+| UCloud US3 | ✅ | S3 互換、SigV4 のみ対応(endpoint から region を推定する専用クライアント) |
 
 > プロバイダー追加 = `<vendor>` SDK を 1 つ書き(S3 互換なら `s3-core` を再利用)、provider アダプターを 1 つ用意して `app-core` に登録するだけ —— **UI の変更は不要**。
 

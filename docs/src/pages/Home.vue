@@ -100,7 +100,7 @@ import {latestRelease} from '../content/releases'
 
 const {t} = useI18n()
 
-const brands = ['Aliyun OSS', 'Tencent COS', 'Huawei OBS', 'AWS S3', 'Cloudflare R2', 'Qiniu Kodo', 'MinIO', 'Backblaze B2', 'Wasabi', 'DigitalOcean Spaces', 'Scaleway Object Storage']
+const brands = ['Aliyun OSS', 'Tencent COS', 'Huawei OBS', 'AWS S3', 'Cloudflare R2', 'Qiniu Kodo', 'MinIO', 'Backblaze B2', 'Wasabi', 'DigitalOcean Spaces', 'Scaleway Object Storage', 'UCloud US3']
 const marquee = [...brands, ...brands, ...brands]
 
 const stats = computed(() => [

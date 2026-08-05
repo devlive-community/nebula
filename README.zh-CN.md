@@ -7,7 +7,7 @@
 
 # Nebula
 
-**跨平台桌面端的多云对象存储管理器** —— 在一个原生应用里,像用本地文件管理器一样管理阿里云 OSS、腾讯云 COS、华为云 OBS、AWS S3、Cloudflare R2、七牛云 Kodo、MinIO、Backblaze B2、Wasabi、DigitalOcean Spaces、Scaleway Object Storage:浏览、上传下载、分享、跨云迁移,一站搞定。
+**跨平台桌面端的多云对象存储管理器** —— 在一个原生应用里,像用本地文件管理器一样管理阿里云 OSS、腾讯云 COS、华为云 OBS、AWS S3、Cloudflare R2、七牛云 Kodo、MinIO、Backblaze B2、Wasabi、DigitalOcean Spaces、Scaleway Object Storage、UCloud US3:浏览、上传下载、分享、跨云迁移,一站搞定。
 
 用 Rust + Tauri 打造,轻量、快速、原生三端(macOS / Windows / Linux)。底层每家云都是从零手写的**独立可发布 Rust SDK**,不依赖任何聚合库。
 
@@ -30,6 +30,7 @@
 | Wasabi | ✅ | S3 兼容(共用 `s3-core`) |
 | DigitalOcean Spaces | ✅ | S3 兼容(专用构造函数,从 endpoint 推导 region) |
 | Scaleway Object Storage | ✅ | S3 兼容(共用 `s3-core`) |
+| UCloud US3 | ✅ | S3 兼容,仅支持 SigV4(专用构造函数,从 endpoint 推导 region) |
 
 > 新增一家厂商 = 写一个 `<vendor>` SDK(S3 兼容的可直接复用 `s3-core`)+ 一个 provider 适配层,在 `app-core` 注册即可,**App 界面无需改动**。
 
@@ -76,6 +77,7 @@ nebula/
 │  ├─ wasabi-s3/                Wasabi SDK(S3 兼容,s3-core 门面)
 │  ├─ digitalocean-spaces/      DigitalOcean Spaces SDK(S3 兼容,专用构造函数推导 region)
 │  ├─ scaleway-object-storage/  Scaleway Object Storage SDK(S3 兼容,s3-core 门面)
+│  ├─ ucloud-us3/               UCloud US3 SDK(S3 兼容仅 SigV4,专用构造函数推导 region)
 │  ├─ nebula-provider/          App 统一抽象 trait(StorageProvider)
 │  ├─ providers/provider-*      适配层(各 SDK → StorageProvider)
 │  └─ app-core/                 App 业务逻辑(账号/传输/设置,框架无关,可 cargo test)
