@@ -50,7 +50,8 @@ const nodes = [
   {name: 'Wasabi', short: 'Was', color: '#22c02e'},
   {name: 'DigitalOcean Spaces', short: 'DO', color: '#0069ff'},
   {name: 'Scaleway Object Storage', short: 'Scw', color: '#4f0599'},
-  {name: 'UCloud US3', short: 'US3', color: '#2e5bff'}
+  {name: 'UCloud US3', short: 'US3', color: '#2e5bff'},
+  {name: '京东云 OSS', short: 'JD', color: '#e3101e'}
 ]
 
 // 均匀分布在中心 Nebula 周围(椭圆,顺时针,rx=42% ry=44%)。徽章现在是统一小尺寸的圆形,

@@ -7,7 +7,7 @@
 
 # Nebula
 
-**A cross-platform desktop manager for multi-cloud object storage** — manage Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo, MinIO, Backblaze B2, Wasabi, DigitalOcean Spaces, Scaleway Object Storage and UCloud US3 from a single native app, just like a local file manager: browse, upload, download, share and migrate across clouds, all in one place.
+**A cross-platform desktop manager for multi-cloud object storage** — manage Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo, MinIO, Backblaze B2, Wasabi, DigitalOcean Spaces, Scaleway Object Storage, UCloud US3 and JD Cloud OSS from a single native app, just like a local file manager: browse, upload, download, share and migrate across clouds, all in one place.
 
 Built with Rust + Tauri — lightweight, fast, and native on macOS / Windows / Linux. Each cloud is backed by a hand-written, independently publishable Rust SDK, with no aggregation libraries.
 
@@ -31,6 +31,7 @@ Built with Rust + Tauri — lightweight, fast, and native on macOS / Windows / L
 | DigitalOcean Spaces | ✅ | S3-compatible (custom region-from-endpoint client) |
 | Scaleway Object Storage | ✅ | S3-compatible (shares `s3-core`) |
 | UCloud US3 | ✅ | S3-compatible, SigV4-only (custom region-from-endpoint client) |
+| JD Cloud OSS | ✅ | S3-compatible (shares `s3-core`) |
 
 > Adding a provider = write one `<vendor>` SDK (S3-compatible ones just reuse `s3-core`) + one provider adapter, register it in `app-core` — **no UI changes needed**.
 
