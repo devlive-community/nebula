@@ -96,6 +96,14 @@ export const VENDORS = {
     endpoint: "s3-<region>.ufileos.com",
     idPlaceholder: "如 us3-main",
   },
+  jdcloud: {
+    label: "京东云 OSS",
+    color: "#e3101e",
+    akLabel: "Access Key",
+    skLabel: "Secret Key",
+    endpoint: "s3.cn-south-1.jdcloud-oss.com",
+    idPlaceholder: "如 jdcloud-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;

@@ -1006,7 +1006,8 @@ export default function App() {
       | "wasabi"
       | "do_spaces"
       | "scaleway"
-      | "us3",
+      | "us3"
+      | "jdcloud",
     id: string,
     ak: string,
     sk: string,
@@ -1036,6 +1037,7 @@ export default function App() {
           do_spaces: api.addDoSpacesAccount,
           scaleway: api.addScalewayAccount,
           us3: api.addUs3Account,
+          jdcloud: api.addJdCloudAccount,
         };
         await adders[vendor](id, ak, sk, endpoint);
       }

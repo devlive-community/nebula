@@ -99,6 +99,7 @@ dependencies = [
  "provider-b2",
  "provider-do-spaces",
  "provider-huawei",
+ "provider-jdcloud",
  "provider-minio",
  "provider-qiniu",
  "provider-r2",
@@ -1338,6 +1339,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "jdcloud-oss"
+version = "1.13.0"
+dependencies = [
+ "futures",
+ "s3-core",
+ "tokio",
+]
+
+[[package]]
 name = "jiff"
 version = "0.2.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2024,6 +2034,18 @@ dependencies = [
  "bytes",
  "futures",
  "huawei-obs",
+ "nebula-provider",
+ "tokio",
+]
+
+[[package]]
+name = "provider-jdcloud"
+version = "1.13.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "jdcloud-oss",
  "nebula-provider",
  "tokio",
 ]
