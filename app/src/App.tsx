@@ -1005,7 +1005,8 @@ export default function App() {
       | "b2"
       | "wasabi"
       | "do_spaces"
-      | "scaleway",
+      | "scaleway"
+      | "us3",
     id: string,
     ak: string,
     sk: string,
@@ -1034,6 +1035,7 @@ export default function App() {
           wasabi: api.addWasabiAccount,
           do_spaces: api.addDoSpacesAccount,
           scaleway: api.addScalewayAccount,
+          us3: api.addUs3Account,
         };
         await adders[vendor](id, ak, sk, endpoint);
       }

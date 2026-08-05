@@ -85,6 +85,13 @@ export const addScalewayAccount = (
   endpoint: string,
 ) => invoke<void>("add_scaleway_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addUs3Account = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_us3_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 /** 给一个账号改别名(id)。 */

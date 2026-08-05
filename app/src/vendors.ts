@@ -88,6 +88,14 @@ export const VENDORS = {
     endpoint: "s3.<region>.scw.cloud",
     idPlaceholder: "如 scaleway-main",
   },
+  us3: {
+    label: "UCloud US3",
+    color: "#2e5bff",
+    akLabel: "Access Key",
+    skLabel: "Secret Key",
+    endpoint: "s3-<region>.ufileos.com",
+    idPlaceholder: "如 us3-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;
