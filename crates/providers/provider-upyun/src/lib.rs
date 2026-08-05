@@ -101,6 +101,8 @@ impl StorageProvider for UpyunProvider {
             // (bucket 级枚举所有未完成上传)——这是两个不同接口,后者才是这个能力位依赖的。
             multipart_cleanup: false,
             object_acl: false,
+            // 只有 AWS S3 / 华为云 OBS 真支持按账号 ID 授权的对象级 ACL(已在各自 provider 里单独开启),其它厂商不建模。
+            fine_grained_acl: false,
             presign: true,
             // 官方文档确认 CopyObject 支持。
             server_side_copy: true,

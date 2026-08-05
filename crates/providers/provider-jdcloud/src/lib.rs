@@ -166,6 +166,8 @@ impl StorageProvider for JdCloudProvider {
             // set_object_acl(path, public: bool) 二态实现的超集。"PutBucket 不支持
             // x-amz-acl"的限制只影响建桶时指定 ACL,不影响这里用的 PutObjectAcl。
             object_acl: true,
+            // 只有 AWS S3 / 华为云 OBS 真支持按账号 ID 授权的对象级 ACL(已在各自 provider 里单独开启),其它厂商不建模。
+            fine_grained_acl: false,
             presign: true,
             // 官方产品功能文档有独立的"分片拷贝"页面,单次 CopyObject 是更基础的操作。
             server_side_copy: true,

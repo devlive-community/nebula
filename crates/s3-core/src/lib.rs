@@ -25,4 +25,4 @@ pub use bucket::{
 pub use client::S3Client;
 pub use error::{Result, S3Error};
 pub use multipart::MIN_PART_SIZE;
-pub use object::ObjectMeta;
+pub use object::{AclGrant, ObjectMeta};

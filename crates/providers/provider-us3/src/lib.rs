@@ -138,6 +138,8 @@ impl StorageProvider for Us3Provider {
             // 官方文档:private/public-read/public-read-write 三种 canned 值,是 Nebula
             // set_object_acl(path, public: bool) 现有二态实现的超集。
             object_acl: true,
+            // 只有 AWS S3 / 华为云 OBS 真支持按账号 ID 授权的对象级 ACL(已在各自 provider 里单独开启),其它厂商不建模。
+            fine_grained_acl: false,
             presign: true,
             // 单次 CopyObject 官方文档确认支持;官方"UploadPartCopy 内测中"针对的是分片
             // 复制这条不同路径,不影响这里用到的单次复制。

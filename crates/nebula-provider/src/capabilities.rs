@@ -30,6 +30,9 @@ pub struct Capabilities {
     pub multipart_cleanup: bool,
     /// 支持设置对象 ACL(公开读 / 私有)与公共直链(set_object_acl / public_url 已实现)。
     pub object_acl: bool,
+    /// 支持按具体账号 ID 授权的细粒度对象 ACL(object_grants / set_object_grants 已实现),
+    /// 而不仅是公开/私有二态。
+    pub fine_grained_acl: bool,
     /// 支持生成预签名临时链接。
     pub presign: bool,
     /// 支持服务端复制(跨对象 / 跨桶免中转)。

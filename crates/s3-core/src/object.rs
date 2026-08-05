@@ -24,6 +24,89 @@ pub struct ObjectMeta {
     pub last_modified: Option<String>,
 }
 
+/// 一条对象授权:被授权账号的 canonical ID + 权限(`READ`/`WRITE`/`READ_ACP`/`WRITE_ACP`/
+/// `FULL_CONTROL` 官方原始字符串,由上层 provider 适配层映射成自己的枚举)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AclGrant {
+    pub grantee_id: String,
+    pub permission: String,
+}
+
+/// `GetObjectAcl` 响应体(XML)。
+#[derive(Debug, Deserialize)]
+struct AccessControlPolicy {
+    #[serde(rename = "Owner")]
+    owner: AclOwner,
+    #[serde(rename = "AccessControlList", default)]
+    access_control_list: AccessControlList,
+}
+
+#[derive(Debug, Deserialize)]
+struct AclOwner {
+    #[serde(rename = "ID")]
+    id: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct AccessControlList {
+    #[serde(rename = "Grant", default)]
+    grants: Vec<GrantXml>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GrantXml {
+    #[serde(rename = "Grantee")]
+    grantee: GranteeXml,
+    #[serde(rename = "Permission")]
+    permission: String,
+}
+
+/// 只取 `<ID>`;预置分组授权(`AllUsers` 等)的 Grantee 只有 `<URI>`,`id` 为 `None`,
+/// 解析时会被过滤掉——不建模为 [`AclGrant`],那类需求已被 [`S3Client::set_object_acl`]
+/// 的公开/私有二态覆盖。
+#[derive(Debug, Default, Deserialize)]
+struct GranteeXml {
+    #[serde(rename = "ID", default)]
+    id: Option<String>,
+}
+
+/// 解析 `GetObjectAcl` 响应体,返回 `(Owner ID, 授权列表)`。
+fn parse_object_acl(xml: &str) -> Result<(String, Vec<AclGrant>)> {
+    let doc: AccessControlPolicy = quick_xml::de::from_str(xml)
+        .map_err(|e| S3Error::Core(cloud_core::CoreError::InvalidRequest(e.to_string())))?;
+    let grants = doc
+        .access_control_list
+        .grants
+        .into_iter()
+        .filter_map(|g| {
+            g.grantee.id.map(|grantee_id| AclGrant {
+                grantee_id,
+                permission: g.permission,
+            })
+        })
+        .collect();
+    Ok((doc.owner.id, grants))
+}
+
+/// 生成 `PutObjectAcl` 的请求体 XML。`owner_id` 来自同一个对象先前的 `GetObjectAcl`
+/// 响应——请求体必须带 Owner,服务端不会替调用方补全。
+fn build_object_acl_xml(owner_id: &str, grants: &[AclGrant]) -> String {
+    let mut body = String::from("<AccessControlPolicy><Owner><ID>");
+    body.push_str(&xml_escape(owner_id));
+    body.push_str("</ID></Owner><AccessControlList>");
+    for g in grants {
+        body.push_str(
+            r#"<Grant><Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser"><ID>"#,
+        );
+        body.push_str(&xml_escape(&g.grantee_id));
+        body.push_str("</ID></Grantee><Permission>");
+        body.push_str(&xml_escape(&g.permission));
+        body.push_str("</Permission></Grant>");
+    }
+    body.push_str("</AccessControlList></AccessControlPolicy>");
+    body
+}
+
 /// `GetObjectTagging` 响应体(XML)。
 #[derive(Debug, Deserialize)]
 struct Tagging {
@@ -302,6 +385,58 @@ impl S3Client {
             content_type: None,
             amz_headers: &[("x-amz-acl", acl.to_string())],
             body: None,
+        })?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
+    /// 读取对象的细粒度授权列表:`GET /{bucket}/{key}?acl`,解析出每条 Grant 里 Grantee 的
+    /// canonical ID 与权限。忽略预置分组授权(Grantee 只有 `<URI>` 没有 `<ID>`,对应
+    /// [`set_object_acl`](Self::set_object_acl) 那种公开/私有二态,不建模为 [`AclGrant`])。
+    pub async fn get_object_acl(&self, bucket: &str, key: &str) -> Result<Vec<AclGrant>> {
+        let (_, grants) = self.get_object_acl_with_owner(bucket, key).await?;
+        Ok(grants)
+    }
+
+    /// 同 [`get_object_acl`](Self::get_object_acl),额外返回 Owner ID——`PutObjectAcl`
+    /// 请求体需要带 Owner,写入前必须先读一次。
+    async fn get_object_acl_with_owner(
+        &self,
+        bucket: &str,
+        key: &str,
+    ) -> Result<(String, Vec<AclGrant>)> {
+        let request = self.build_signed(RequestSpec {
+            method: Method::GET,
+            canonical_uri: &object_uri(bucket, key),
+            query: &[("acl".to_string(), String::new())],
+            content_type: None,
+            amz_headers: &[],
+            body: None,
+        })?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(cloud_core::CoreError::from)?;
+        parse_object_acl(&body)
+    }
+
+    /// 覆盖对象的细粒度授权列表(**整套替换**,包括清掉已有的预置分组授权如
+    /// `public-read`——和 [`set_bucket_lifecycle`](crate::bucket) 等其它"整套替换"接口
+    /// 语义一致)。先 `GET ?acl` 取 Owner ID(请求体必须带),再 `PUT ?acl` 写整份
+    /// `AccessControlPolicy`。
+    pub async fn set_object_acl_grants(
+        &self,
+        bucket: &str,
+        key: &str,
+        grants: &[AclGrant],
+    ) -> Result<()> {
+        let (owner_id, _) = self.get_object_acl_with_owner(bucket, key).await?;
+        let body = build_object_acl_xml(&owner_id, grants);
+        let request = self.build_signed(RequestSpec {
+            method: Method::PUT,
+            canonical_uri: &object_uri(bucket, key),
+            query: &[("acl".to_string(), String::new())],
+            content_type: Some("application/xml"),
+            amz_headers: &[],
+            body: Some(Bytes::from(body)),
         })?;
         check_status(self.http().execute(request).await?).await?;
         Ok(())
@@ -599,6 +734,123 @@ mod tests {
             ("owner".to_string(), "a&b".to_string()),
         ];
         let parsed = parse_tagging(&build_tagging_xml(&original)).unwrap();
+        assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn parse_object_acl_reads_owner_and_canonical_user_grants() {
+        // 官方 GetObjectAcl 响应体典型形状(参考 AWS S3 API 文档给出的示例)。
+        let xml = r#"<AccessControlPolicy>
+            <Owner><ID>852b113e7a2f25102679df27bb0ae12b3f85be6BucketOwnerCanonicalUserID</ID>
+            <DisplayName>OwnerDisplayName</DisplayName></Owner>
+            <AccessControlList>
+                <Grant>
+                    <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser">
+                        <ID>852b113e7a2f25102679df27bb0ae12b3f85be6GranteeCanonicalUserID</ID>
+                        <DisplayName>GranteeDisplayName</DisplayName>
+                    </Grantee>
+                    <Permission>FULL_CONTROL</Permission>
+                </Grant>
+            </AccessControlList>
+        </AccessControlPolicy>"#;
+        let (owner, grants) = parse_object_acl(xml).unwrap();
+        assert_eq!(
+            owner,
+            "852b113e7a2f25102679df27bb0ae12b3f85be6BucketOwnerCanonicalUserID"
+        );
+        assert_eq!(
+            grants,
+            vec![AclGrant {
+                grantee_id: "852b113e7a2f25102679df27bb0ae12b3f85be6GranteeCanonicalUserID"
+                    .to_string(),
+                permission: "FULL_CONTROL".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn parse_object_acl_ignores_group_grantees_without_an_id() {
+        // 预置分组授权(如 AllUsers)的 Grantee 只有 <URI>,没有 <ID>——不是 AclGrant 建模的
+        // 范围(那类需求已被 set_object_acl 的公开/私有二态覆盖),解析时应被过滤掉而不是报错。
+        let xml = r#"<AccessControlPolicy>
+            <Owner><ID>owner-id</ID></Owner>
+            <AccessControlList>
+                <Grant>
+                    <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="Group">
+                        <URI>http://acs.amazonaws.com/groups/global/AllUsers</URI>
+                    </Grantee>
+                    <Permission>READ</Permission>
+                </Grant>
+                <Grant>
+                    <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser">
+                        <ID>real-account-id</ID>
+                    </Grantee>
+                    <Permission>WRITE</Permission>
+                </Grant>
+            </AccessControlList>
+        </AccessControlPolicy>"#;
+        let (_, grants) = parse_object_acl(xml).unwrap();
+        assert_eq!(
+            grants,
+            vec![AclGrant {
+                grantee_id: "real-account-id".to_string(),
+                permission: "WRITE".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn parse_object_acl_handles_no_grants() {
+        let xml = "<AccessControlPolicy><Owner><ID>owner-id</ID></Owner>\
+            <AccessControlList></AccessControlList></AccessControlPolicy>";
+        let (owner, grants) = parse_object_acl(xml).unwrap();
+        assert_eq!(owner, "owner-id");
+        assert!(grants.is_empty());
+    }
+
+    #[test]
+    fn build_object_acl_xml_includes_owner_and_canonical_user_grants() {
+        let xml = build_object_acl_xml(
+            "owner-id",
+            &[AclGrant {
+                grantee_id: "grantee-id".to_string(),
+                permission: "READ".to_string(),
+            }],
+        );
+        assert_eq!(
+            xml,
+            r#"<AccessControlPolicy><Owner><ID>owner-id</ID></Owner><AccessControlList><Grant><Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser"><ID>grantee-id</ID></Grantee><Permission>READ</Permission></Grant></AccessControlList></AccessControlPolicy>"#
+        );
+    }
+
+    #[test]
+    fn build_object_acl_xml_escapes_reserved_chars() {
+        let xml = build_object_acl_xml(
+            "a&b",
+            &[AclGrant {
+                grantee_id: "x<y>".to_string(),
+                permission: "READ".to_string(),
+            }],
+        );
+        assert!(xml.contains("<ID>a&amp;b</ID>"));
+        assert!(xml.contains("<ID>x&lt;y&gt;</ID>"));
+    }
+
+    #[test]
+    fn object_acl_grants_round_trip_through_build_and_parse() {
+        let original = vec![
+            AclGrant {
+                grantee_id: "acct-1".to_string(),
+                permission: "READ".to_string(),
+            },
+            AclGrant {
+                grantee_id: "acct-2".to_string(),
+                permission: "FULL_CONTROL".to_string(),
+            },
+        ];
+        let xml = build_object_acl_xml("owner-id", &original);
+        let (owner, parsed) = parse_object_acl(&xml).unwrap();
+        assert_eq!(owner, "owner-id");
         assert_eq!(parsed, original);
     }
 

@@ -52,9 +52,10 @@ where
 /// 必须涵盖所有我们会发出的子资源:分片上传(`uploads`/`uploadId`/`partNumber`)、
 /// 对象标签(`tagging`)、归档取回(`restore`)、bucket 生命周期规则(`lifecycle`)、
 /// 版本控制(`versioning`/`versions`/`versionId`)、CORS 规则(`cors`)、静态网站托管
-/// (`website`)。漏掉任何一个都会导致我们签名时把它从 CanonicalizedResource 里过滤掉,
-/// 而请求 URL 仍带着它 → 服务端算出不同签名 → 签名不匹配。OBS 完整子资源集很大
-/// (`acl`……),用到再补。
+/// (`website`)、对象 ACL(`acl`,细粒度授权的 get/set 走 [`crate::multipart::PartRequest`]
+/// 这条路径,不像 `set_object_acl` 那样手拼签名串,必须在这里登记)。漏掉任何一个都会导致
+/// 我们签名时把它从 CanonicalizedResource 里过滤掉,而请求 URL 仍带着它 → 服务端算出不同
+/// 签名 → 签名不匹配。OBS 完整子资源集很大,用到再补。
 const SUBRESOURCE_KEYS: &[&str] = &[
     "uploads",
     "uploadId",
@@ -67,6 +68,7 @@ const SUBRESOURCE_KEYS: &[&str] = &[
     "versionId",
     "cors",
     "website",
+    "acl",
 ];
 
 /// 构造带子资源的 CanonicalizedResource,如 `/bucket/key?partNumber=1&uploadId=xxx`。

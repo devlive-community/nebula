@@ -58,8 +58,8 @@ pub use largest::LargestFiles;
 pub use limits::TransferLimits;
 pub use nebula_pdf::{Assembly, NumberPos, PageInfo, PageNumbers, PageSpec, PdfInfo, Watermark};
 pub use nebula_provider::{
-    ByteStream, Capabilities, CorsRule, EntryKind, IncompleteUpload, LifecycleRule, ObjectVersion,
-    Page, ProgressFn, WebsiteConfig,
+    ByteStream, Capabilities, CorsRule, EntryKind, Grant, IncompleteUpload, LifecycleRule,
+    ObjectVersion, Page, Permission, ProgressFn, WebsiteConfig,
 };
 pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
@@ -1090,6 +1090,24 @@ impl App {
     /// 设置对象为公开读(`public = true`)或私有。
     pub async fn set_object_acl(&self, account: &str, path: &str, public: bool) -> Result<()> {
         Ok(self.provider(account)?.set_object_acl(path, public).await?)
+    }
+
+    /// 读取对象的细粒度授权列表(按具体账号 ID,而不是公开/私有二态)。
+    pub async fn object_grants(&self, account: &str, path: &str) -> Result<Vec<Grant>> {
+        Ok(self.provider(account)?.object_grants(path).await?)
+    }
+
+    /// 覆盖对象的细粒度授权列表(整套替换;空列表即清空)。
+    pub async fn set_object_grants(
+        &self,
+        account: &str,
+        path: &str,
+        grants: &[Grant],
+    ) -> Result<()> {
+        Ok(self
+            .provider(account)?
+            .set_object_grants(path, grants)
+            .await?)
     }
 
     /// 批量把多个对象移动 / 复制到目标目录 `dst_dir` 下(各自保留原文件名)。

@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use app_core::{
     AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, CorsRule, DiffItem,
-    DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, ImageData, IncompleteUpload,
+    DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, Grant, ImageData, IncompleteUpload,
     Integrity, LargestFiles, LifecycleRule, ObjectVersion, Ops, Page, PageNumbers, PdfInfo,
     RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport,
     SyncSpec, TextPreview, TransferRecord, Watermark, WebsiteConfig,
@@ -842,6 +842,33 @@ async fn set_object_acl(
 ) -> Result<(), String> {
     let app = state.inner().clone();
     app.set_object_acl(&account, &path, public)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 读取对象的细粒度授权列表(按具体账号 ID,而不是公开/私有二态)。
+#[tauri::command]
+async fn object_grants(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+) -> Result<Vec<Grant>, String> {
+    let app = state.inner().clone();
+    app.object_grants(&account, &path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 覆盖对象的细粒度授权列表(整套替换;空列表即清空)。
+#[tauri::command]
+async fn set_object_grants(
+    state: State<'_, App>,
+    account: String,
+    path: String,
+    grants: Vec<Grant>,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    app.set_object_grants(&account, &path, &grants)
         .await
         .map_err(|e| e.to_string())
 }
@@ -2185,6 +2212,8 @@ pub fn run() {
             object_tags,
             set_object_tags,
             set_object_acl,
+            object_grants,
+            set_object_grants,
             public_url,
             incomplete_uploads,
             clean_incomplete_uploads,

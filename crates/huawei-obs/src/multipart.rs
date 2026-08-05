@@ -260,6 +260,69 @@ impl ObsClient {
         Ok(())
     }
 
+    /// 读取对象的细粒度授权列表:`GET /{key}?acl`,解析出每条 Grant 里 Grantee 的账号 ID
+    /// 与权限。忽略预置分组授权(Grantee 是 `<Canned>Everyone</Canned>` 而不是 `<ID>`,对应
+    /// [`ObsClient::set_object_acl`] 那种公开/私有二态,不建模为 [`AclGrant`])。
+    pub async fn get_object_acl(&self, bucket: &str, key: &str) -> Result<Vec<AclGrant>> {
+        let (_, grants) = self.get_object_acl_with_owner(bucket, key).await?;
+        Ok(grants)
+    }
+
+    /// 同 [`get_object_acl`](Self::get_object_acl),额外返回 Owner ID——`PutObjectAcl`
+    /// 请求体需要带 Owner,写入前必须先读一次。
+    async fn get_object_acl_with_owner(
+        &self,
+        bucket: &str,
+        key: &str,
+    ) -> Result<(String, Vec<AclGrant>)> {
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::GET,
+                key,
+                subresources: &[("acl", None)],
+                content_type: None,
+                content_md5: None,
+                body: None,
+            },
+            &date,
+        )?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let body = resp.text().await.map_err(cloud_core::CoreError::from)?;
+        parse_object_acl(&body)
+    }
+
+    /// 覆盖对象的细粒度授权列表(**整套替换**,包括清掉已有的预置分组授权如
+    /// `public-read`——和标签 / 生命周期规则等其它"整套替换"接口语义一致)。先
+    /// `GET ?acl` 取 Owner ID(请求体必须带),再 `PUT ?acl` 写整份 `AccessControlPolicy`。
+    pub async fn set_object_acl_grants(
+        &self,
+        bucket: &str,
+        key: &str,
+        grants: &[AclGrant],
+    ) -> Result<()> {
+        let (owner_id, _) = self.get_object_acl_with_owner(bucket, key).await?;
+        let body = Bytes::from(build_object_acl_xml(&owner_id, grants));
+        // OBS 的 PutObjectAcl 和 PutObjectTagging 一样要求带 Content-MD5(会计入签名)。
+        let content_md5 = cloud_core::crypto::content_md5(&body);
+        let date = now_gmt();
+        let request = self.build_part_request(
+            bucket,
+            PartRequest {
+                method: Method::PUT,
+                key,
+                subresources: &[("acl", None)],
+                content_type: Some("application/xml"),
+                content_md5: Some(&content_md5),
+                body: Some(body),
+            },
+            &date,
+        )?;
+        check_status(self.http().execute(request).await?).await?;
+        Ok(())
+    }
+
     /// 高层封装:把整块数据按 `part_size` 切分并完成分片上传;任一步失败自动 abort。
     ///
     /// `part_size` 会被抬到不小于 [`MIN_PART_SIZE`]。至少上传一个分片(空数据也会
@@ -536,6 +599,88 @@ fn split_parts(data: &Bytes, part_size: usize) -> Vec<(u32, Bytes)> {
     specs
 }
 
+/// 一条对象授权:被授权账号的华为云账号 ID(DomainId)+ 权限(`READ`/`WRITE`/`READ_ACP`/
+/// `WRITE_ACP`/`FULL_CONTROL` 官方原始字符串,由上层 provider 适配层映射成自己的枚举)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AclGrant {
+    pub grantee_id: String,
+    pub permission: String,
+}
+
+/// `GetObjectAcl` 响应体(XML)。
+#[derive(Debug, Deserialize)]
+struct AccessControlPolicy {
+    #[serde(rename = "Owner")]
+    owner: AclOwner,
+    #[serde(rename = "AccessControlList", default)]
+    access_control_list: AccessControlList,
+}
+
+#[derive(Debug, Deserialize)]
+struct AclOwner {
+    #[serde(rename = "ID")]
+    id: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct AccessControlList {
+    #[serde(rename = "Grant", default)]
+    grants: Vec<GrantXml>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GrantXml {
+    #[serde(rename = "Grantee")]
+    grantee: GranteeXml,
+    #[serde(rename = "Permission")]
+    permission: String,
+}
+
+/// 只取 `<ID>`;预置分组授权(`Everyone`)的 Grantee 是 `<Canned>Everyone</Canned>`,没有
+/// `<ID>`,`id` 为 `None`,解析时会被过滤掉——不建模为 [`AclGrant`],那类需求已被
+/// [`ObsClient::set_object_acl`] 的公开/私有二态覆盖。
+#[derive(Debug, Default, Deserialize)]
+struct GranteeXml {
+    #[serde(rename = "ID", default)]
+    id: Option<String>,
+}
+
+/// 解析 `GetObjectAcl` 响应体,返回 `(Owner ID, 授权列表)`。
+fn parse_object_acl(xml: &str) -> Result<(String, Vec<AclGrant>)> {
+    let doc: AccessControlPolicy = quick_xml::de::from_str(xml)
+        .map_err(|e| ObsError::Core(cloud_core::CoreError::InvalidResponse(e.to_string())))?;
+    let grants = doc
+        .access_control_list
+        .grants
+        .into_iter()
+        .filter_map(|g| {
+            g.grantee.id.map(|grantee_id| AclGrant {
+                grantee_id,
+                permission: g.permission,
+            })
+        })
+        .collect();
+    Ok((doc.owner.id, grants))
+}
+
+/// 生成 `PutObjectAcl` 的请求体 XML。`owner_id` 来自同一个对象先前的 `GetObjectAcl`
+/// 响应——请求体必须带 Owner,服务端不会替调用方补全。`Delivered` 固定 `false`(是否把
+/// 权限下发给桶所有者的委托子用户,Nebula 不建模这层)。
+fn build_object_acl_xml(owner_id: &str, grants: &[AclGrant]) -> String {
+    let mut body = String::from("<AccessControlPolicy><Owner><ID>");
+    body.push_str(&xml_escape(owner_id));
+    body.push_str("</ID></Owner><AccessControlList>");
+    for g in grants {
+        body.push_str("<Grant><Grantee><ID>");
+        body.push_str(&xml_escape(&g.grantee_id));
+        body.push_str("</ID></Grantee><Permission>");
+        body.push_str(&xml_escape(&g.permission));
+        body.push_str("</Permission><Delivered>false</Delivered></Grant>");
+    }
+    body.push_str("</AccessControlList></AccessControlPolicy>");
+    body
+}
+
 /// `GetObjectTagging` 响应体(XML)。
 #[derive(Debug, Deserialize)]
 struct Tagging {
@@ -789,5 +934,123 @@ mod tests {
 </InitiateMultipartUploadResult>"#;
         let parsed: InitiateResult = quick_xml::de::from_str(xml).unwrap();
         assert_eq!(parsed.upload_id, "000001648453845DBB78F2340DD460D8");
+    }
+
+    #[test]
+    fn parse_object_acl_reads_owner_and_id_grants() {
+        // 官方文档给出的 GetObjectAcl 响应体典型形状(华为云账号 ID 作为 Grantee)。
+        let xml = r#"<AccessControlPolicy>
+            <Owner><ID>owner-domain-id</ID></Owner>
+            <AccessControlList>
+                <Grant>
+                    <Grantee><ID>grantee-domain-id</ID></Grantee>
+                    <Permission>FULL_CONTROL</Permission>
+                    <Delivered>false</Delivered>
+                </Grant>
+            </AccessControlList>
+        </AccessControlPolicy>"#;
+        let (owner, grants) = parse_object_acl(xml).unwrap();
+        assert_eq!(owner, "owner-domain-id");
+        assert_eq!(
+            grants,
+            vec![AclGrant {
+                grantee_id: "grantee-domain-id".to_string(),
+                permission: "FULL_CONTROL".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn parse_object_acl_ignores_canned_group_grantees() {
+        // 预置分组授权(Everyone)的 Grantee 是 <Canned>Everyone</Canned>,没有 <ID>——不是
+        // AclGrant 建模的范围,解析时应被过滤掉而不是报错。
+        let xml = r#"<AccessControlPolicy>
+            <Owner><ID>owner-id</ID></Owner>
+            <AccessControlList>
+                <Grant>
+                    <Grantee><Canned>Everyone</Canned></Grantee>
+                    <Permission>READ</Permission>
+                    <Delivered>false</Delivered>
+                </Grant>
+                <Grant>
+                    <Grantee><ID>real-account-id</ID></Grantee>
+                    <Permission>WRITE</Permission>
+                    <Delivered>false</Delivered>
+                </Grant>
+            </AccessControlList>
+        </AccessControlPolicy>"#;
+        let (_, grants) = parse_object_acl(xml).unwrap();
+        assert_eq!(
+            grants,
+            vec![AclGrant {
+                grantee_id: "real-account-id".to_string(),
+                permission: "WRITE".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn build_object_acl_xml_includes_owner_grant_and_delivered_false() {
+        let xml = build_object_acl_xml(
+            "owner-id",
+            &[AclGrant {
+                grantee_id: "grantee-id".to_string(),
+                permission: "READ".to_string(),
+            }],
+        );
+        assert_eq!(
+            xml,
+            "<AccessControlPolicy><Owner><ID>owner-id</ID></Owner><AccessControlList>\
+             <Grant><Grantee><ID>grantee-id</ID></Grantee><Permission>READ</Permission>\
+             <Delivered>false</Delivered></Grant></AccessControlList></AccessControlPolicy>"
+        );
+    }
+
+    #[test]
+    fn object_acl_grants_round_trip_through_build_and_parse() {
+        let original = vec![
+            AclGrant {
+                grantee_id: "acct-1".to_string(),
+                permission: "READ".to_string(),
+            },
+            AclGrant {
+                grantee_id: "acct-2".to_string(),
+                permission: "FULL_CONTROL".to_string(),
+            },
+        ];
+        let xml = build_object_acl_xml("owner-id", &original);
+        let (owner, parsed) = parse_object_acl(&xml).unwrap();
+        assert_eq!(owner, "owner-id");
+        assert_eq!(parsed, original);
+    }
+
+    #[test]
+    fn get_object_acl_request_signs_acl_subresource() {
+        let client = test_client();
+        let date = "Thu, 17 Nov 2005 18:49:58 GMT";
+        let req = client
+            .build_part_request(
+                "examplebucket",
+                PartRequest {
+                    method: Method::GET,
+                    key: "photo.jpg",
+                    subresources: &[("acl", None)],
+                    content_type: None,
+                    content_md5: None,
+                    body: None,
+                },
+                date,
+            )
+            .unwrap();
+
+        assert_eq!(
+            req.url().as_str(),
+            "https://examplebucket.obs.cn-north-4.myhuaweicloud.com/photo.jpg?acl"
+        );
+        let sts = sign::string_to_sign("GET", "", "", date, "", "/examplebucket/photo.jpg?acl");
+        assert_eq!(
+            req.headers().get(AUTHORIZATION).unwrap().to_str().unwrap(),
+            sign::authorization(client.access_key(), client.secret_key(), &sts)
+        );
     }
 }

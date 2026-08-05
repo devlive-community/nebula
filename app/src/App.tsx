@@ -54,6 +54,7 @@ import {
 import { ShareDialog } from "./components/ShareDialog";
 import { FileDetails } from "./components/FileDetails";
 import { TagsDialog } from "./components/TagsDialog";
+import { GrantsDialog } from "./components/GrantsDialog";
 import { LifecycleDialog } from "./components/LifecycleDialog";
 import { CorsDialog } from "./components/CorsDialog";
 import { WebsiteDialog } from "./components/WebsiteDialog";
@@ -166,6 +167,7 @@ export default function App() {
   const [detailsEntry, setDetailsEntry] = useState<Entry | null>(null);
   const [editTypeTarget, setEditTypeTarget] = useState<Entry | null>(null);
   const [tagsTarget, setTagsTarget] = useState<Entry | null>(null);
+  const [grantsTarget, setGrantsTarget] = useState<Entry | null>(null);
   const [lifecycleTarget, setLifecycleTarget] = useState<Entry | null>(null);
   const [corsTarget, setCorsTarget] = useState<Entry | null>(null);
   const [websiteTarget, setWebsiteTarget] = useState<Entry | null>(null);
@@ -1921,6 +1923,7 @@ export default function App() {
     showNewBucket ||
     !!editTypeTarget ||
     !!tagsTarget ||
+    !!grantsTarget ||
     !!lifecycleTarget ||
     !!corsTarget ||
     !!websiteTarget ||
@@ -1963,6 +1966,7 @@ export default function App() {
       else if (showNewBucket) setShowNewBucket(false);
       else if (editTypeTarget) setEditTypeTarget(null);
       else if (tagsTarget) setTagsTarget(null);
+      else if (grantsTarget) setGrantsTarget(null);
       else if (lifecycleTarget) setLifecycleTarget(null);
       else if (corsTarget) setCorsTarget(null);
       else if (websiteTarget) setWebsiteTarget(null);
@@ -2285,6 +2289,7 @@ export default function App() {
                 onShare={share}
                 onEditType={setEditTypeTarget}
                 onEditTags={setTagsTarget}
+                onEditGrants={setGrantsTarget}
               />
             )}
 
@@ -2413,6 +2418,29 @@ export default function App() {
           onCancel={() => setTagsTarget(null)}
           onError={(msg) => {
             setTagsTarget(null);
+            setError(msg);
+          }}
+        />
+      )}
+
+      {grantsTarget && current && (
+        <GrantsDialog
+          account={current}
+          path={grantsTarget.path}
+          name={grantsTarget.name}
+          onSaved={(grants) => {
+            setGrantsTarget(null);
+            setNotice({
+              tone: "ok",
+              text: t("✓ {name} 授权已保存({n})", {
+                name: grantsTarget.name,
+                n: grants.length,
+              }),
+            });
+          }}
+          onCancel={() => setGrantsTarget(null)}
+          onError={(msg) => {
+            setGrantsTarget(null);
             setError(msg);
           }}
         />

@@ -386,6 +386,15 @@ export interface ObjectVersion {
   last_modified: string;
 }
 
+/** 细粒度对象 ACL 的授权权限(与 Rust 端 app_core::Permission 对应)。 */
+export type Permission = "READ" | "WRITE" | "READ_ACP" | "WRITE_ACP" | "FULL_CONTROL";
+
+/** 一条细粒度授权:被授权账号 ID + 权限(与 Rust 端 app_core::Grant 对应)。 */
+export interface Grant {
+  grantee_id: string;
+  permission: Permission;
+}
+
 /** 递归搜索结果(与 Rust 端 app_core::SearchResult 对应)。 */
 export interface SearchResult {
   entries: Entry[];

@@ -316,6 +316,15 @@ export const EN: Record<string, string> = {
   添加标签: "Add tag",
   "✓ {name} 标签已保存({n})": "✓ Saved {n} tag(s) on {name}",
 
+  // 细粒度对象 ACL(按账号 ID 授权)
+  细粒度授权: "Fine-grained access",
+  "按账号 ID 授权,整套替换,覆盖现有全部授权(包括公开读等预置权限)。":
+    "Grant access by account ID. Saving replaces the entire grant list, including any preset grants like public-read.",
+  "暂无授权,点下方添加。": "No grants yet — add one below.",
+  "被授权账号 ID": "Grantee account ID",
+  添加授权: "Add grant",
+  "✓ {name} 授权已保存({n})": "✓ Saved {n} grant(s) on {name}",
+
   // 列表 / 状态栏
   名称: "Name",
   大小: "Size",

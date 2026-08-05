@@ -17,6 +17,7 @@ pub mod capabilities;
 pub mod cors;
 pub mod entry;
 pub mod error;
+pub mod grant;
 pub mod lifecycle;
 pub mod path;
 pub mod provider;
@@ -28,6 +29,7 @@ pub use capabilities::Capabilities;
 pub use cors::CorsRule;
 pub use entry::{Entry, EntryKind};
 pub use error::{ProviderError, Result};
+pub use grant::{Grant, Permission};
 pub use lifecycle::LifecycleRule;
 pub use provider::{
     collect_stream, ByteStream, IncompleteUpload, Page, ProgressFn, StorageProvider,

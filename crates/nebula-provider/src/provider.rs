@@ -10,6 +10,7 @@ use crate::capabilities::Capabilities;
 use crate::cors::CorsRule;
 use crate::entry::Entry;
 use crate::error::{ProviderError, Result};
+use crate::grant::Grant;
 use crate::lifecycle::LifecycleRule;
 use crate::version::ObjectVersion;
 use crate::website::WebsiteConfig;
@@ -217,6 +218,19 @@ pub trait StorageProvider: Send + Sync {
     /// 支持的适配层覆盖并置 [`capabilities`](Self::capabilities) 的 `object_acl = true`。
     async fn set_object_acl(&self, _path: &str, _public: bool) -> Result<()> {
         Err(ProviderError::Unsupported("object acl".into()))
+    }
+
+    /// 读取对象的细粒度授权列表(按具体账号 ID,而不是公开/私有二态)。默认
+    /// [`ProviderError::Unsupported`];支持的适配层覆盖并在 [`capabilities`](Self::capabilities)
+    /// 置 `fine_grained_acl = true`。
+    async fn object_grants(&self, _path: &str) -> Result<Vec<Grant>> {
+        Err(ProviderError::Unsupported("fine-grained object acl".into()))
+    }
+
+    /// 覆盖对象的细粒度授权列表(**整套替换**,不是增量 patch)。默认
+    /// [`ProviderError::Unsupported`]。
+    async fn set_object_grants(&self, _path: &str, _grants: &[Grant]) -> Result<()> {
+        Err(ProviderError::Unsupported("fine-grained object acl".into()))
     }
 
     /// 对象的永久公共直链(不签名);仅当对象为公开读时可访问。默认 `None`,支持的适配层返回

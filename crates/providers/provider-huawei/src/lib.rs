@@ -12,9 +12,26 @@ use futures::StreamExt;
 
 use huawei_obs::{ListEntry, ObsClient, ObsError};
 use nebula_provider::{
-    path, ByteStream, Capabilities, CorsRule, Entry, IncompleteUpload, LifecycleRule,
-    ObjectVersion, ProgressFn, ProviderError, Result, StorageProvider, WebsiteConfig,
+    path, ByteStream, Capabilities, CorsRule, Entry, Grant, IncompleteUpload, LifecycleRule,
+    ObjectVersion, Permission, ProgressFn, ProviderError, Result, StorageProvider, WebsiteConfig,
 };
+
+/// 把 SDK 的授权条目映射到统一 provider 模型;权限字符串未知(理论上不会发生,SDK 只会
+/// 转发官方 XML 里出现过的值)时静默丢弃这一条,不让一条无法识别的历史授权拖垮整次读取。
+fn grant_from_sdk(g: huawei_obs::multipart::AclGrant) -> Option<Grant> {
+    Some(Grant {
+        grantee_id: g.grantee_id,
+        permission: Permission::parse_official(&g.permission)?,
+    })
+}
+
+/// 把统一 provider 模型映射回 SDK 的授权条目。
+fn grant_to_sdk(g: &Grant) -> huawei_obs::multipart::AclGrant {
+    huawei_obs::multipart::AclGrant {
+        grantee_id: g.grantee_id.clone(),
+        permission: g.permission.as_str().to_string(),
+    }
+}
 
 /// 超过该大小的上传自动改用分片上传。
 const MULTIPART_THRESHOLD: usize = 16 * 1024 * 1024;
@@ -167,6 +184,8 @@ impl StorageProvider for HuaweiProvider {
             object_tagging: true,
             multipart_cleanup: true,
             object_acl: true,
+            // 华为云 OBS 官方支持按账号 ID(DomainId)授权对象级 ACL(GetObjectAcl/PutObjectAcl)。
+            fine_grained_acl: true,
             presign: true,
             server_side_copy: true,
             hierarchical: false,
@@ -589,6 +608,25 @@ impl StorageProvider for HuaweiProvider {
             .map_err(map_err)
     }
 
+    async fn object_grants(&self, path: &str) -> Result<Vec<Grant>> {
+        let (bucket, key) = require_object(path)?;
+        let grants = self
+            .client
+            .get_object_acl(bucket, key)
+            .await
+            .map_err(map_err)?;
+        Ok(grants.into_iter().filter_map(grant_from_sdk).collect())
+    }
+
+    async fn set_object_grants(&self, path: &str, grants: &[Grant]) -> Result<()> {
+        let (bucket, key) = require_object(path)?;
+        let grants: Vec<_> = grants.iter().map(grant_to_sdk).collect();
+        self.client
+            .set_object_acl_grants(bucket, key, &grants)
+            .await
+            .map_err(map_err)
+    }
+
     fn public_url(&self, path: &str) -> Option<String> {
         let (bucket, key) = require_object(path).ok()?;
         Some(self.client.public_url(bucket, key))
@@ -646,7 +684,29 @@ mod tests {
         let p = provider();
         assert_eq!(p.id(), "test");
         assert!(p.capabilities().multipart_upload);
+        assert!(p.capabilities().fine_grained_acl);
         assert!(!p.capabilities().hierarchical);
+    }
+
+    #[test]
+    fn grant_round_trips_through_sdk_mapping() {
+        let g = Grant {
+            grantee_id: "acct-1".to_string(),
+            permission: Permission::FullControl,
+        };
+        let sdk = grant_to_sdk(&g);
+        assert_eq!(sdk.grantee_id, "acct-1");
+        assert_eq!(sdk.permission, "FULL_CONTROL");
+        assert_eq!(grant_from_sdk(sdk), Some(g));
+    }
+
+    #[test]
+    fn grant_from_sdk_drops_unrecognized_permission_strings() {
+        let sdk = huawei_obs::multipart::AclGrant {
+            grantee_id: "acct-1".to_string(),
+            permission: "BOGUS".to_string(),
+        };
+        assert_eq!(grant_from_sdk(sdk), None);
     }
 
     #[test]

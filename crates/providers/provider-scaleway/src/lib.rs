@@ -135,6 +135,8 @@ impl StorageProvider for ScalewayProvider {
             multipart_cleanup: true,
             // 官方文档确认支持 canned ACL(public-read/private 二态"对象可见性"模型)。
             object_acl: true,
+            // 只有 AWS S3 / 华为云 OBS 真支持按账号 ID 授权的对象级 ACL(已在各自 provider 里单独开启),其它厂商不建模。
+            fine_grained_acl: false,
             presign: true,
             server_side_copy: true,
             hierarchical: false,

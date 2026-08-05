@@ -132,6 +132,8 @@ impl StorageProvider for WasabiProvider {
             // 协议层支持 canned ACL;公开访问的实际效果可能被 Wasabi 账号等级(免费/试用 vs
             // 付费)限制,Nebula 拿不到账号等级信息,没法提前判断——已知限制,不是漏做。
             object_acl: true,
+            // 只有 AWS S3 / 华为云 OBS 真支持按账号 ID 授权的对象级 ACL(已在各自 provider 里单独开启),其它厂商不建模。
+            fine_grained_acl: false,
             presign: true,
             server_side_copy: true,
             hierarchical: false,

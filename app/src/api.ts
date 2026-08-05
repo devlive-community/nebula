@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Bookmark, CorsRule, Entry, ExifInfo, FolderStats, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, ObjectVersion, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry, WebsiteConfig } from "./types";
+import type { AccountInfo, Bookmark, CorsRule, Entry, ExifInfo, FolderStats, Grant, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, ObjectVersion, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry, WebsiteConfig } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -348,6 +348,14 @@ export const readPreview = (account: string, path: string, maxBytes: number) =>
 /** 设置对象为公开读 / 私有。 */
 export const setObjectAcl = (account: string, path: string, isPublic: boolean) =>
   invoke<void>("set_object_acl", { account, path, public: isPublic });
+
+/** 读取对象的细粒度授权列表(按具体账号 ID,而不是公开/私有二态)。 */
+export const objectGrants = (account: string, path: string) =>
+  invoke<Grant[]>("object_grants", { account, path });
+
+/** 覆盖对象的细粒度授权列表(整套替换;空数组即清空)。 */
+export const setObjectGrants = (account: string, path: string, grants: Grant[]) =>
+  invoke<void>("set_object_grants", { account, path, grants });
 
 /** 取对象的永久公共直链(不签名);未支持返回 null。 */
 export const publicUrl = (account: string, path: string) =>
