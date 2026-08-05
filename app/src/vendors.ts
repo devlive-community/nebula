@@ -104,6 +104,14 @@ export const VENDORS = {
     endpoint: "s3.cn-south-1.jdcloud-oss.com",
     idPlaceholder: "如 jdcloud-main",
   },
+  upyun: {
+    label: "又拍云",
+    color: "#2ac845",
+    akLabel: "Access Key",
+    skLabel: "Secret Key",
+    endpoint: "s3.api.upyun.com",
+    idPlaceholder: "如 upyun-main",
+  },
 } as const;
 
 export type Vendor = keyof typeof VENDORS;

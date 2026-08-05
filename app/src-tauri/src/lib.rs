@@ -339,6 +339,20 @@ fn add_jdcloud_account(
         .map_err(|e| e.to_string())
 }
 
+/// 新增一个又拍云账号(持久化到 SQLite)。
+#[tauri::command]
+fn add_upyun_account(
+    state: State<'_, App>,
+    id: String,
+    access_key_id: String,
+    access_key_secret: String,
+    endpoint: String,
+) -> Result<(), String> {
+    state
+        .add_upyun_account(id, access_key_id, access_key_secret, endpoint)
+        .map_err(|e| e.to_string())
+}
+
 /// 移除账号(从注册表与 SQLite)。
 #[tauri::command]
 fn remove_account(state: State<'_, App>, id: String) -> Result<bool, String> {
@@ -2130,6 +2144,7 @@ pub fn run() {
             add_scaleway_account,
             add_us3_account,
             add_jdcloud_account,
+            add_upyun_account,
             remove_account,
             rename_account,
             get_account,

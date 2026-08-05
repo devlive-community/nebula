@@ -1007,7 +1007,8 @@ export default function App() {
       | "do_spaces"
       | "scaleway"
       | "us3"
-      | "jdcloud",
+      | "jdcloud"
+      | "upyun",
     id: string,
     ak: string,
     sk: string,
@@ -1038,6 +1039,7 @@ export default function App() {
           scaleway: api.addScalewayAccount,
           us3: api.addUs3Account,
           jdcloud: api.addJdCloudAccount,
+          upyun: api.addUpyunAccount,
         };
         await adders[vendor](id, ak, sk, endpoint);
       }

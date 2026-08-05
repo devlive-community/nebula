@@ -99,6 +99,13 @@ export const addJdCloudAccount = (
   endpoint: string,
 ) => invoke<void>("add_jdcloud_account", { id, accessKeyId, accessKeySecret, endpoint });
 
+export const addUpyunAccount = (
+  id: string,
+  accessKeyId: string,
+  accessKeySecret: string,
+  endpoint: string,
+) => invoke<void>("add_upyun_account", { id, accessKeyId, accessKeySecret, endpoint });
+
 export const removeAccount = (id: string) => invoke<boolean>("remove_account", { id });
 
 /** 给一个账号改别名(id)。 */

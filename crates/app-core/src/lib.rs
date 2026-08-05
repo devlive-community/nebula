@@ -44,6 +44,7 @@ use provider_qiniu::QiniuProvider;
 use provider_r2::R2Provider;
 use provider_scaleway::ScalewayProvider;
 use provider_tencent::TencentProvider;
+use provider_upyun::UpyunProvider;
 use provider_us3::Us3Provider;
 use provider_wasabi::WasabiProvider;
 
@@ -83,6 +84,7 @@ const VENDOR_DO_SPACES: &str = "do_spaces";
 const VENDOR_SCALEWAY: &str = "scaleway";
 const VENDOR_US3: &str = "us3";
 const VENDOR_JDCLOUD: &str = "jdcloud";
+const VENDOR_UPYUN: &str = "upyun";
 
 /// 递归搜索结果:命中条目 + 是否因触及上限而**可能不完整**。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -388,6 +390,12 @@ impl App {
                 rec.endpoint.clone(),
             ))),
             VENDOR_JDCLOUD => self.registry.register(Arc::new(JdCloudProvider::new(
+                rec.id.clone(),
+                rec.access_key_id.clone(),
+                secret.to_string(),
+                rec.endpoint.clone(),
+            ))),
+            VENDOR_UPYUN => self.registry.register(Arc::new(UpyunProvider::new(
                 rec.id.clone(),
                 rec.access_key_id.clone(),
                 secret.to_string(),
@@ -744,6 +752,33 @@ impl App {
         let rec = AccountRecord {
             id,
             vendor: VENDOR_JDCLOUD.to_string(),
+            access_key_id: access_key.into(),
+            access_key_secret: String::new(),
+            endpoint: endpoint.into(),
+            custom_domain: String::new(),
+        };
+        if let Some(store) = &self.store {
+            store.upsert(&rec)?;
+        }
+        self.register_record(&rec, &secret);
+        Ok(())
+    }
+
+    /// 便捷:新增一个又拍云账号。密钥进钥匙串,元信息进 SQLite。
+    pub fn add_upyun_account(
+        &self,
+        id: impl Into<String>,
+        access_key: impl Into<String>,
+        secret_key: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> Result<()> {
+        let id = id.into();
+        let secret = secret_key.into();
+        self.secrets.set(&id, &secret)?;
+
+        let rec = AccountRecord {
+            id,
+            vendor: VENDOR_UPYUN.to_string(),
             access_key_id: access_key.into(),
             access_key_secret: String::new(),
             endpoint: endpoint.into(),

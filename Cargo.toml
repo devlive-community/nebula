@@ -33,6 +33,7 @@ members = [
     "crates/scaleway-object-storage",
     "crates/ucloud-us3",
     "crates/jdcloud-oss",
+    "crates/upyun-uss",
 
     # App 统一抽象 trait(可选发布)
     "crates/nebula-provider",
@@ -63,6 +64,7 @@ members = [
     "crates/providers/provider-scaleway",
     "crates/providers/provider-us3",
     "crates/providers/provider-jdcloud",
+    "crates/providers/provider-upyun",
 
     # 桌面 App 后端(独立 workspace,不纳入根)
     # "app/src-tauri",

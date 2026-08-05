@@ -128,6 +128,7 @@ dependencies = [
  "provider-r2",
  "provider-scaleway",
  "provider-tencent",
+ "provider-upyun",
  "provider-us3",
  "provider-wasabi",
  "reqwest 0.12.28",
@@ -3781,6 +3782,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "provider-upyun"
+version = "1.13.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "nebula-provider",
+ "upyun-uss",
+]
+
+[[package]]
 name = "provider-us3"
 version = "1.13.0"
 dependencies = [
@@ -5931,6 +5943,13 @@ name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
+
+[[package]]
+name = "upyun-uss"
+version = "1.13.0"
+dependencies = [
+ "s3-core",
+]
 
 [[package]]
 name = "url"

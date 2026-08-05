@@ -1,0 +1,17 @@
+[package]
+name = "upyun-uss"
+version.workspace = true
+description = "Hand-written async Rust SDK for UPYUN's S3-compatible object storage API, a thin facade over s3-core"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["upyun", "uss", "object-storage", "sigv4"]
+categories = ["api-bindings"]
+
+[dependencies]
+s3-core = { path = "../s3-core", version = "1" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+futures = { workspace = true }

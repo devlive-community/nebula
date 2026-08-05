@@ -27,6 +27,7 @@ provider-do-spaces = { path = "../providers/provider-do-spaces" }
 provider-scaleway = { path = "../providers/provider-scaleway" }
 provider-us3 = { path = "../providers/provider-us3" }
 provider-jdcloud = { path = "../providers/provider-jdcloud" }
+provider-upyun = { path = "../providers/provider-upyun" }
 bytes = { workspace = true }
 futures = { workspace = true }
 # 断点续传上传要按偏移读本地文件分片;rt 提供 spawn_blocking(图片解码放阻塞线程池)。
